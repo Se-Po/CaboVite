@@ -20,11 +20,36 @@ function culoareFateta(panta, altitudine, paleta) {
 }
 
 /**
+ * Testul punct-în-poligon, regula par-impar.
+ *
+ * Trage o rază spre est din (x, z) și numără laturile traversate: impar
+ * înseamnă înăuntru. Comparația `(a.z > z) !== (b.z > z)` tratează o latură ca
+ * închisă la un capăt și deschisă la celălalt, ceea ce face ca un punct aflat
+ * exact pe orizontala unui vârf să fie numărat o singură dată — altfel conturul
+ * ar avea găuri pe rândurile care trec fix prin vârfuri.
+ *
+ * Stă aici, lângă mesher, fiindcă asta face: decide ce celulă intră în plasă.
+ */
+export function inPoligon(x, z, puncte) {
+  let inauntru = false;
+  for (let i = 0, j = puncte.length - 1; i < puncte.length; j = i++) {
+    const a = puncte[i], b = puncte[j];
+    if ((a.z > z) !== (b.z > z) &&
+        x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x)
+      inauntru = !inauntru;
+  }
+  return inauntru;
+}
+
+/**
  * @param {{latime,inaltime,pasX,pasZ,inaltimi}} relief — de la incarcaRelief()
- * @param {{material?: THREE.Material, pastreaza?: (x: number, z: number) => boolean}} optiuni
+ * @param {{material?: THREE.Material, pastreaza?: (x: number, z: number) => boolean,
+ *          deplasare?: {x: number, z: number}}} optiuni
  *   `pastreaza` primește centrul unei celule, în metri de scenă, și decide dacă
- *   ea intră în plasă. Așa se taie terenul după poligonul selectat: celulele din
- *   afară nu se generează deloc, deci și numărul de triunghiuri scade.
+ *   ea intră în plasă. Așa capătă harta forma conturului cu care a fost extrasă
+ *   (`poligon_scena` din sidecar) și așa se taie gaura de sub petic: celulele
+ *   din afară nu se generează deloc, deci și numărul de triunghiuri scade.
+ *   `deplasare` mută întreaga grilă în scenă — vezi comentariul de la `dep`.
  */
 export function creeazaTeren(relief, optiuni = {}) {
   const { latime: w, inaltime: h, pasX, pasZ, inaltimi } = relief;
@@ -32,8 +57,15 @@ export function creeazaTeren(relief, optiuni = {}) {
   const adancimeM = (h - 1) * pasZ;
 
   // Centrăm pe origine. Rândul 0 e nordul, deci ajunge la Z negativ.
-  const X = (c) => (c - (w - 1) / 2) * pasX;
-  const Z = (r) => (r - (h - 1) / 2) * pasZ;
+  //
+  // `deplasare` mută grila față de acel centru. Îi trebuie unui petic de altă
+  // rezoluție: el își are propriul centru, iar fără decalaj ar ateriza în
+  // mijlocul scenei în loc de locul lui de pe hartă. Se calculează din diferența
+  // dintre colțurile TM06 ale celor două seturi de date, deci e exactă, nu
+  // potrivită din ochi.
+  const dep = optiuni.deplasare ?? { x: 0, z: 0 };
+  const X = (c) => (c - (w - 1) / 2) * pasX + dep.x;
+  const Z = (r) => (r - (h - 1) / 2) * pasZ + dep.z;
   const Y = (r, c) => inaltimi[r * w + c];
 
   const paleta = paletaCurenta();
@@ -131,8 +163,8 @@ export function creeazaTeren(relief, optiuni = {}) {
     /** Altitudinea (metri) în coordonate de scenă, interpolată biliniar. */
     inaltimeLa(x, z) {
       if (!viu) return 0;
-      const fc = x / pasX + (w - 1) / 2;
-      const fr = z / pasZ + (h - 1) / 2;
+      const fc = (x - dep.x) / pasX + (w - 1) / 2;
+      const fr = (z - dep.z) / pasZ + (h - 1) / 2;
       const c0 = Math.max(0, Math.min(w - 2, Math.floor(fc)));
       const r0 = Math.max(0, Math.min(h - 2, Math.floor(fr)));
       const tx = Math.min(1, Math.max(0, fc - c0));

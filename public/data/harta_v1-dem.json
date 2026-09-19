@@ -1,0 +1,90 @@
+{
+  "nume": "harta_v1",
+  "rol": "petic",
+  "baza": "harta_v0",
+  "descriere": "Petic de 1 m peste harta_v0. LiDAR DGT 2024-2025, MDT 50 cm redus prin mediere. Uint16 little-endian, rând 0 = nord.",
+  "latime": 535,
+  "inaltime": 701,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "bbox_tm06": {
+    "xMin": -94819,
+    "xMax": -94285,
+    "yMin": -137999,
+    "yMax": -137299
+  },
+  "pasX_m": 1,
+  "pasZ_m": 1,
+  "zMin_m": -8,
+  "zMax_m": 134.36,
+  "zScara": 0.002172247590594482,
+  "deplasare_scena": {
+    "x": 72,
+    "z": -250
+  },
+  "gaura_scena": {
+    "x0": -195,
+    "x1": 339,
+    "z0": -600,
+    "z1": 100
+  },
+  "poligon_geo": [
+    {
+      "lon": -9.2184,
+      "lat": 38.4265
+    },
+    {
+      "lon": -9.2128,
+      "lat": 38.4246
+    },
+    {
+      "lon": -9.2132,
+      "lat": 38.4215
+    },
+    {
+      "lon": -9.2136,
+      "lat": 38.4204
+    },
+    {
+      "lon": -9.2153,
+      "lat": 38.4203
+    },
+    {
+      "lon": -9.2186,
+      "lat": 38.4196
+    },
+    {
+      "lon": -9.2189,
+      "lat": 38.4213
+    },
+    {
+      "lon": -9.2188,
+      "lat": 38.422
+    }
+  ],
+  "acoperire": {
+    "noduri_uscat": 250755,
+    "procent_uscat": 66.9,
+    "regula_apa": "exact 0.0 m sau NODATA (-999); plaja, care are valori mici dar nenule, rămâne uscat"
+  },
+  "prelucrare": {
+    "exagerare_verticala": 1,
+    "ascutire": "niciuna",
+    "reducere": "medie pe pătrate de 1 × 1 m din date de 0.5 m, ignorând celulele de apă",
+    "cusatura": {
+      "latime_m": 4,
+      "nota": "Inelul exterior ia exact relieful bazei (harta_v0), interpolat de-a lungul muchiei comune, iar spre interior se trece lin la datele peticului. Fără asta, cele două rezoluții ar lăsa o crăpătură pe margine. Artificiu de îmbinare, nu date."
+    },
+    "aliniere": "Nodurile peticului cad peste nodurile bazei din 2 în 2; colțurile sunt noduri ale bazei."
+  },
+  "sursa": {
+    "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 50 cm",
+    "producator": "Direção-Geral do Território (DGT)",
+    "densitate": "10 puncte/m²",
+    "licenta": "CC BY 4.0",
+    "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
+    "portal": "https://cdd.dgterritorio.gov.pt/",
+    "dale": [
+      "MDT-50cm-105163-06-2024_v01.tif"
+    ]
+  }
+}

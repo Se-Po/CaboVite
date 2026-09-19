@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { creeazaRenderer, redimensioneaza } from './renderer.js';
 import { creeazaCamera, incadreazaLaAspect } from './camera.js';
 import { creeazaLumini } from './lights.js';
-import { creeazaTeren } from './terrain.js';
+import { creeazaTeren, inPoligon } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { incarcaRelief } from './loaders.js';
 import { paletaCurenta } from './palette.js';
 import { instantaneuMemorie } from './dispose.js';
-import { creeazaSelectie, inPoligon } from './selectie.js';
 
 // Orchestrarea scenei și randarea la cerere.
 //
@@ -16,13 +15,8 @@ import { creeazaSelectie, inPoligon } from './selectie.js';
 // capitol. Bucla rulează prin setAnimationLoop, dar decide de fiecare dată dacă
 // are ce desena; asta ține și amortizarea controalelor lină.
 
-/**
- * @param {HTMLCanvasElement} canvas
- * @param {{laSelectie?: (stare: object) => void}} optiuni
- *   `laSelectie` primește starea selectorului de poligon la fiecare schimbare.
- *   Scena nu știe nimic despre butoane sau DOM; interfața se leagă în main.js.
- */
-export async function porneste(canvas, { laSelectie } = {}) {
+/** @param {HTMLCanvasElement} canvas */
+export async function porneste(canvas) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -42,7 +36,14 @@ export async function porneste(canvas, { laSelectie } = {}) {
   const mare = creeazaMare(paleta);
   scena.add(mare.obiect);
 
-  const relief = await incarcaRelief();
+  const incarcat = await incarcaRelief();
+
+  // Fișierul cerut poate fi un petic de rezoluție mai mare, care își aduce baza
+  // cu el. Terenul principal rămâne baza; peticul e o a doua plasă, așezată în
+  // gaura lăsată de ea. Două plase, nu una cu densitate variabilă: o singură
+  // grilă are un singur pas, prin definiție.
+  const relief = incarcat.baza ?? incarcat;
+  const reliefPetic = incarcat.baza ? incarcat : null;
 
   // Datele extrase pentru o zonă aleasă poartă poligonul cu ele. Plasa se
   // generează numai înăuntrul lui: cutia dreptunghiulară din care e decupată
@@ -52,32 +53,30 @@ export async function porneste(canvas, { laSelectie } = {}) {
     ? poligonDate
     : null;
 
-  const masca = (puncte) => (puncte ? { pastreaza: (x, z) => inPoligon(x, z, puncte) } : {});
+  // Gaura din bază: exact dreptunghiul peticului. Marginile lui sunt noduri ale
+  // bazei, deci cele două plase se termină pe aceeași linie.
+  const g = reliefPetic?.meta?.gaura_scena;
+  const subPetic = g
+    ? (x, z) => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1
+    : null;
 
-  let teren = creeazaTeren(relief, masca(limitaDatelor));
+  // Masca bazei: înăuntrul conturului cu care a fost extrasă harta și în afara
+  // găurii. Se calculează o singură dată — nimic nu o mai schimbă după pornire.
+  const pastreaza = (limitaDatelor || subPetic)
+    ? (x, z) => (!limitaDatelor || inPoligon(x, z, limitaDatelor)) &&
+                !(subPetic && subPetic(x, z))
+    : undefined;
+
+  const teren = creeazaTeren(relief, { pastreaza });
   scena.add(teren.obiect);
+
+  const petic = reliefPetic
+    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena })
+    : null;
+  if (petic) scena.add(petic.obiect);
 
   let cerut = true;
   const cereRandare = () => { cerut = true; };
-
-  /**
-   * Reconstruiește terenul păstrând numai celulele din poligon.
-   *
-   * Remeshuire, nu ascundere. Cu `null` se revine la limita datelor — poligonul
-   * pentru care a fost extras fișierul, dacă există — nu la dreptunghiul întreg:
-   * în afara lui datele sunt apă umplută, nu relief măsurat.
-   *
-   * Terenul vechi se eliberează întâi; altfel fiecare selecție ar lăsa o
-   * geometrie pe placă, iar zece contururi ar scurge zece geometrii.
-   */
-  function aplicaMasca(puncte) {
-    const alese = puncte && puncte.length >= 3 ? puncte : limitaDatelor;
-    teren.dispose();
-    teren = creeazaTeren(relief, masca(alese));
-    scena.add(teren.obiect);
-    cereRandare();
-    return teren;
-  }
 
   // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
   // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,
@@ -113,25 +112,14 @@ export async function porneste(canvas, { laSelectie } = {}) {
     renderer.render(scena, camera);
   });
 
-  const selectie = creeazaSelectie({
-    canvas, camera, controale, scena, meta: relief.meta,
-    terenObiect: () => teren.obiect,
-    inaltimeLa: (x, z) => teren.inaltimeLa(x, z),
-    aplica: aplicaMasca,
-    // Datele extrase poartă deja un contur; „Arată tot" revine la el, nu la
-    // dreptunghiul din care a fost decupat. Panoul trebuie s-o poată spune.
-    areLimitaProprie: !!limitaDatelor,
-    laSchimbare: (stare) => laSelectie?.(stare),
-    cereRandare,
-  });
-  selectie.seteazaNrTriunghiuri(teren.nrTriunghiuri);
-  selectie.incarca(); // o selecție salvată se reaplică la reîncărcare
-
   return {
-    renderer, scena, camera, controale, relief, selectie,
-    // Terenul se înlocuiește la fiecare selecție, deci se citește prin getter:
-    // o referință prinsă la pornire ar rămâne la plasa dinainte de tăiere.
-    get teren() { return teren; },
+    renderer, scena, camera, controale, relief, teren, petic,
+    nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
+    // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
+    // nicio valoare sub gaură. Nimic nu-l cheamă acum, dar e accesorul firesc
+    // pentru așezarea unui reper pe teren, la capitolele care urmează.
+    inaltimeLa: (x, z) =>
+      (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z)),
     cereRandare,
     memorie: () => instantaneuMemorie(renderer),
     dispose() {
@@ -139,8 +127,8 @@ export async function porneste(canvas, { laSelectie } = {}) {
       controale.removeEventListener('change', cereRandare);
       globalThis.removeEventListener('resize', laResize);
       faraMiscare?.removeEventListener?.('change', aplicaMiscare);
-      selectie.dispose();
       teren.dispose();
+      petic?.dispose();
       mare.dispose();
       lumini.dispose();
       controale.dispose();

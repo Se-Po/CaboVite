@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Extrage zona selectată în pagină din dalele LiDAR ale DGT.
+// Extrage o zonă delimitată de un poligon din dalele LiDAR ale DGT.
 //
-// Poligonul vine din selectorul din pagină, în longitudine/latitudine. Aici e
+// Poligonul se scrie mai jos, în longitudine/latitudine. Aici e
 // proiectat în ETRS89 / Portugal TM06, decupat din mozaicul dalelor și scris ca
 // heightmap, împreună cu poligonul în coordonate de scenă — ca plasa să se
 // genereze numai înăuntrul lui, nu pe toată cutia dreptunghiulară.
@@ -24,8 +24,8 @@ const IESIRE = 'public/data';
 const NODATA = -999;
 const REZ_SURSA = 2;
 
-// Poligonul desenat în pagină, longitudine latitudine. Îl schimbi de aici când
-// alegi altă zonă — panoul „Coordonate" îl dă exact în forma asta.
+// Conturul zonei, longitudine latitudine. Singurul loc din care se schimbă
+// zona extrasă. Vârfurile se dau în ordine, conturul se închide singur.
 const POLIGON_GEO = [
   [-9.2202, 38.4345],
   [-9.2034, 38.4256],
@@ -99,7 +99,7 @@ function dinTM06(x, y) {
   return { lon: +((lon * 180) / Math.PI).toFixed(6), lat: +((lat * 180) / Math.PI).toFixed(6) };
 }
 
-/** Regula par-impar, aceeași ca în src/scene/selectie.js. */
+/** Regula par-impar, aceeași ca inPoligon() din src/scene/terrain.js. */
 function inPoligon(x, y, p) {
   let inauntru = false;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++)

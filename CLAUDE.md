@@ -75,16 +75,25 @@ nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`
 
 | hartă | sursă | acoperire |
 |---|---|---|
+| `harta_v1` | LiDAR DGT, MDT 50 cm mediat | petic de 534 × 700 m la 1 m, peste `harta_v0` |
 | `harta_v0` | LiDAR DGT 2024-2025, MDT 2 m | conturul ales în pagină, 4,00 km², 2 m |
 | `espichel-dem` | Copernicus DEM GLO-30 | promontoriul întreg, 4,12 × 3,93 km, ~30 m |
 | `lagosteiros-dem` | LiDAR DGT, MDT 2 m | golful Lagosteiros, 1,5 × 1,1 km, 2 m |
 
-Pagina încarcă una singură, aleasă în `src/scene/loaders.js`. Datele-sursă
+O hartă poate avea cheia `baza`: atunci e un **petic** de rezoluție mai mare,
+iar `incarcaRelief()` încarcă și baza. Scena generează două plase — baza, cu o
+gaură exact sub petic, și peticul deasupra. Nodurile peticului cad peste ale
+bazei din doi în doi, iar inelul lui exterior ia relieful bazei, așa că muchia
+comună e aceeași linie și nu rămâne nicio crăpătură.
+
+Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loaders.js`. Datele-sursă
 (`date-sursa/`) nu intră în depozit; hărțile produse, da — altfel pagina nu se
 poate încărca dintr-o clonă curată.
 
-Zona se alege cu selectorul de poligon din pagină, iar panoul „Coordonate" dă
-conturul exact în forma constantei `POLIGON_GEO` din `scripts/build-zona.mjs`.
+Conturul unei hărți se scrie ca longitudine/latitudine în constanta
+`POLIGON_GEO` din capul lui `scripts/build-zona.mjs` (sau `build-petic.mjs`),
+iar scriptul îl proiectează în TM06 și decupează după el. Pagina doar îl citește
+din sidecar — nu mai există unealtă de desenat contururi în ea.
 
 ## Principii de design (nenegociabile)
 
