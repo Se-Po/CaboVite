@@ -1,0 +1,88 @@
+{
+  "descriere": "Relief Cabo Espichel, din Copernicus DEM GLO-30. Uint16 little-endian, rând 0 = nord.",
+  "latime": 170,
+  "inaltime": 127,
+  "bbox": {
+    "nord": 38.44,
+    "sud": 38.405,
+    "vest": -9.232,
+    "est": -9.185
+  },
+  "pasX_m": 24.226,
+  "pasZ_m": 30.922,
+  "zMin_m": -6,
+  "zMax_m": 161.69,
+  "zScara": 0.002558809866701119,
+  "brut": {
+    "zMin_m": 0,
+    "zMax_m": 162.85
+  },
+  "acoperire": {
+    "margini_uscat": {
+      "nord": 90,
+      "sud": 0,
+      "vest": 0,
+      "est": 75
+    },
+    "distanta_uscat_la_margine_celule": {
+      "nord": 0,
+      "sud": 16,
+      "vest": 35,
+      "est": 0
+    },
+    "nota": "Numărul de celule de uscat care ating fiecare latură. Zero = țărm real; altceva = fereastra taie promontoriul."
+  },
+  "prelucrare": {
+    "ascutire": {
+      "algoritm": "laplacian cu poartă pe relief, limitat la intervalul vecinilor",
+      "lambda": 0.35,
+      "iteratii": 3,
+      "prag_m": [
+        8,
+        20
+      ]
+    },
+    "exagerare_verticala": 1,
+    "apa_coborata_la_m": -6,
+    "margini_atenuate": {
+      "latime_celule": 6,
+      "latime_m": [
+        145,
+        186
+      ],
+      "nota": "Marginile tăiate de fereastră coboară lin la nivelul apei, ca marginea unei machete. Artificiu de prezentare, nu date."
+    },
+    "nota": "Ascuțirea mută tranziția pe orizontală în limitele eșantionării de 30 m; nu introduce altitudini noi. Coborârea apei e un artificiu de randare — GLO-30 nu conține batimetrie."
+  },
+  "masca_umplere": {
+    "histograma": {
+      "1": 10331,
+      "2": 10635,
+      "3": 143,
+      "5": 481
+    },
+    "legenda": {
+      "0": "gol (fără date)",
+      "1": "editat",
+      "2": "nemodificat (TanDEM-X brut)",
+      "3": "umplut: ASTER",
+      "4": "umplut: SRTM90",
+      "5": "umplut: SRTM30",
+      "6": "umplut: GMTED2010",
+      "7": "umplut: SRTM30plus",
+      "8": "umplut: TerraSAR-X radargrametric",
+      "9": "umplut: AW3D30",
+      "100": "umplut: Norway DEM",
+      "101": "umplut: DSM05 Spania",
+      "102": "umplut: Norway DEM v2"
+    },
+    "sursa_legenda": "Copernicus DEM Product Handbook v5.0 (29.11.2022), cap. 1.2.5.2, Tabelul 7",
+    "nota": "Valorile 3 și 5 NU sunt măsurători TanDEM-X, ci umpleri de goluri din ASTER, respectiv SRTM30 — surse mai grosiere. La Cabo Espichel ele se grupează pe muchia falezei. Gruparea e consistentă cu umbra radar pe pante abrupte, dar manualul nu afirmă asta. <!-- NEVERIFICAT: cauza golurilor -->"
+  },
+  "atributie": {
+    "obligatorie": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "neraspundere": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30",
+    "licenta": "https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf"
+  },
+  "sursa": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W010_00_DEM/Copernicus_DSM_COG_10_N38_00_W010_00_DEM.tif"
+}

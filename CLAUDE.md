@@ -67,6 +67,25 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
 - Versiunea se schimbă o dată la fiecare push, cu etichetă `v0.0.N`. Fiecare
   commit are un număr `0.0.N.xx`, scris ca prefix în subiect.
 
+## Hărțile de relief
+
+Hărțile se numesc `harta_vN` și trăiesc în `public/data/<nume>-dem.bin` +
+`.json`. O hartă nouă — alt contur sau altă rezoluție — primește un nume nou;
+nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`.
+
+| hartă | sursă | acoperire |
+|---|---|---|
+| `harta_v0` | LiDAR DGT 2024-2025, MDT 2 m | conturul ales în pagină, 4,00 km², 2 m |
+| `espichel-dem` | Copernicus DEM GLO-30 | promontoriul întreg, 4,12 × 3,93 km, ~30 m |
+| `lagosteiros-dem` | LiDAR DGT, MDT 2 m | golful Lagosteiros, 1,5 × 1,1 km, 2 m |
+
+Pagina încarcă una singură, aleasă în `src/scene/loaders.js`. Datele-sursă
+(`date-sursa/`) nu intră în depozit; hărțile produse, da — altfel pagina nu se
+poate încărca dintr-o clonă curată.
+
+Zona se alege cu selectorul de poligon din pagină, iar panoul „Coordonate" dă
+conturul exact în forma constantei `POLIGON_GEO` din `scripts/build-zona.mjs`.
+
 ## Principii de design (nenegociabile)
 
 - **Accesibilitate:** fonturi mari, contrast ridicat. Cititorii pot fi vârstnici.

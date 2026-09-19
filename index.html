@@ -8,6 +8,39 @@
   </head>
   <body>
     <canvas id="scena"></canvas>
+
+    <!-- Unealta de lucru: alegi pe hartă ce porțiune rămâne randată.
+         Rămâne ascunsă dacă scena 3D nu pornește — fără scenă n-ai ce selecta. -->
+    <aside id="unelte" hidden>
+      <div class="cap">
+        <h2>Zona randată</h2>
+        <!-- Panoul stă peste colțul hărții pe care s-ar putea să vrei să dai
+             clic, deci trebuie să poată fi dat la o parte fără să dispară. -->
+        <button id="sel-restrange" type="button" aria-expanded="true" aria-controls="sel-corp">
+          Restrânge
+        </button>
+      </div>
+      <p id="sel-stare" role="status" aria-live="polite">Harta întreagă.</p>
+      <div id="sel-corp">
+        <div class="butoane">
+          <button id="sel-deseneaza" type="button" aria-pressed="false">Desenează zona</button>
+          <button id="sel-inchide" type="button" disabled>Închide conturul</button>
+          <button id="sel-sus" type="button">Vedere de sus</button>
+          <button id="sel-sterge" type="button">Arată tot</button>
+        </div>
+        <p class="ajutor">
+          Clic pe hartă pune un punct. Trage ca să rotești. Închizi conturul cu
+          <kbd>Enter</kbd> sau cu un clic pe primul punct; <kbd>Backspace</kbd>
+          șterge ultimul punct, <kbd>Esc</kbd> iese din desen.
+        </p>
+        <details id="sel-coordonate">
+          <summary>Coordonate</summary>
+          <pre id="sel-text">—</pre>
+          <button id="sel-copiaza" type="button">Copiază</button>
+        </details>
+      </div>
+    </aside>
+
     <main id="continut"></main>
     <script type="module" src="/src/main.js"></script>
   </body>

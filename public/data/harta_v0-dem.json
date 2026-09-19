@@ -1,0 +1,106 @@
+{
+  "nume": "harta_v0",
+  "descriere": "Zona selectată la Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m, redus la 2 m. Uint16 little-endian, rând 0 = nord.",
+  "latime": 1164,
+  "inaltime": 1493,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "bbox_tm06": {
+    "xMin": -95788,
+    "xMax": -93460,
+    "yMin": -139392,
+    "yMax": -136406
+  },
+  "pasX_m": 2,
+  "pasZ_m": 2,
+  "colturi_geo": {
+    "nv": {
+      "lon": -9.230173,
+      "lat": 38.434423
+    },
+    "ne": {
+      "lon": -9.203514,
+      "lat": 38.434669
+    },
+    "sv": {
+      "lon": -9.229766,
+      "lat": 38.407528
+    },
+    "se": {
+      "lon": -9.203117,
+      "lat": 38.407774
+    }
+  },
+  "zMin_m": -8,
+  "zMax_m": 143.64,
+  "zScara": 0.002313937443821765,
+  "poligon_scena": [
+    {
+      "x": -293.14,
+      "z": -1491.28
+    },
+    {
+      "x": 1162.29,
+      "z": -486.13
+    },
+    {
+      "x": 379.3,
+      "z": 1492.08
+    },
+    {
+      "x": -1162.4,
+      "z": 1107.51
+    }
+  ],
+  "poligon_geo": [
+    {
+      "lon": -9.2202,
+      "lat": 38.4345
+    },
+    {
+      "lon": -9.2034,
+      "lat": 38.4256
+    },
+    {
+      "lon": -9.2121,
+      "lat": 38.4077
+    },
+    {
+      "lon": -9.2298,
+      "lat": 38.411
+    }
+  ],
+  "acoperire": {
+    "celule_in_poligon": 1000887,
+    "uscat_masurat_in_poligon": 492056,
+    "uscat_masurat_in_cutie": 773369,
+    "regula_apa": "exact 0.0 m sau NODATA (-999); plaja, care are valori mici dar nenule, rămâne uscat",
+    "nota_colt_fara_dala": "Colțul de nord-vest al cutiei iese din acoperirea LiDAR (dala MDT-2m-104164 nu există). Verificat pe Copernicus GLO-30: acolo e mare, nu uscat — deci nu lipsește relief."
+  },
+  "prelucrare": {
+    "exagerare_verticala": 1,
+    "ascutire": "niciuna",
+    "reducere": "niciuna — rezoluția nativă de 2 m",
+    "nota": "La 2 m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la -8 m — artificiu de randare, nu batimetrie."
+  },
+  "sursa": {
+    "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 2 m",
+    "producator": "Direção-Geral do Território (DGT)",
+    "densitate": "10 puncte/m²",
+    "licenta": "CC BY 4.0",
+    "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
+    "portal": "https://cdd.dgterritorio.gov.pt/",
+    "dale": [
+      "MDT-2m-104161-06-2024_v01.tif",
+      "MDT-2m-104162-06-2024_v01.tif",
+      "MDT-2m-104163-06-2024_v01.tif",
+      "MDT-2m-105161-06-2024_v01.tif",
+      "MDT-2m-105162-06-2024_v01.tif",
+      "MDT-2m-105163-06-2024_v01.tif",
+      "MDT-2m-105164-06-2024_v01.tif",
+      "MDT-2m-106161-06-2024_v01.tif",
+      "MDT-2m-106162-06-2024_v01.tif",
+      "MDT-2m-106163-06-2024_v01.tif",
+      "MDT-2m-106164-06-2024_v01.tif"
+    ]
+  }
+}

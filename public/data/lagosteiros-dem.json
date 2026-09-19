@@ -1,0 +1,59 @@
+{
+  "descriere": "Golful Lagosteiros, Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m. Uint16 little-endian, rând 0 = nord.",
+  "latime": 750,
+  "inaltime": 550,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "bbox_tm06": {
+    "xMin": -95600,
+    "xMax": -94100,
+    "yMin": -139300,
+    "yMax": -138200
+  },
+  "pasX_m": 2,
+  "pasZ_m": 2,
+  "zMin_m": -8,
+  "zMax_m": 140.2,
+  "zScara": 0.0022614514935959795,
+  "acoperire": {
+    "uscat_masurat": 144593,
+    "apa_sau_fara_date": 267907,
+    "regula_apa": "exact 0.0 m sau NODATA (-999); plaja, care are valori mici dar nenule, rămâne uscat",
+    "margini_uscat": {
+      "nord": 309,
+      "sud": 0,
+      "vest": 0,
+      "est": 372
+    },
+    "procent_masurat": 35.1
+  },
+  "prelucrare": {
+    "exagerare_verticala": 1,
+    "ascutire": "niciuna",
+    "margini_atenuate": {
+      "latime_m": 60,
+      "nota": "Marginile tăiate de fereastră coboară lin la nivelul apei, ca marginea unei machete. Artificiu de prezentare, nu date."
+    },
+    "nota": "La 2 m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la -8 m — artificiu de randare, nu batimetrie."
+  },
+  "sursa": {
+    "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 2 m",
+    "producator": "Direção-Geral do Território (DGT)",
+    "densitate": "10 puncte/m²",
+    "licenta": "CC BY 4.0",
+    "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
+    "portal": "https://cdd.dgterritorio.gov.pt/",
+    "dale": [
+      "MDT-2m-104161-06-2024_v01.tif",
+      "MDT-2m-104162-06-2024_v01.tif",
+      "MDT-2m-104163-06-2024_v01.tif",
+      "MDT-2m-105161-06-2024_v01.tif",
+      "MDT-2m-105162-06-2024_v01.tif",
+      "MDT-2m-105163-06-2024_v01.tif",
+      "MDT-2m-105164-06-2024_v01.tif",
+      "MDT-2m-106161-06-2024_v01.tif",
+      "MDT-2m-106162-06-2024_v01.tif",
+      "MDT-2m-106163-06-2024_v01.tif",
+      "MDT-2m-106164-06-2024_v01.tif"
+    ]
+  }
+}
