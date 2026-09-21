@@ -11,12 +11,17 @@
     "fetch-dem": "node scripts/fetch-dem.mjs",
     "build-lagosteiros": "node scripts/build-lagosteiros.mjs",
     "build-zona": "node scripts/build-zona.mjs",
-    "build-petic": "node scripts/build-petic.mjs"
+    "build-petic": "node scripts/build-petic.mjs",
+    "citeste-poze": "node scripts/citeste-poze.mjs",
+    "culori-poze": "node scripts/culori-poze.mjs",
+    "paleta": "node scripts/paleta.mjs",
+    "ortofoto": "node scripts/ortofoto.mjs"
   },
   "dependencies": {
     "three": "0.186.0"
   },
   "devDependencies": {
+    "jpeg-js": "^0.4.4",
     "vite": "^8.0.0"
   }
 }

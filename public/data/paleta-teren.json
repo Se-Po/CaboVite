@@ -1,0 +1,281 @@
+{
+ "generat": "2026-09-21T19:38:37.837Z",
+ "sursa": {
+  "nume": "Fotografii proprii, Cabo Espichel",
+  "aparat": "Google Pixel 8 Pro",
+  "poze": 30,
+  "data": "2026-08-02, 11:48–13:31 ora locală",
+  "nota": "O singură sesiune de fotografiat, deci o singură lumină — de aceea nu s-a mai făcut corecție de alb între poze."
+ },
+ "repere": {
+  "#d2bea8": "poteca",
+  "#94b5e4": "cer",
+  "#585a5a": "calcar",
+  "#767067": "calcar",
+  "#343a3c": "tufaris",
+  "#93877d": "vegetatie_uscata",
+  "#c0cee5": "cer",
+  "#638ac1": "mare",
+  "#486c9f": "mare",
+  "#759cd5": "cer",
+  "#a89f99": "calcar",
+  "#3a4f65": "mare"
+ },
+ "metoda": {
+  "spatiu": "OKLab",
+  "albedo": "cuantila 0.8 a luminozității, ca să prindă materialul în soare, nu la umbră",
+  "nuanta": "media ponderată a peticelor peste mediana luminozității; umbra e albastră de la cer și ar falsifica nuanța",
+  "atribuire": "fiecare petic ia eticheta reperului celui mai apropiat în OKLab",
+  "avertisment": "croma sub 0.02 = nuanța nu e de încredere, materialul e practic neutru"
+ },
+ "materiale": {
+  "cer": {
+   "culoare": "#b7cff1",
+   "rgb": [
+    183,
+    207,
+    241
+   ],
+   "sursa": "fotografii",
+   "de_ce": "numai din fotografii — ortofotoul n-are clasă pentru el",
+   "fotografii": {
+    "culoare": "#b7cff1",
+    "rgb": [
+     183,
+     207,
+     241
+    ],
+    "croma": 0.0546
+   },
+   "ortofoto": null,
+   "rol": "fundal",
+   "oklab": {
+    "L": 0.8473,
+    "a": -0.0111,
+    "b": -0.0534
+   },
+   "masurat": {
+    "L_minim": 0.663,
+    "L_median": 0.768,
+    "L_lumina": 0.847,
+    "croma": 0.0546,
+    "nuanta_de_incredere": true
+   },
+   "pondere": 0.2671,
+   "poze": 24,
+   "petice": 41
+  },
+  "calcar": {
+   "culoare": "#9d958c",
+   "rgb": [
+    157,
+    149,
+    140
+   ],
+   "sursa": "fotografii",
+   "de_ce": "măsurat de la sol: e fie sub picioare, fie o suprafață prea dreaptă ca privirea de sus s-o vadă",
+   "fotografii": {
+    "culoare": "#9d958c",
+    "rgb": [
+     157,
+     149,
+     140
+    ],
+    "croma": 0.0159
+   },
+   "ortofoto": {
+    "culoare": "#a6a8a2",
+    "rgb": [
+     166,
+     168,
+     162
+    ],
+    "croma": 0.0078
+   },
+   "rol": "teren",
+   "oklab": {
+    "L": 0.6736,
+    "a": 0.0054,
+    "b": 0.0149
+   },
+   "masurat": {
+    "L_minim": 0.419,
+    "L_median": 0.498,
+    "L_lumina": 0.674,
+    "croma": 0.0159,
+    "nuanta_de_incredere": false
+   },
+   "pondere": 0.2272,
+   "poze": 29,
+   "petice": 49
+  },
+  "mare": {
+   "culoare": "#668dc6",
+   "rgb": [
+    102,
+    141,
+    198
+   ],
+   "sursa": "fotografii",
+   "de_ce": "numai din fotografii — ortofotoul n-are clasă pentru el",
+   "fotografii": {
+    "culoare": "#668dc6",
+    "rgb": [
+     102,
+     141,
+     198
+    ],
+    "croma": 0.0963
+   },
+   "ortofoto": null,
+   "rol": "fundal",
+   "oklab": {
+    "L": 0.6389,
+    "a": -0.0203,
+    "b": -0.0941
+   },
+   "masurat": {
+    "L_minim": 0.395,
+    "L_median": 0.541,
+    "L_lumina": 0.639,
+    "croma": 0.0963,
+    "nuanta_de_incredere": true
+   },
+   "pondere": 0.155,
+   "poze": 19,
+   "petice": 27
+  },
+  "poteca": {
+   "culoare": "#dbc8b0",
+   "rgb": [
+    219,
+    200,
+    176
+   ],
+   "sursa": "fotografii",
+   "de_ce": "măsurat de la sol: e fie sub picioare, fie o suprafață prea dreaptă ca privirea de sus s-o vadă",
+   "fotografii": {
+    "culoare": "#dbc8b0",
+    "rgb": [
+     219,
+     200,
+     176
+    ],
+    "croma": 0.0387
+   },
+   "ortofoto": {
+    "culoare": "#bcafa0",
+    "rgb": [
+     188,
+     175,
+     160
+    ],
+    "croma": 0.0259
+   },
+   "rol": "teren",
+   "oklab": {
+    "L": 0.8417,
+    "a": 0.012,
+    "b": 0.0368
+   },
+   "masurat": {
+    "L_minim": 0.771,
+    "L_median": 0.822,
+    "L_lumina": 0.842,
+    "croma": 0.0387,
+    "nuanta_de_incredere": true
+   },
+   "pondere": 0.1419,
+   "poze": 20,
+   "petice": 21
+  },
+  "vegetatie_uscata": {
+   "culoare": "#717b76",
+   "rgb": [
+    113,
+    123,
+    118
+   ],
+   "sursa": "ortofoto",
+   "de_ce": "măsurat de sus: materialul e departe în fotografii, iar aerul dintre îi spală culoarea",
+   "fotografii": {
+    "culoare": "#908781",
+    "rgb": [
+     144,
+     135,
+     129
+    ],
+    "croma": 0.0143
+   },
+   "ortofoto": {
+    "culoare": "#717b76",
+    "rgb": [
+     113,
+     123,
+     118
+    ],
+    "croma": 0.0145
+   },
+   "rol": "teren",
+   "oklab": {
+    "L": 0.6299,
+    "a": 0.0069,
+    "b": 0.0126
+   },
+   "masurat": {
+    "L_minim": 0.591,
+    "L_median": 0.605,
+    "L_lumina": 0.63,
+    "croma": 0.0143,
+    "nuanta_de_incredere": false
+   },
+   "pondere": 0.1106,
+   "poze": 17,
+   "petice": 17
+  },
+  "tufaris": {
+   "culoare": "#516868",
+   "rgb": [
+    81,
+    104,
+    104
+   ],
+   "sursa": "ortofoto",
+   "de_ce": "măsurat de sus: materialul e departe în fotografii, iar aerul dintre îi spală culoarea",
+   "fotografii": {
+    "culoare": "#3b4447",
+    "rgb": [
+     59,
+     68,
+     71
+    ],
+    "croma": 0.0123
+   },
+   "ortofoto": {
+    "culoare": "#516868",
+    "rgb": [
+     81,
+     104,
+     104
+    ],
+    "croma": 0.0272
+   },
+   "rol": "teren",
+   "oklab": {
+    "L": 0.3791,
+    "a": -0.009,
+    "b": -0.0084
+   },
+   "masurat": {
+    "L_minim": 0.279,
+    "L_median": 0.368,
+    "L_lumina": 0.379,
+    "croma": 0.0123,
+    "nuanta_de_incredere": false
+   },
+   "pondere": 0.0983,
+   "poze": 25,
+   "petice": 25
+  }
+ }
+}
