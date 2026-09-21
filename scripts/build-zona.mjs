@@ -13,6 +13,8 @@
 //          npm run build-zona -- 4     (mediere pe blocuri 2 × 2)
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { laTM06, dinTM06, inPoligon, arie } from './comun/tm06.mjs';
+import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
 // Numele hărții produse. Hărțile proiectului sunt numerotate harta_vN: o
 // hartă nouă înseamnă alt contur sau altă rezoluție, deci alt nume, nu un
@@ -33,6 +35,16 @@ const POLIGON_GEO = [
   [-9.2298, 38.4110],
 ];
 
+// Banda de altitudine, metri deasupra nivelului mării. `null` înseamnă toată.
+//
+// Nu se aplică DATELOR: fișierul rămâne un DEM întreg, iar banda ajunge în
+// sidecar, de unde pagina o folosește ca să nu genereze plasa în afara ei. Așa e
+// reversibilă — schimbi banda fără să reconstruiești harta — și harta rămâne
+// validă pentru orice alt folos, nu doar pentru felia asta.
+//
+// Ambele constante se pot copia din panoul selectorului 3D din pagină.
+const BANDA_ALTITUDINE = null; // sau { min: 120, max: 140 }
+
 // Marea, în aceste date, NU e NODATA: LiDAR-ul o dă ca 0.0 m exact. Lăsată așa,
 // ar fi coplanară cu planul mării al scenei și ar produce z-fighting pe sute de
 // metri. O coborâm, ca linia țărmului să fie intersecția onestă a terenului cu
@@ -44,128 +56,6 @@ const pas = Number(process.argv[2]) || REZ_SURSA;
 if (pas % REZ_SURSA !== 0) throw new Error(`pasul trebuie să fie multiplu de ${REZ_SURSA} m`);
 const FACTOR = pas / REZ_SURSA;
 
-// --------------------------------------------------- ETRS89 / PT-TM06 (3763)
-//
-// Mercator transversal pe GRS80, fără deplasări false. Formulele complete, nu
-// aproximarea „grade × metri pe grad": la 95 km de meridianul central aceea
-// greșește cu zeci de metri, adică zeci de celule la rezoluția asta.
-const A = 6378137, F = 1 / 298.257222101;
-const E2 = F * (2 - F), EP2 = E2 / (1 - E2);
-const LAT0 = (39.6682583333333 * Math.PI) / 180;
-const LON0 = (-8.13310833333333 * Math.PI) / 180;
-
-const arcMeridian = (lat) =>
-  A * ((1 - E2 / 4 - (3 * E2 ** 2) / 64 - (5 * E2 ** 3) / 256) * lat
-     - ((3 * E2) / 8 + (3 * E2 ** 2) / 32 + (45 * E2 ** 3) / 1024) * Math.sin(2 * lat)
-     + ((15 * E2 ** 2) / 256 + (45 * E2 ** 3) / 1024) * Math.sin(4 * lat)
-     - ((35 * E2 ** 3) / 3072) * Math.sin(6 * lat));
-const M0 = arcMeridian(LAT0);
-
-function laTM06(lonGrade, latGrade) {
-  const lat = (latGrade * Math.PI) / 180, lon = (lonGrade * Math.PI) / 180;
-  const N = A / Math.sqrt(1 - E2 * Math.sin(lat) ** 2);
-  const T = Math.tan(lat) ** 2;
-  const C = EP2 * Math.cos(lat) ** 2;
-  const a = (lon - LON0) * Math.cos(lat);
-  return {
-    x: N * (a + ((1 - T + C) * a ** 3) / 6
-          + ((5 - 18 * T + T ** 2 + 72 * C - 58 * EP2) * a ** 5) / 120),
-    y: arcMeridian(lat) - M0 + N * Math.tan(lat) * (a ** 2 / 2
-          + ((5 - T + 9 * C + 4 * C ** 2) * a ** 4) / 24
-          + ((61 - 58 * T + T ** 2 + 600 * C - 330 * EP2) * a ** 6) / 720),
-  };
-}
-
-/** Inversa: TM06 → longitudine/latitudine, ca sidecar-ul să poarte colțurile. */
-function dinTM06(x, y) {
-  const mu = (y + M0) / (A * (1 - E2 / 4 - (3 * E2 ** 2) / 64 - (5 * E2 ** 3) / 256));
-  const e1 = (1 - Math.sqrt(1 - E2)) / (1 + Math.sqrt(1 - E2));
-  const lat1 = mu
-    + ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu)
-    + ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu)
-    + ((151 * e1 ** 3) / 96) * Math.sin(6 * mu)
-    + ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
-  const C1 = EP2 * Math.cos(lat1) ** 2;
-  const T1 = Math.tan(lat1) ** 2;
-  const s = 1 - E2 * Math.sin(lat1) ** 2;
-  const N1 = A / Math.sqrt(s);
-  const R1 = (A * (1 - E2)) / s ** 1.5;
-  const D = x / N1;
-  const lat = lat1 - ((N1 * Math.tan(lat1)) / R1) * (D ** 2 / 2
-    - ((5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * EP2) * D ** 4) / 24
-    + ((61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * EP2 - 3 * C1 ** 2) * D ** 6) / 720);
-  const lon = LON0 + (D - ((1 + 2 * T1 + C1) * D ** 3) / 6
-    + ((5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * EP2 + 24 * T1 ** 2) * D ** 5) / 120) / Math.cos(lat1);
-  return { lon: +((lon * 180) / Math.PI).toFixed(6), lat: +((lat * 180) / Math.PI).toFixed(6) };
-}
-
-/** Regula par-impar, aceeași ca inPoligon() din src/scene/terrain.js. */
-function inPoligon(x, y, p) {
-  let inauntru = false;
-  for (let i = 0, j = p.length - 1; i < p.length; j = i++)
-    if ((p[i].y > y) !== (p[j].y > y) &&
-        x < ((p[j].x - p[i].x) * (y - p[i].y)) / (p[j].y - p[i].y) + p[i].x)
-      inauntru = !inauntru;
-  return inauntru;
-}
-
-const arie = (p) => {
-  let s = 0;
-  for (let i = 0, j = p.length - 1; i < p.length; j = i++)
-    s += (p[j].x + p[i].x) * (p[j].y - p[i].y);
-  return Math.abs(s / 2);
-};
-
-// ------------------------------------------------------------------ GeoTIFF
-
-/** Citește antetul unui TIFF little-endian și întoarce ce ne trebuie. */
-function citesteTiff(cale) {
-  const buf = readFileSync(cale);
-  if (buf.readUInt16LE(0) !== 0x4949) throw new Error(`${cale}: nu e TIFF little-endian`);
-  const off = buf.readUInt32LE(4);
-  const n = buf.readUInt16LE(off);
-  const t = new Map();
-  for (let i = 0; i < n; i++) {
-    const b = off + 2 + i * 12;
-    t.set(buf.readUInt16LE(b), { tip: buf.readUInt16LE(b + 2), nr: buf.readUInt32LE(b + 4), val: buf.readUInt32LE(b + 8) });
-  }
-  const scalar = (tag) => { const e = t.get(tag); return e && (e.tip === 3 ? e.val & 0xffff : e.val); };
-  const lung = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    if (e.nr === 1) return [e.val];
-    const out = [];
-    for (let i = 0; i < e.nr; i++)
-      out.push(e.tip === 4 ? buf.readUInt32LE(e.val + i * 4) : buf.readUInt16LE(e.val + i * 2));
-    return out;
-  };
-  const dubluri = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    const out = [];
-    for (let i = 0; i < e.nr; i++) out.push(buf.readDoubleLE(e.val + i * 8));
-    return out;
-  };
-
-  const compresie = scalar(259) ?? 1;
-  if (compresie !== 1) throw new Error(`${cale}: compresie ${compresie}, aștept necomprimat`);
-  const ps = dubluri(33550), tp = dubluri(33922);
-  return {
-    buf,
-    latime: scalar(256), inaltime: scalar(257), rezolutie: ps[0],
-    x0: tp[3], y0: tp[4], // TiePoint dă colțul stânga-sus; în TM06 Y crește spre nord
-    randuriPeStrip: scalar(278), stripOffsets: lung(273),
-  };
-}
-
-/** Un rând de float32 dintr-un TIFF necomprimat cu strip-uri. */
-function randTiff(t, r) {
-  const strip = Math.floor(r / t.randuriPeStrip);
-  const start = t.stripOffsets[strip] + (r - strip * t.randuriPeStrip) * t.latime * 4;
-  const out = new Float32Array(t.latime);
-  for (let i = 0; i < t.latime; i++) out[i] = t.buf.readFloatLE(start + i * 4);
-  return out;
-}
 
 // --------------------------------------------------------------------- main
 
@@ -190,7 +80,7 @@ const main = () => {
 
   const fisiere = readdirSync(DIR).filter((f) => f.toLowerCase().endsWith('.tif'));
   if (!fisiere.length) throw new Error(`niciun .tif în ${DIR}`);
-  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiff(join(DIR, f)) }));
+  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
   if (dale.some((d) => d.rezolutie !== REZ_SURSA)) throw new Error('dale cu altă rezoluție decât 2 m');
 
   const folosite = [];
@@ -295,6 +185,7 @@ const main = () => {
     // dreptunghiulară ar avea de 1,7 ori mai multe celule, mai toate apă.
     poligon_scena: poligonScena,
     poligon_geo: POLIGON_GEO.map(([lon, lat]) => ({ lon, lat })),
+    ...(BANDA_ALTITUDINE ? { banda_altitudine: BANDA_ALTITUDINE } : {}),
     acoperire: {
       celule_in_poligon: inPolig,
       uscat_masurat_in_poligon: uscatInPolig,

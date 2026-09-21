@@ -9,6 +9,8 @@
 //          npm run build-petic -- 0.5   (rezoluția nativă)
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { laTM06 } from './comun/tm06.mjs';
+import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
 const NUME = 'harta_v1';
 const BAZA = 'harta_v0';
@@ -43,88 +45,6 @@ const pas = Number(process.argv[2]) || 1;
 if (Math.round(pas / REZ_SURSA) * REZ_SURSA !== pas || pas < REZ_SURSA)
   throw new Error(`pasul trebuie să fie multiplu de ${REZ_SURSA} m`);
 
-// --------------------------------------------------- ETRS89 / PT-TM06 (3763)
-const A = 6378137, F = 1 / 298.257222101;
-const E2 = F * (2 - F), EP2 = E2 / (1 - E2);
-const LAT0 = (39.6682583333333 * Math.PI) / 180;
-const LON0 = (-8.13310833333333 * Math.PI) / 180;
-
-const arcMeridian = (lat) =>
-  A * ((1 - E2 / 4 - (3 * E2 ** 2) / 64 - (5 * E2 ** 3) / 256) * lat
-     - ((3 * E2) / 8 + (3 * E2 ** 2) / 32 + (45 * E2 ** 3) / 1024) * Math.sin(2 * lat)
-     + ((15 * E2 ** 2) / 256 + (45 * E2 ** 3) / 1024) * Math.sin(4 * lat)
-     - ((35 * E2 ** 3) / 3072) * Math.sin(6 * lat));
-const M0 = arcMeridian(LAT0);
-
-function laTM06(lonGrade, latGrade) {
-  const lat = (latGrade * Math.PI) / 180, lon = (lonGrade * Math.PI) / 180;
-  const N = A / Math.sqrt(1 - E2 * Math.sin(lat) ** 2);
-  const T = Math.tan(lat) ** 2;
-  const C = EP2 * Math.cos(lat) ** 2;
-  const a = (lon - LON0) * Math.cos(lat);
-  return {
-    x: N * (a + ((1 - T + C) * a ** 3) / 6
-          + ((5 - 18 * T + T ** 2 + 72 * C - 58 * EP2) * a ** 5) / 120),
-    y: arcMeridian(lat) - M0 + N * Math.tan(lat) * (a ** 2 / 2
-          + ((5 - T + 9 * C + 4 * C ** 2) * a ** 4) / 24
-          + ((61 - 58 * T + T ** 2 + 600 * C - 330 * EP2) * a ** 6) / 720),
-  };
-}
-
-// ------------------------------------------------------------------ GeoTIFF
-
-/** Citește antetul unui TIFF little-endian și întoarce ce ne trebuie. */
-function citesteTiff(cale) {
-  const buf = readFileSync(cale);
-  if (buf.readUInt16LE(0) !== 0x4949) throw new Error(`${cale}: nu e TIFF little-endian`);
-  const off = buf.readUInt32LE(4);
-  const n = buf.readUInt16LE(off);
-  const t = new Map();
-  for (let i = 0; i < n; i++) {
-    const b = off + 2 + i * 12;
-    t.set(buf.readUInt16LE(b), { tip: buf.readUInt16LE(b + 2), nr: buf.readUInt32LE(b + 4), val: buf.readUInt32LE(b + 8) });
-  }
-  const scalar = (tag) => { const e = t.get(tag); return e && (e.tip === 3 ? e.val & 0xffff : e.val); };
-  const lung = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    if (e.nr === 1) return [e.val];
-    const out = [];
-    for (let i = 0; i < e.nr; i++)
-      out.push(e.tip === 4 ? buf.readUInt32LE(e.val + i * 4) : buf.readUInt16LE(e.val + i * 2));
-    return out;
-  };
-  const dubluri = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    const out = [];
-    for (let i = 0; i < e.nr; i++) out.push(buf.readDoubleLE(e.val + i * 8));
-    return out;
-  };
-
-  const compresie = scalar(259) ?? 1;
-  // Colecția MDT-50cm e inegal comprimată: unele dale sunt brute, altele nu, iar
-  // codecul nu e documentat nicăieri. Nu ghicim — oprim cu un mesaj limpede.
-  if (compresie !== 1)
-    throw new Error(`${cale}: compresie ${compresie}. Dalele comprimate nu sunt acceptate; cere din catalog una necomprimată (dimensiune = lățime·înălțime·4 + rânduri·6 + 379).`);
-
-  const ps = dubluri(33550), tp = dubluri(33922);
-  return {
-    buf,
-    latime: scalar(256), inaltime: scalar(257), rezolutie: ps[0],
-    x0: tp[3], y0: tp[4],
-    randuriPeStrip: scalar(278), stripOffsets: lung(273),
-  };
-}
-
-/** Un rând de float32 dintr-un TIFF necomprimat cu benzi. */
-function randTiff(t, r) {
-  const strip = Math.floor(r / t.randuriPeStrip);
-  const start = t.stripOffsets[strip] + (r - strip * t.randuriPeStrip) * t.latime * 4;
-  const out = new Float32Array(t.latime);
-  for (let i = 0; i < t.latime; i++) out[i] = t.buf.readFloatLE(start + i * 4);
-  return out;
-}
 
 // -------------------------------------------------------------- harta de bază
 
@@ -177,7 +97,7 @@ const main = () => {
   const baza = incarcaBaza();
   console.log(`bază: ${BAZA}, ${baza.w} × ${baza.h} la ${baza.pas} m`);
 
-  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiff(join(DIR, f)) }));
+  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
   if (dale.some((d) => d.rezolutie !== REZ_SURSA))
     throw new Error(`dale cu altă rezoluție decât ${REZ_SURSA} m`);
   const acop = {

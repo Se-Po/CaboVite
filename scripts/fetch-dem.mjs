@@ -9,6 +9,7 @@
 // Rulează: npm run fetch-dem
 import { inflateSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { citesteIfd } from './comun/tiff.mjs';
 
 const BAZA =
   'https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W010_00_DEM';
@@ -66,34 +67,20 @@ async function ia(url, start, len) {
   return Buffer.from(await r.arrayBuffer());
 }
 
-/** Citește prima structură de directoare a unui TIFF little-endian. */
+/**
+ * Antetul unui COG little-endian, cu dale (nu benzi, ca la DGT).
+ *
+ * Mersul prin IFD e comun cu cel al dalelor DGT si cu EXIF-ul pozelor; difera
+ * doar ce se scoate din el. Aici ne trebuie tabelul de dale (324/325), ca sa
+ * putem cere prin HTTP doar dalele care ne intereseaza, nu tot fisierul.
+ */
 function citesteAntet(buf) {
   if (buf.readUInt16LE(0) !== 0x4949) throw new Error('nu e TIFF little-endian');
-  const off = buf.readUInt32LE(4);
-  const n = buf.readUInt16LE(off);
-  const t = new Map();
-  for (let i = 0; i < n; i++) {
-    const b = off + 2 + i * 12;
-    t.set(buf.readUInt16LE(b), {
-      tip: buf.readUInt16LE(b + 2),
-      nr: buf.readUInt32LE(b + 4),
-      val: buf.readUInt32LE(b + 8),
-    });
-  }
-  const lung = (tag) => {
-    const e = t.get(tag);
-    const out = new Uint32Array(e.nr);
-    for (let i = 0; i < e.nr; i++) out[i] = buf.readUInt32LE(e.val + i * 4);
-    return out;
-  };
-  const scalar = (tag) => {
-    const e = t.get(tag);
-    return e && (e.tip === 3 ? e.val & 0xffff : e.val);
-  };
+  const d = citesteIfd(buf, buf.readUInt32LE(4));
   return {
-    latime: scalar(256), inaltime: scalar(257), biti: scalar(258),
-    compresie: scalar(259), predictor: scalar(317) ?? 1, tile: scalar(322),
-    offsets: lung(324), octeti: lung(325),
+    latime: d.scalar(256), inaltime: d.scalar(257), biti: d.scalar(258),
+    compresie: d.scalar(259), predictor: d.scalar(317) ?? 1, tile: d.scalar(322),
+    offsets: d.valori(324), octeti: d.valori(325),
   };
 }
 

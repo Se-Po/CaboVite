@@ -16,6 +16,7 @@
 // Rulează: npm run build-lagosteiros
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
 const DIR = 'date-sursa/lidar';
 const IESIRE = 'public/data';
@@ -52,70 +53,13 @@ const ADANCIME_APA = -8;
 // strictă separă apa de plajă, iar un prag mai lat (0,3 m) îneca plaja degeaba.
 const esteApa = (v) => v === 0 || v <= NODATA + 1;
 
-/** Citește antetul unui TIFF little-endian și întoarce ce ne trebuie. */
-function citesteTiff(cale) {
-  const buf = readFileSync(cale);
-  if (buf.readUInt16LE(0) !== 0x4949) throw new Error(`${cale}: nu e TIFF little-endian`);
-  const off = buf.readUInt32LE(4);
-  const n = buf.readUInt16LE(off);
-  const t = new Map();
-  for (let i = 0; i < n; i++) {
-    const b = off + 2 + i * 12;
-    t.set(buf.readUInt16LE(b), { tip: buf.readUInt16LE(b + 2), nr: buf.readUInt32LE(b + 4), val: buf.readUInt32LE(b + 8) });
-  }
-  const scalar = (tag) => {
-    const e = t.get(tag);
-    return e && (e.tip === 3 ? e.val & 0xffff : e.val);
-  };
-  const lung = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    if (e.nr === 1) return [e.val];
-    const out = [];
-    for (let i = 0; i < e.nr; i++)
-      out.push(e.tip === 4 ? buf.readUInt32LE(e.val + i * 4) : buf.readUInt16LE(e.val + i * 2));
-    return out;
-  };
-  const dubluri = (tag) => {
-    const e = t.get(tag);
-    if (!e) return null;
-    const out = [];
-    for (let i = 0; i < e.nr; i++) out.push(buf.readDoubleLE(e.val + i * 8));
-    return out;
-  };
-
-  const compresie = scalar(259) ?? 1;
-  if (compresie !== 1) throw new Error(`${cale}: compresie ${compresie}, aștept necomprimat`);
-
-  const ps = dubluri(33550), tp = dubluri(33922);
-  return {
-    buf,
-    latime: scalar(256), inaltime: scalar(257),
-    rezolutie: ps[0],
-    // TiePoint dă colțul stânga-sus; în TM06 Y crește spre nord.
-    x0: tp[3], y0: tp[4],
-    randuriPeStrip: scalar(278),
-    stripOffsets: lung(273), stripOcteti: lung(279),
-  };
-}
-
-/** Întoarce un rând de float32 dintr-un TIFF necomprimat cu strip-uri. */
-function randTiff(t, r) {
-  const peStrip = t.randuriPeStrip;
-  const strip = Math.floor(r / peStrip);
-  const inStrip = r - strip * peStrip;
-  const start = t.stripOffsets[strip] + inStrip * t.latime * 4;
-  const out = new Float32Array(t.latime);
-  for (let i = 0; i < t.latime; i++) out[i] = t.buf.readFloatLE(start + i * 4);
-  return out;
-}
 
 const main = () => {
   const fisiere = readdirSync(DIR).filter((f) => f.toLowerCase().endsWith('.tif'));
   if (!fisiere.length) throw new Error(`niciun .tif în ${DIR}`);
   console.log(`${fisiere.length} dale găsite`);
 
-  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiff(join(DIR, f)) }));
+  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
   const rez = dale[0].rezolutie;
   if (dale.some((d) => d.rezolutie !== rez)) throw new Error('dale cu rezoluții diferite');
 
