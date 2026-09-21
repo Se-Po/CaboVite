@@ -43,12 +43,14 @@ export function inPoligon(x, z, puncte) {
 
 /**
  * @param {{latime,inaltime,pasX,pasZ,inaltimi}} relief — de la incarcaRelief()
- * @param {{material?: THREE.Material, pastreaza?: (x: number, z: number) => boolean,
- *          deplasare?: {x: number, z: number}}} optiuni
- *   `pastreaza` primește centrul unei celule, în metri de scenă, și decide dacă
- *   ea intră în plasă. Așa capătă harta forma conturului cu care a fost extrasă
- *   (`poligon_scena` din sidecar) și așa se taie gaura de sub petic: celulele
- *   din afară nu se generează deloc, deci și numărul de triunghiuri scade.
+ * @param {{material?: THREE.Material,
+ *          pastreaza?: (x: number, z: number, y: number) => boolean,
+ *          deplasare?: {x: number, z: number}, paleta?: object}} optiuni
+ *   `pastreaza` primește centrul unei celule — x, z și **înălțimea acolo** — și
+ *   decide dacă ea intră în plasă. Așa capătă harta forma conturului cu care a
+ *   fost extrasă (`poligon_scena` din sidecar), așa se taie gaura de sub petic și
+ *   așa taie selectorul o bandă de altitudine: celulele din afară nu se
+ *   generează deloc, deci scade și numărul de triunghiuri.
  *   `deplasare` mută întreaga grilă în scenă — vezi comentariul de la `dep`.
  */
 export function creeazaTeren(relief, optiuni = {}) {
@@ -68,7 +70,20 @@ export function creeazaTeren(relief, optiuni = {}) {
   const Z = (r) => (r - (h - 1) / 2) * pasZ + dep.z;
   const Y = (r, c) => inaltimi[r * w + c];
 
-  const paleta = paletaCurenta();
+  // Înălțimea în centrul unei celule. Media celor patru colțuri nu e o
+  // aproximare comodă: pe un patrulater bilinear, media colțurilor *este*
+  // valoarea interpolată în centru. Deci decizia pe verticală se ia în exact
+  // același punct ca cea pe orizontală, unde comentariul de mai jos explică de
+  // ce centrul și nu colțul.
+  const Yc = (r, c) => (Y(r, c) + Y(r, c + 1) + Y(r + 1, c) + Y(r + 1, c + 1)) / 4;
+
+  // Paleta se primește, nu se ia singură din modul. Culorile se coc o singură
+  // dată, aici, în atributul de vârf: dacă cineva ar chema creeazaTeren() înainte
+  // ca `incarcaPaleta()` să fi terminat, terenul ar ieși tăcut cu culoarea de
+  // rezervă, iar remedierea ar cere regenerarea întregii geometrii. Ca parametru,
+  // răspunderea stă la apelant, care știe ce-a așteptat. `paletaCurenta()` rămâne
+  // ca rezervă, ca fișierul să-și țină promisiunea din capul lui: funcție pură.
+  const paleta = optiuni.paleta ?? paletaCurenta();
   const pastreaza = optiuni.pastreaza;
 
   // Cu o selecție activă numărăm întâi celulele păstrate, abia apoi alocăm.
@@ -79,7 +94,7 @@ export function creeazaTeren(relief, optiuni = {}) {
   if (pastreaza) {
     for (let r = 0; r < h - 1; r++)
       for (let c = 0; c < w - 1; c++)
-        if (pastreaza(X(c) + pasX / 2, Z(r) + pasZ / 2)) nrCelule++;
+        if (pastreaza(X(c) + pasX / 2, Z(r) + pasZ / 2, Yc(r, c))) nrCelule++;
   } else {
     nrCelule = (w - 1) * (h - 1);
   }
@@ -115,7 +130,7 @@ export function creeazaTeren(relief, optiuni = {}) {
       // poligon care trece exact printre două rânduri ar păstra sau ar arunca
       // celula după colțul din stânga-sus, iar conturul ar ieși deplasat cu
       // jumătate de celulă într-o direcție.
-      if (pastreaza && !pastreaza(X(c) + pasX / 2, Z(r) + pasZ / 2)) continue;
+      if (pastreaza && !pastreaza(X(c) + pasX / 2, Z(r) + pasZ / 2, Yc(r, c))) continue;
 
       const A = [X(c), Y(r, c), Z(r)];
       const B = [X(c + 1), Y(r, c + 1), Z(r)];

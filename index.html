@@ -8,6 +8,42 @@
   </head>
   <body>
     <canvas id="scena"></canvas>
+
+    <!--
+      Panoul selectorului. E o unealtă, nu conținut: cine vrea pagina curat
+      narativă îl șterge de aici, împreună cu regulile #unelte din main.css și cu
+      blocul din main.js. Decupajul nu atârnă de el — acela trăiește în datele
+      hărții și în scena.js.
+    -->
+    <aside id="unelte" hidden>
+      <h2>Selecție</h2>
+
+      <div class="rand">
+        <button id="sel-comuta" type="button" aria-pressed="false">Selectează</button>
+        <button id="sel-tot" type="button">Tot</button>
+        <button id="sel-goleste" type="button">Golește</button>
+        <button id="sel-sus" type="button">Vedere de sus</button>
+      </div>
+
+      <p class="ajutor" id="sel-ajutor">
+        Trage cu butonul stâng pe teren ca să desenezi dreptunghiul. Butonul drept
+        rotește camera. Trage de planurile aurii ca să muți banda de altitudine.
+      </p>
+
+      <div class="rand banda">
+        <label>de la <input id="sel-jos" type="number" step="1" inputmode="numeric" /> m</label>
+        <label>până la <input id="sel-sus-m" type="number" step="1" inputmode="numeric" /> m</label>
+      </div>
+
+      <dl id="sel-cifre"></dl>
+
+      <details id="sel-export">
+        <summary>Coordonate, pentru scriptul de hărți</summary>
+        <textarea id="sel-cod" readonly rows="7" spellcheck="false"></textarea>
+        <button id="sel-copiaza" type="button">Copiază</button>
+      </details>
+    </aside>
+
     <main id="continut"></main>
     <script type="module" src="/src/main.js"></script>
   </body>
