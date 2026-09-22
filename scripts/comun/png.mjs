@@ -37,6 +37,10 @@ const bucata = (tip, date) => {
  * Filtrele PNG ajută compresia pe imagini cu gradienți; pe decupaje mici de
  * fotografie câștigul e neglijabil, iar codul ar crește de trei ori.
  *
+ * Exportat deși nimic din afară nu-l cheamă, și anume: `pngDataUri` întoarce
+ * numai base64, deci asta e singura cale spre un PNG scris pe disc. O poartă
+ * lăsată deschisă, nu un rest.
+ *
  * @param {number} w @param {number} h
  * @param {Uint8Array} rgb — w·h·3 octeți
  */
@@ -57,5 +61,5 @@ export function scriePng(w, h, rgb) {
   ]);
 }
 
-/** Acelaşi PNG, ca URI de date, pentru încorporat într-o pagină. */
+/** Același PNG, ca URI de date, pentru încorporat într-o pagină. */
 export const pngDataUri = (w, h, rgb) => `data:image/png;base64,${scriePng(w, h, rgb).toString('base64')}`;

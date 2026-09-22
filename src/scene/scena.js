@@ -141,7 +141,8 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,
   // încadrarea devine a lui și nu i-o mai luăm.
   let incadrareAutomata = true;
-  controale.addEventListener('start', () => { incadrareAutomata = false; });
+  const laStart = () => { incadrareAutomata = false; };
+  controale.addEventListener('start', laStart);
 
   controale.addEventListener('change', cereRandare);
   const laResize = () => cereRandare();
@@ -229,6 +230,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
       viu = false;
       renderer.setAnimationLoop(null);
       controale.removeEventListener('change', cereRandare);
+      controale.removeEventListener('start', laStart);
       globalThis.removeEventListener('resize', laResize);
       faraMiscare?.removeEventListener?.('change', aplicaMiscare);
       // Aceeași listă ca la eșecul pornirii, nu o copie scrisă de mână.

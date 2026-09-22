@@ -24,10 +24,16 @@ import jpeg from 'jpeg-js';
 import { citesteIfd, deschideTiff } from './comun/tiff.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { inPoligon, laTM06 } from './comun/tm06.mjs';
-import { cereDirector, cereFisier } from './comun/cere.mjs';
+import { cereDirector } from './comun/cere.mjs';
 
 const DIR = 'date-sursa/ortofoto';
-const IESIRE = 'public/data';
+// Două directoare, două înțelesuri, și nu se pot amesteca: `public/` e ce
+// SERVEȘTE pagina, iar paleta de acolo chiar se încarcă în browser. Raportul
+// de ortofoto nu — e intrare pentru pasul următor al lanțului, deci stă lângă
+// datele-sursă. Amândouă au stat până acum sub aceeași constantă, iar
+// rezultatul era un fișier livrat vizitatorului pe care nimic nu-l cerea.
+const PALETA_POZE = 'public/data';
+const IESIRE = DIR;
 const HARTA = process.argv[2] || 'harta_v0';
 
 // Pragul de vegetație pe indicele de infraroșu. Ales după histograma datelor,
@@ -295,7 +301,7 @@ const main = () => {
   // Comparația cu fotografiile: acolo unde cele două se despart, diferența spune
   // ceva despre drumul luminii, nu despre teren.
   try {
-    const poze = JSON.parse(readFileSync(join(IESIRE, 'paleta-teren.json'), 'utf8')).materiale;
+    const poze = JSON.parse(readFileSync(join(PALETA_POZE, 'paleta-teren.json'), 'utf8')).materiale;
     console.log('\n fotografii de la sol  vs  ortofoto de sus');
     console.log(' ───────────────────────────────────────────');
     for (const k of ['calcar', 'poteca', 'vegetatie_uscata', 'tufaris']) {

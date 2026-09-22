@@ -11,7 +11,7 @@
 //
 // Rulează: npm run build-zona          (pas de 2 m, rezoluția nativă)
 //          npm run build-zona -- 4     (mediere pe blocuri 2 × 2)
-import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { laTM06, dinTM06, inPoligon, arie } from './comun/tm06.mjs';
 import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
@@ -135,11 +135,10 @@ const main = () => {
       if (v < zmin) zmin = v;
       if (v > zmax) zmax = v;
     }
-  const celuleMesh = inPolig;
   console.log(`în poligon: ${inPolig} celule (${(100 * inPolig / (w * h)).toFixed(0)}% din cutie)`);
   console.log(`  din care uscat măsurat: ${uscatInPolig} (${(100 * uscatInPolig / inPolig).toFixed(0)}%)`);
   console.log(`altitudine: ${zmin.toFixed(2)} .. ${zmax.toFixed(2)} m`);
-  console.log(`triunghiuri estimate: ${(2 * celuleMesh / 1000).toFixed(0)}k`);
+  console.log(`triunghiuri estimate: ${(2 * inPolig / 1000).toFixed(0)}k`);
 
   // Golurile devin apă. Nu interpolăm: o gaură în mijlocul uscatului ar fi o
   // problemă de date, nu ceva de umplut pe tăcute.

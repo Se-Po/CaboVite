@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import jpeg from 'jpeg-js';
 import { pngDataUri } from './comun/png.mjs';
-import { cereDirector, cereFisier } from './comun/cere.mjs';
+import { cereFisier } from './comun/cere.mjs';
 
 const DIR = 'date-sursa/poze';
 const LAT_MIC = 220;    // pentru grupare: destul pentru culoare, 1/340 din pixeli
@@ -149,8 +149,22 @@ function decupeaza(img, cx, cy, lat) {
 
 const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 
-const ETICHETE = ['calcar', 'tufăriș verde', 'vegetație uscată', 'pământ / potecă',
-                  'mare', 'cer', 'plajă / nisip', 'umbră', 'altceva'];
+// Cod pentru mașină, text pentru om — și e o deosebire care s-a plătit deja.
+// Pagina oferea numai textul, iar `paleta.mjs` cere codul fără diacritice
+// (`tufaris`, nu `tufăriș verde`), pe care nu-l verifică nimeni: o etichetă
+// necunoscută trece tăcut drept fundal. Se vede în `repere` din
+// paleta-teren.json că omul a tradus manual, de mână. Acum nu mai are ce.
+const ETICHETE = [
+  { cod: 'calcar',           text: 'calcar' },
+  { cod: 'tufaris',          text: 'tufăriș verde' },
+  { cod: 'vegetatie_uscata', text: 'vegetație uscată' },
+  { cod: 'poteca',           text: 'pământ / potecă' },
+  { cod: 'mare',             text: 'mare' },
+  { cod: 'cer',              text: 'cer' },
+  { cod: 'plaja',            text: 'plajă / nisip' },
+  { cod: 'umbra',            text: 'umbră' },
+  { cod: 'altceva',          text: 'altceva' },
+];
 
 // --------------------------------------------------------------------- main
 
@@ -170,12 +184,15 @@ const main = () => {
   const petice = [];
   const miniaturi = [];
 
-  process.stdout.write(`decodez ${deDecodat.length} poze `);
   // Chiar dacă inventarul e vechi și a prins ceva ce nu e fotografie, nu murim
   // pe el: `citesteExif` a scris deja formatul, deci știm exact ce sărim.
   const deDecodat = indice.poze.filter((p) => p.format === 'JPEG');
   if (deDecodat.length < indice.poze.length)
     console.log(`sar peste ${indice.poze.length - deDecodat.length} fișiere care nu sunt JPEG`);
+  // Anunțul vine DUPĂ declarația pe care o citește. Mai sus, `deDecodat` era
+  // în zona moartă temporală, iar scriptul murea cu ReferenceError înainte să
+  // decodeze prima poză — cu lanțul întreg rupt la mijloc.
+  process.stdout.write(`decodez ${deDecodat.length} poze `);
   for (const p of deDecodat) {
     const brut = jpeg.decode(readFileSync(join(DIR, p.fisier)), { useTArray: true, maxMemoryUsageInMB: 1024 });
     const mediu = micsoreaza(brut.data, brut.width, brut.height, LAT_MEDIU);
@@ -188,7 +205,13 @@ const main = () => {
       puncte[i] = laOklab(mic.data[i * 3], mic.data[i * 3 + 1], mic.data[i * 3 + 2]);
 
     const grupuri = kmeans(puncte, unu, K_POZA);
-    const greutatePoza = 1 / (laPozitie.get(`${p.gps.lon},${p.gps.lat}`) ?? 1);
+    // Fără fixare GPS, ponderea e 1. Poza măsoară culori la fel de bine, doar
+    // că nu se știe unde — iar ponderea de mai sus există numai ca aceeași
+    // bucată de teren să nu fie numărată de N ori pentru N cadre din același
+    // loc. Fără poziție, n-are cu ce se dubla.
+    const greutatePoza = p.gps
+      ? 1 / (laPozitie.get(`${p.gps.lon},${p.gps.lat}`) ?? 1)
+      : 1;
     const scara = mediu.w / mic.w;
 
     for (const g of grupuri) {
@@ -314,7 +337,7 @@ ${grupuri.map((g, i) => `
    ${g.poze.length} poze · spre ${g.inaltimeInCadru < 0.38 ? 'partea de sus' : g.inaltimeInCadru > 0.62 ? 'partea de jos' : 'mijlocul'} cadrului</div>
   <label class="mic">ce e: <select data-culoare="${g.culoare}">
    <option value="">— alege —</option>
-   ${ETICHETE.map((e) => `<option>${e}</option>`).join('')}
+   ${ETICHETE.map((e) => `<option value="${e.cod}">${e.text}</option>`).join('')}
   </select></label>
  </div>
  <div class="decupaje">${g.decupaje.map((d) => `<img src="${d}" alt="decupaj din fotografie">`).join('')}</div>

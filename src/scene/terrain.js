@@ -53,8 +53,6 @@ export function inPoligon(x, z, puncte) {
  */
 export function creeazaTeren(relief, optiuni = {}) {
   const { latime: w, inaltime: h, pasX, pasZ, inaltimi } = relief;
-  const latimeM = (w - 1) * pasX;
-  const adancimeM = (h - 1) * pasZ;
 
   // Centrăm pe origine. Rândul 0 e nordul, deci ajunge la Z negativ.
   //
@@ -163,7 +161,6 @@ export function creeazaTeren(relief, optiuni = {}) {
 
   return {
     obiect,
-    limite: { latimeM, adancimeM, zMin: Math.min(...[0]), zMax: 0 },
     nrTriunghiuri,
 
     /** Altitudinea (metri) în coordonate de scenă, interpolată biliniar. */

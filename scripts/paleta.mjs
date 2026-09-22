@@ -19,9 +19,15 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cereDirector, cereFisier } from './comun/cere.mjs';
+import { cereFisier } from './comun/cere.mjs';
 
 const DIR = 'date-sursa/poze';
+const DIR_ORTO = 'date-sursa/ortofoto';
+// `public/` înseamnă „ce servește pagina", iar `paleta-teren.json` chiar se
+// încarcă în browser. Raportul de ortofoto NU: e intrare pentru pasul ăsta,
+// deci stă lângă datele-sursă, de unde îl și scrie `ortofoto.mjs`. Au stat
+// amândouă sub aceeași constantă, iar unul dintre ele ajungea livrat
+// vizitatorului degeaba.
 const IESIRE = 'public/data';
 const PRAG_LUMINA = 0.8;   // cuantila de luminozitate luată drept „în soare"
 const PRAG_CROMA = 0.02;   // sub atât, nuanța măsurată nu mai înseamnă nimic
@@ -111,7 +117,7 @@ const main = () => {
   // fiindcă dala de 283 MB nu intră în depozit și cine clonează n-o are.
   let orto = {};
   try {
-    orto = JSON.parse(readFileSync(join(IESIRE, 'ortofoto-culori.json'), 'utf8')).clase;
+    orto = JSON.parse(readFileSync(join(DIR_ORTO, 'ortofoto-culori.json'), 'utf8')).clase;
     console.log('ortofoto găsit — îl folosesc pentru materialele pe care pozele le-au văzut de departe\n');
   } catch {
     console.log('fără ortofoto — paleta iese numai din fotografii\n');
@@ -126,6 +132,19 @@ const main = () => {
     material, hex: h,
     oklab: laOklab(...[1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))),
   }));
+
+  // O etichetă pe care n-o cunoaștem trece mai jos drept `rol: 'fundal'`,
+  // `sursa: 'fotografii'`, fără nicio eroare — iar dacă era de fapt un material
+  // de teren scris altfel (`tufăriș verde` în loc de `tufaris`), culoarea lui
+  // măsurată nu ajunge niciodată în hartă și nimeni nu află. De aceea se spune.
+  const stiute = new Set([...TEREN, ...Object.keys(SURSA)]);
+  const straine = [...new Set(ancore.map((a) => a.material))].filter((m) => !stiute.has(m));
+  if (straine.length) {
+    console.log(`ATENȚIE — etichete pe care nu le cunosc: ${straine.join(', ')}`);
+    console.log(` Le trec drept fundal. Codurile așteptate: ${[...stiute].sort().join(', ')}.`);
+    console.log(' Dacă una dintre ele era un material de teren scris altfel, culoarea lui');
+    console.log(' nu va ajunge în paletă — iar terenul se va picta fără ea, fără nicio eroare.\n');
+  }
 
   const peMaterial = new Map();
   let nrPetice = 0;
@@ -204,7 +223,6 @@ const main = () => {
       + `${(x.ortofoto ? x.ortofoto.culoare : '—').padEnd(10)} ${x.rol}`);
   }
 
-  const slabe = ordine.filter((m) => !materiale[m].masurat.nuanta_de_incredere && m.sursa !== 'ortofoto');
   const inca = ordine.filter((m) => materiale[m].sursa === 'fotografii' && !materiale[m].masurat.nuanta_de_incredere);
   if (inca.length) {
     console.log(`\nNuanță încă nesigură la: ${inca.join(', ')} (croma sub ${PRAG_CROMA}).`);

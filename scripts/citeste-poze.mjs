@@ -16,7 +16,7 @@
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { citesteExif } from './comun/exif.mjs';
-import { cereDirector, cereFisier } from './comun/cere.mjs';
+import { cereDirector } from './comun/cere.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { laTM06, inPoligon } from './comun/tm06.mjs';
 
