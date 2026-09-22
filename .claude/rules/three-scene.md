@@ -63,6 +63,18 @@ Scena aceasta este în mare parte statică. Nu randa continuu: randează la
 `controls.addEventListener('change', ...)`, la resize și la schimbarea capitolului.
 Economisește baterie pe mobil și este tiparul recomandat în manual.
 
+## Ordinea de desenare
+
+`renderOrder` **nu trece granița opac/transparent.** three.js sortează obiectele
+în două liste — opacă și transparentă — și o desenează pe cea opacă prima;
+`renderOrder` contează numai în interiorul uneia. Un material opac cu
+`renderOrder: 999` ajunge tot înaintea unuia transparent cu `998`, oricât ar
+părea de invers.
+
+Ca `renderOrder` să însemne ce pare că înseamnă între două obiecte, amândouă
+trebuie să fie în aceeași listă. Un material perfect opac se poate muta în lista
+transparentă cu `transparent: true` — nu pentru transparență, ci pentru sortare.
+
 ## Eliberarea resurselor
 
 Scoaterea din scenă nu eliberează nimic. La schimbarea capitolului:
@@ -85,6 +97,28 @@ function disposeObject(root) {
 
 Verifică scurgerile cu `renderer.info.memory.geometries` / `.textures` și numărul
 de draw call-uri cu `renderer.info.render.calls`.
+
+`dispose()` trebuie să treacă prin **aceeași listă** ca eșecul pornirii, nu
+printr-o copie scrisă de mână. Ține resursele într-un tablou de închideri, în
+ordinea creării, golește-l dintr-o singură funcție idempotentă și cheam-o din
+amândouă locurile — din `catch`-ul de la pornire și din `dispose()`:
+
+```js
+const deEliberat = [];
+const curata = () => {
+  // Fiecare eliberare în try-ul ei: una care aruncă ar ascunde excepția adevărată.
+  for (const f of deEliberat.reverse()) {
+    try { f(); } catch (e) { console.warn('eliberare eșuată:', e.message); }
+  }
+  deEliberat.length = 0;
+};
+```
+
+Înregistrează fiecare resursă **imediat** după ce ai creat-o, nu pe toate la
+sfârșit: dacă a doua alocare aruncă, prima trebuie să fie deja în listă. Două căi
+scrise separat se despart încet — una capătă o resursă nouă, cealaltă n-o află
+niciodată, iar ce rămâne viu sunt exact geometriile și ascultătorii pe care nu-i
+mai caută nimeni.
 
 ## Performanță
 

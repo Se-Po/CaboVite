@@ -20,7 +20,8 @@ const IESIRE = 'public/data';
  *                       Primul nod e chiar la xMin. Semn: === (lățime − 1) · pas.
  *
  * Diferența e o jumătate de celulă. Pe petic, la 1 m, înseamnă 0,5 m — sub
- * zgomotul unui GPS de telefon, dar destul cât să strice o unealtă de măsurat.
+ * zgomotul unui GPS de telefon, dar destul cât să mute o fotografie cu o celulă
+ * întreagă pe hartă, când se adună cu el.
  * De aceea convenția se DEDUCE din aritmetică, nu se presupune: cele două
  * valori nu se pot confunda (2328 față de 2326 pe harta_v0, 534 față de 535 pe
  * harta_v1), deci deducția e sigură. Dacă nu se potrivește niciuna, oprim —

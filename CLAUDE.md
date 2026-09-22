@@ -45,6 +45,10 @@ IFD-urile unui TIFF, citirea unei hărți gata făcute, EXIF-ul — stă în
 
 - Bucla de animație: `renderer.setAnimationLoop(animate)`. **Nu** `requestAnimationFrame`
   — documentația oficială cere `setAnimationLoop` pentru compatibilitate.
+- O animație proprie — întoarcerea camerei spre un punct de privire, un zbor de
+  capitol — **nu** deschide al doilea `requestAnimationFrame`. Bucla rulează deja
+  la fiecare cadru și decide doar *dacă* desenează, deci animația se agață în ea.
+  Modelul e `busola.pas()`, chemat ca primă instrucțiune din buclă.
 - Importă addon-urile ca `three/addons/...`, nu `three/examples/jsm/...`.
 - `THREE.Clock` e deprecat din r183 → folosește `THREE.Timer`.
 - `PCFSoftShadowMap` a fost **eliminat** în r186 → `THREE.PCFShadowMap`.
@@ -106,7 +110,66 @@ Sunt recuperabile din istoricul git.
 Conturul unei hărți se scrie ca longitudine/latitudine în constanta
 `POLIGON_GEO` din capul lui `scripts/build-zona.mjs` (sau `build-petic.mjs`),
 iar scriptul îl proiectează în TM06 și decupează după el. Pagina doar îl citește
-din sidecar — nu mai există unealtă de desenat contururi în ea.
+din sidecar; nu are unealtă de desenat sau de măsurat contururi.
+
+### Convenția `bbox_tm06`: două scripturi, două înțelesuri
+
+`build-zona.mjs` scrie dreptunghiul de **decupare** (muchii de celulă), deci
+primul nod cade la `xMin + pas/2`. `build-petic.mjs` scrie poziții de **noduri**
+ale bazei, deci primul nod cade chiar la `xMin`. Diferența e o jumătate de celulă.
+
+Semnul care le distinge, fără ambiguitate: `xMax − xMin` e `lățime · pas` la
+prima și `(lățime − 1) · pas` la a doua (2328 față de 2326; 534 față de 535).
+`scripts/comun/relief.mjs` **deduce** convenția din aritmetică și aruncă dacă nu
+se potrivește niciuna. Nu presupune.
+
+## Busola și nordul adevărat
+
+Scena e așezată pe grila TM06: `+X` e estul grilei, `−Z` e **nordul grilei**.
+Nordul adevărat e altceva. Zona stă la ~95 km vest de meridianul central al
+proiecției (λ₀ = −8,133108°), deci convergența meridianelor e **γ = −0,673704°**:
+nordul adevărat cade cu 0,67° la **est** de nordul grilei. Pe rozetă asta face
+0,47 px — deci nu se vede, și tocmai de aceea nu se verifică din ochi.
+
+γ **nu e scris ca o constantă.** `src/scene/busola.js` îl deduce din
+`colturi_geo` al hărții de **bază** — `harta_v1` n-are cheia asta, numai
+`harta_v0` — ca media azimutului celor două muchii verticale. Scalarea
+longitudinii NU e `cos(φ)`, ci `cos(φ)·N(φ)/M(φ)` pe GRS80; cu `cos(φ)` singur γ
+iese sistematic mai mic cu 0,414%. Fără `colturi_geo`, busola **nu se creează**
+și spune de ce: mai bine lipsește decât să arate cu convingere un nord care nu e.
+
+Verificare independentă, din parametrii proiecției:
+`γ = atan(tan(λ−λ₀)·sin φ)` dă −0,673397°. Cele 0,0003° rămase sunt rotunjirea
+colțurilor la șase zecimale în sidecar (~0,1 m pe o muchie de 2986 m). Un sidecar
+cu mai puține zecimale ar lărgi eroarea proporțional, tăcut.
+
+**Capcana semnului.** `OrbitControls.getAzimuthalAngle()` întoarce
+`Spherical.theta = atan2(x, z)` al vectorului de la țintă la cameră, deci
+`theta = 0` înseamnă camera la SUD, privind spre nord. `theta` **nu** e azimutul
+privirii, ci minus el. „Nordul în sus" e `theta = γ`, nu `theta = 0`.
+
+Cifra afișată e azimutul **poziției** camerei — dinspre ce direcție privești —,
+nu al privirii. La pornire scrie `213° SV`, coerent cu `AZIMUT = 214` din
+`camera.js` și cu fotografia de referință.
+
+**Clicul nu întoarce scena cu nordul în sus.** Duce camera la un punct de
+privire ales, `AZIMUT_TINTA` din `busola.js`, acum **300° NV** — privirea dinspre
+nord-vest peste promontoriu. Eticheta butonului se scrie din constanta aceea, ca
+textul și comportamentul să nu se poată despărți. Dacă vrei totuși „nordul în
+sus", valoarea e 180: cifra fiind a poziției, stai în sud ca să privești spre nord.
+
+**Camera se rotește punând `theta` ABSOLUT**, nu cu `rotateLeft()`. Acela există
+și e public în r186, dar adaugă un *delta* într-un acumulator care se scurge
+exponențial; deltele se compun, deci două clicuri repezi trec de nord cu exact
+cât mai rămăsese de aplicat. `setAzimuthalAngle()` nu există.
+
+**Probe care pot eșua.** La încadrarea de pornire busola scrie **213° SV**; cu
+nordul grilei ar scrie 214°, cu semnul lui γ inversat 215°. După clic,
+`__scena.controale.getAzimuthalAngle() * 180/Math.PI` trebuie să fie
+**−120,673704** — pe grilă ar fi fost exact −120, deci zecimalele sunt chiar
+dovada că punctul e cel adevărat, nu cel al grilei. Iar
+`__scena.busola.convergenta` trebuie să cadă la mai puțin de 0,001 de valoarea
+analitică: pragul e ales ca să pice dacă factorul elipsoidal lipsește.
 
 ## Principii de design (nenegociabile)
 
@@ -214,82 +277,3 @@ Tabelul `SURSA` din `scripts/paleta.mjs` ține regula, iar fiecare material din
 
 `npm run paleta` merge și fără ortofoto — dala nu intră în depozit, deci cine
 clonează trebuie să poată reface paleta numai din fotografii.
-
-## Selectorul 3D
-
-`src/scene/selectie3d.js` — o cutie aliniată la axele scenei: dreptunghi tras pe
-teren pentru X-Z, bandă de altitudine pentru Y. Panoul `#unelte` din `index.html`
-scoate coordonatele gata de pus în `scripts/build-zona.mjs`.
-
-**E o unealtă, nu conținut.** Se scoate ștergând trei bucăți — `<aside id="unelte">`
-din `index.html`, blocul `#unelte` din `main.css` și `legPanoul()` din `main.js`.
-Decupajul hărții nu atârnă de ea: acela trăiește în sidecar și în `scena.js`.
-
-Ce s-a hotărât și de ce:
-
-- **Verticala aruncă celule întregi**, nu taie triunghiuri. Terenul e o pânză,
-  n-are interior; marginea urmează curbele de nivel. Decizia se ia pe înălțimea
-  din *centrul* celulei — media celor patru colțuri, care pe un patrulater
-  bilinear chiar *este* valoarea din centru, deci același punct ca pentru X-Z.
-- **Mânerele de altitudine merg pe deplasare de ECRAN**, nu pe proiecție în
-  lume. Scena e de 20 de ori mai lată decât înaltă (X ±1163 m, Z ±1492 m, Y de la
-  −8 la 143,6). Prima variantă proiecta raza pe un plan vertical: geometric
-  corect, dar la o cameră de 1600 m o tragere scurtă prăbușea banda dintr-o dată.
-  Acum o tragere pe toată înălțimea ecranului parcurge exact tot intervalul de
-  altitudine — ~0,2 m pe pixel, la fel de previzibil de aproape ca de departe.
-- **Regenerarea se face la eliberarea butonului**, nu în timpul tragerii:
-  `creeazaTeren()` alocă până la ~250 MB pentru baza de 1164 × 1493.
-- **Cutia e aliniată la TM06, nu la nord.** Scripturile decupează în TM06; o
-  cutie rotită față de ele ar cere reeșantionare. Rotația de ~0,7° o poartă cele
-  patru colțuri raportate în longitudine/latitudine.
-- Selecția se ține în `localStorage` și **se reaplică la reîncărcare** — asta
-  înseamnă „folosesc numai acea selecție". Butonul *Tot* o desface.
-
-`src/scene/geo.js` face conversiile scenă ↔ TM06 ↔ longitudine/latitudine.
-**Ancorează pe centrul cutiei, nu pe un colț** — vezi mai jos de ce.
-
-### Convenția `bbox_tm06`: două scripturi, două înțelesuri
-
-`build-zona.mjs` scrie dreptunghiul de **decupare** (muchii de celulă), deci
-primul nod cade la `xMin + pas/2`. `build-petic.mjs` scrie poziții de **noduri**
-ale bazei, deci primul nod cade chiar la `xMin`. Diferența e o jumătate de celulă.
-
-Semnul care le distinge, fără ambiguitate: `xMax − xMin` e `lățime · pas` la
-prima și `(lățime − 1) · pas` la a doua (2328 față de 2326; 534 față de 535).
-`scripts/comun/relief.mjs` **deduce** convenția din aritmetică și aruncă dacă nu
-se potrivește niciuna. Nu presupune.
-
-Ancorat pe **centrul** cutiei, conversia nu mai depinde deloc de convenție:
-nodurile sunt simetrice față de centru în ambele cazuri. Verificat pe `harta_v0`
-și `harta_v1` — deci pe ambele convenții — plus pe o a treia hartă de atunci,
-ștearsă între timp: diferență exact zero. De aceea `geo.js` folosește
-`TM06 = scenă + centrul cutiei`, iar nu un colț.
-
-### Ce a ieșit la recenzie, și rămâne valabil
-
-- **Nu se dă raycast pe plasă.** `raycaster.intersectObject()` pe geometria
-  neindexată de 2,75 milioane de triunghiuri costă **53 ms pe rază**, măsurat pe
-  desktop. `pointermove` vine de 60–120 de ori pe secundă. Selectorul merge în
-  schimb pe rază folosind `inaltimeLa` și prinde schimbarea de semn, apoi
-  bisectează: **0,34 ms**, de 156 de ori mai rapid. Diferența dintre suprafața
-  biliniară și cea din triunghiuri e mediana 3,6 mm, maxim 17 cm pe o celulă de
-  2 m — răsucirea celulei, nu o eroare.
-- **`renderOrder` nu trece granița opac/transparent.** three.js sortează în două
-  liste, iar cea opacă se desenează prima; `renderOrder` contează numai în
-  interiorul uneia. De aceea materialul liniilor are `transparent: true` deși e
-  opac — altfel planele-mânere i-ar spăla muchiile.
-- **`controale.touches` se schimbă separat de `mouseButtons`.** OrbitControls le
-  citește din două locuri; fără al doilea, pe telefon o tragere cu un deget
-  rotește camera **și** desenează dreptunghiul.
-- **`dispose()` trece prin aceeași listă ca eșecul pornirii** (`deEliberat` /
-  `curata()`). O listă scrisă de mână sărise deja peste selector o dată: trei
-  geometrii vii, patru ascultători de pointer rămași, iar o tragere de după
-  `dispose()` reconstruia 250 MB într-o scenă moartă.
-- **Un clic fără mișcare nu regenerează.** Se compară o amprentă a cutiei luată
-  la apăsare; altfel orice clic rătăcit costa ~250 MB și 2,75 M de triunghiuri
-  pentru zero schimbare. Acum costă 2,2 ms.
-- **Materialul terenului se creează o dată** și se injectează în amândouă
-  plasele. Recreat la fiecare regenerare, ducea `usedTimes` la zero și forța o
-  recompilare de shader la fiecare selecție.
-- **`fog: false` pe materialele uneltei** — ceața începe la 5000 m, iar pe 390 px
-  camera ajunge la ~4350.

@@ -6,8 +6,7 @@ import { creeazaTeren, inPoligon } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { incarcaRelief } from './loaders.js';
 import { incarcaPaleta, paletaCurenta } from './palette.js';
-import { creeazaGeo } from './geo.js';
-import { creeazaSelectie3d } from './selectie3d.js';
+import { creeazaBusola } from './busola.js';
 import { instantaneuMemorie } from './dispose.js';
 
 // Orchestrarea scenei și randarea la cerere.
@@ -18,7 +17,7 @@ import { instantaneuMemorie } from './dispose.js';
 // are ce desena; asta ține și amortizarea controalelor lină.
 
 /** @param {HTMLCanvasElement} canvas */
-export async function porneste(canvas, laSelectie) {
+export async function porneste(canvas) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -41,7 +40,7 @@ export async function porneste(canvas, laSelectie) {
   };
 
   try {
-    return await construieste(canvas, renderer, deEliberat, curata, laSelectie);
+    return await construieste(canvas, renderer, deEliberat, curata);
   } catch (e) {
     curata();
     renderer.dispose();
@@ -55,7 +54,7 @@ export async function porneste(canvas, laSelectie) {
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata, laSelectie) {
+async function construieste(canvas, renderer, deEliberat, curata) {
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
   // Dacă ar veni după, ar trebui regenerată toată geometria ca să se vadă.
@@ -106,119 +105,35 @@ async function construieste(canvas, renderer, deEliberat, curata, laSelectie) {
     ? (x, z) => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1
     : null;
 
-  // Banda de altitudine poate veni gata scrisă în sidecar, ca și poligonul.
-  // Datele rămân un DEM întreg — banda taie la randare, nu în fișier — deci e
-  // reversibilă și harta rămâne validă pentru orice alt folos.
-  const bandaDate = relief.meta?.banda_altitudine;
-
-  // Cutia curentă. Se umple mai jos, DIN selector: el e singura sursă de adevăr,
-  // ca panoul să nu scrie „toată harta" în timp ce terenul e tăiat pe verticală.
-  let cutie = null;
-
   let cerut = true;
   const cereRandare = () => { cerut = true; };
 
-  /** Testul cutiei. `y` e înălțimea în centrul celulei. */
-  const inCutie = (x, z, y) => !cutie || (
-    x >= cutie.xMin && x <= cutie.xMax &&
-    z >= cutie.zMin && z <= cutie.zMax &&
-    y >= cutie.yMin && y <= cutie.yMax);
-
   /**
-   * Măștile celor două plase — și nu sunt aceeași.
+   * Masca bazei: înăuntrul conturului cu care a fost extrasă harta și în afara
+   * găurii. Se calculează o singură dată — nimic nu o mai schimbă după pornire.
    *
-   * Baza se taie după conturul hărții, după gaura de sub petic și după cutie.
-   * Peticul se taie NUMAI după cutie: masca bazei cere `!subPetic`, iar peticul
-   * stă în întregime înăuntrul acelui dreptunghi, deci aplicată lui l-ar șterge
-   * cu totul. Două plase, două măști.
-   *
-   * Testul pe verticală aruncă celule întregi, deci marginea urmează curbele de
-   * nivel — terenul e o pânză, n-are interior de tăiat.
+   * Peticul NU o primește: masca cere `!subPetic`, iar peticul stă în întregime
+   * înăuntrul acelui dreptunghi, deci aplicată lui l-ar șterge cu totul. Cine
+   * „repară" asimetria dând-o amândurora pierde peticul fără nicio eroare.
    */
-  const mascaBaza = () => (limitaDatelor || subPetic || cutie)
-    ? (x, z, y) => (!limitaDatelor || inPoligon(x, z, limitaDatelor)) &&
-                   !(subPetic && subPetic(x, z)) && inCutie(x, z, y)
+  const pastreaza = (limitaDatelor || subPetic)
+    ? (x, z) => (!limitaDatelor || inPoligon(x, z, limitaDatelor)) &&
+                !(subPetic && subPetic(x, z))
     : undefined;
-  const mascaPetic = () => (cutie ? inCutie : undefined);
 
-  // Un singur material pentru amândouă plasele, creat o dată.
-  //
-  // Dacă l-ar face `creeazaTeren()` de fiecare dată, regenerarea ar elibera
-  // materialul vechi — ducând `usedTimes` la zero și ștergând programul din
-  // cache — ca să ceară imediat altul identic: o recompilare de shader la
-  // fiecare selecție aplicată. Injectat, `terrain.js` nu-l mai eliberează
-  // (`materialPropriu`), deci îl eliberăm noi.
-  const materialTeren = new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.95, metalness: 0,
-  });
-  deEliberat.push(() => materialTeren.dispose());
+  const teren = creeazaTeren(relief, { pastreaza, paleta });
+  scena.add(teren.obiect);
+  // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza de
+  // ~250 MB trebuie să fie deja în listă ca s-o elibereze `curata()`.
+  deEliberat.push(() => teren.dispose());
 
-  let teren = null, petic = null;
-  // Citesc variabilele la apel, nu la înregistrare: după o regenerare, se
-  // eliberează plasa curentă, nu cea moartă.
-  deEliberat.push(() => teren?.dispose());
-  deEliberat.push(() => petic?.dispose());
-
-  function regenereaza() {
-    // Eliberăm înainte să construim, ca să nu ținem două plase deodată: la
-    // 1164 × 1493 ar însemna un vârf de o jumătate de gigaoctet. Prețul e că, la
-    // o excepție, scena rămâne goală — deci o prindem aici și o spunem, în loc
-    // s-o lăsăm să plece dintr-un ascultător de `pointerup`, unde n-o prinde nimeni.
-    teren?.dispose();
-    petic?.dispose();
-    teren = null;
-    petic = null;
-    try {
-      teren = creeazaTeren(relief, { pastreaza: mascaBaza(), paleta, material: materialTeren });
-      scena.add(teren.obiect);
-      if (reliefPetic) {
-        petic = creeazaTeren(reliefPetic, {
-          deplasare: reliefPetic.meta.deplasare_scena,
-          paleta,
-          pastreaza: mascaPetic(),
-          material: materialTeren,
-        });
-        scena.add(petic.obiect);
-      }
-    } catch (e) {
-      console.error('terenul nu s-a putut genera:', e.message);
-      cereRandare();
-      return { nrTriunghiuri: 0, eroare: e.message };
-    }
-    cereRandare();
-    return { nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0) };
+  const petic = reliefPetic
+    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta })
+    : null;
+  if (petic) {
+    scena.add(petic.obiect);
+    deEliberat.push(() => petic.dispose());
   }
-
-  // Conversiile se fac pe metadatele BAZEI, nu ale peticului: scena e centrată pe
-  // ea, iar peticul e doar o plasă mai fină așezată înăuntru. Tot de acolo vin și
-  // `colturi_geo`, pe care peticul nici nu le are.
-  const geo = creeazaGeo(relief.meta);
-
-  const selectie = creeazaSelectie3d({
-    canvas, camera, controale, scena, geo,
-    terenObiect: () => teren?.obiect,   // se schimbă la fiecare regenerare
-    inaltimeLa: (x, z) => teren?.inaltimeLa(x, z) ?? 0,
-    aplica(noua) { cutie = noua; return regenereaza(); },
-    laSchimbare: laSelectie,
-    cereRandare,
-    // Banda din sidecar intră prin selector, nu pe lângă el.
-    cutieInitiala: bandaDate
-      ? { xMin: -Infinity, xMax: Infinity, zMin: -Infinity, zMax: Infinity,
-          yMin: bandaDate.min, yMax: bandaDate.max }
-      : null,
-  });
-  deEliberat.push(() => selectie.dispose());
-
-  // O selecție salvată se aplică la reîncărcare: asta înseamnă „folosesc numai
-  // acea selecție". Panoul arată limpede că e una activă, cu un buton de golit.
-  //
-  // Se citește ÎNAINTE de prima construcție: altfel terenul s-ar genera o dată
-  // întreg și imediat a doua oară tăiat, cu un vârf dublu de memorie tocmai pe
-  // calea cea mai fragilă.
-  selectie.incarca();
-  cutie = selectie.cutieCurenta();
-  regenereaza();
-  selectie.seteazaNrTriunghiuri((teren?.nrTriunghiuri ?? 0) + (petic?.nrTriunghiuri ?? 0));
 
   // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
   // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,
@@ -240,7 +155,22 @@ async function construieste(canvas, renderer, deEliberat, curata, laSelectie) {
   aplicaMiscare();
   faraMiscare?.addEventListener?.('change', aplicaMiscare);
 
+  // Busola. E DOM peste scenă, nu geometrie, dar aparține scenei: fără cameră
+  // n-are ce arăta, iar fără WebGL nici nu se creează. Metadatele sunt ale BAZEI
+  // — peticul n-are `colturi_geo` — și de acolo își deduce nordul adevărat.
+  // Întoarce null dacă nu-l poate deduce; atunci pagina rămâne fără ea.
+  const busola = creeazaBusola({
+    gazda: canvas.parentElement ?? document.body,
+    camera, controale, cereRandare,
+    colturi: relief.meta?.colturi_geo,
+  });
+  if (busola) deEliberat.push(() => busola.dispose());
+
   renderer.setAnimationLoop(() => {
+    // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
+    // doar dacă desenează — deci animația busolei se agață aici, nu într-un al
+    // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
+    busola?.pas();
     const seMisca = controale.enableDamping && controale.update();
     if (redimensioneaza(renderer)) {
       const c = renderer.domElement;
@@ -264,13 +194,9 @@ async function construieste(canvas, renderer, deEliberat, curata, laSelectie) {
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, selectie, geo,
+    renderer, scena, camera, controale, teren, petic, busola,
     get relief() { return viu ? relief : null; },
-    // Plasele se înlocuiesc la fiecare selecție, deci se dau prin gettere:
-    // o proprietate fixată la pornire ar rămâne la plasa moartă.
-    get teren() { return teren; },
-    get petic() { return petic; },
-    get nrTriunghiuri() { return (teren?.nrTriunghiuri ?? 0) + (petic?.nrTriunghiuri ?? 0); },
+    nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
     // nicio valoare sub gaură. Nimic nu-l cheamă acum, dar e accesorul firesc
     // pentru așezarea unui reper pe teren, la capitolele care urmează.
@@ -286,12 +212,11 @@ async function construieste(canvas, renderer, deEliberat, curata, laSelectie) {
       faraMiscare?.removeEventListener?.('change', aplicaMiscare);
       // Aceeași listă ca la eșecul pornirii, nu o copie scrisă de mână.
       //
-      // Înainte, `dispose()` înșira resursele pe de rost — și sărise peste
-      // selector: trei geometrii rămase vii, patru ascultători de pointer încă
-      // pe canvas, iar o tragere de după `dispose()` reconstruia 250 MB de plase
-      // într-o scenă moartă, cu un renderer deja eliberat. Cu o singură listă,
-      // orice resursă adăugată de acum încolo se eliberează pe amândouă căile
-      // fără să-și mai amintească nimeni de ea. `curata()` e idempotent.
+      // Două căi care eliberează aceleași resurse se despart încet: una capătă o
+      // resursă nouă, cealaltă n-o află niciodată, iar ce rămâne viu sunt tocmai
+      // lucrurile pe care nu le mai caută nimeni. Cu o singură listă, orice se
+      // adaugă de acum încolo se eliberează pe amândouă căile fără să-și mai
+      // amintească cineva de ea. `curata()` e idempotent.
       curata();
       renderer.dispose();
       // Aici NU se cheamă `forceContextLoss()`, spre deosebire de calea de eroare

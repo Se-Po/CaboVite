@@ -35,16 +35,6 @@ const POLIGON_GEO = [
   [-9.2298, 38.4110],
 ];
 
-// Banda de altitudine, metri deasupra nivelului mării. `null` înseamnă toată.
-//
-// Nu se aplică DATELOR: fișierul rămâne un DEM întreg, iar banda ajunge în
-// sidecar, de unde pagina o folosește ca să nu genereze plasa în afara ei. Așa e
-// reversibilă — schimbi banda fără să reconstruiești harta — și harta rămâne
-// validă pentru orice alt folos, nu doar pentru felia asta.
-//
-// Ambele constante se pot copia din panoul selectorului 3D din pagină.
-const BANDA_ALTITUDINE = null; // sau { min: 120, max: 140 }
-
 // Marea, în aceste date, NU e NODATA: LiDAR-ul o dă ca 0.0 m exact. Lăsată așa,
 // ar fi coplanară cu planul mării al scenei și ar produce z-fighting pe sute de
 // metri. O coborâm, ca linia țărmului să fie intersecția onestă a terenului cu
@@ -185,7 +175,6 @@ const main = () => {
     // dreptunghiulară ar avea de 1,7 ori mai multe celule, mai toate apă.
     poligon_scena: poligonScena,
     poligon_geo: POLIGON_GEO.map(([lon, lat]) => ({ lon, lat })),
-    ...(BANDA_ALTITUDINE ? { banda_altitudine: BANDA_ALTITUDINE } : {}),
     acoperire: {
       celule_in_poligon: inPolig,
       uscat_masurat_in_poligon: uscatInPolig,

@@ -68,9 +68,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   padding-left: 18px;
 }
 
-/* Un contur de focus vizibil, pentru linkurile din text. Regula asta locuia
-   în panoul de unelte, care a fost scos; fără ea pagina ar rămâne cu inelul
-   implicit al browserului, care pe fond cald aproape nu se vede. */
+/* Un contur de focus vizibil, pentru linkurile din text. Fără el, pagina rămâne
+   cu inelul implicit al browserului, care pe fond cald aproape nu se vede. */
 :focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 2px;
@@ -85,134 +84,120 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   }
 }
 
-/* --------------------------------------------------------------- unealta
+/* ------------------------------------------------------------------ busola
  *
- * Panoul selectorului 3D. E unealtă, nu conținut: se șterge blocul ăsta,
- * <aside id="unelte"> din index.html și blocul din main.js, iar pagina redevine
- * curat narativă. Decupajul hărții nu atârnă de el.
+ * Rozeta stă fixă în colț, peste scenă. E unealtă de orientare, nu conținut: se
+ * șterge blocul ăsta împreună cu `creeazaBusola()` din scena.js, iar pagina
+ * rămâne întreagă.
  *
- * Fonturile rămân mari și contrastul ridicat, ca peste tot în pagină: o unealtă
- * nu e o scuză să scădem sub principiile de accesibilitate.
+ * z-index 2: peste canvas (0) și peste text (1). Cutia NU prinde clicuri —
+ * numai butonul — ca derularea textului pe sub ea să meargă mai departe.
+ *
+ * Culorile poartă informația după contrast, nu după gust: `--accent` pe acul de
+ * nord și pe litera N (7,6:1 pe tema deschisă, 7,2:1 pe cea întunecată),
+ * `--muted` pe rest (6,5 / 7,1), `--ink` pe cifră. `--gold` NU atinge text sau
+ * linii subțiri: pe tema deschisă are 3,91:1 pe `--bg`, sub pragul de 4,5:1.
+ * Rămâne unde 3:1 e de ajuns — inelul de focus și conturul la trecerea cu
+ * mouse-ul.
+ *
+ * Discul e OPAC, nu translucid. Altfel contrastul acului s-ar măsura față de
+ * niște pixeli necunoscuți de teren, iar niciuna din cifrele de mai sus n-ar mai
+ * însemna nimic.
+ *
+ * Nicio tranziție CSS pe `transform`: regula de mai sus ar stinge-o oricum la
+ * prefers-reduced-motion, iar o tranziție s-ar bate cap în cap cu actualizarea
+ * pe cadru. Rotirea e atribut SVG scris din JS.
  */
-
-#unelte {
+#busola {
   position: fixed;
   top: 1rem;
-  left: 1rem;
-  z-index: 10;
-  width: min(22rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
-  padding: 0.9rem 1rem 1rem;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
-  font-family: var(--sans);
-  font-size: 0.95rem;
-  color: var(--ink);
-}
-
-#unelte h2 {
-  margin: 0 0 0.6rem;
-  font-family: var(--serif);
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-#unelte .rand {
+  right: 1rem;
+  z-index: 2;
+  pointer-events: none;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.6rem;
+  font-family: var(--sans);
 }
 
-#unelte button {
-  font: inherit;
-  padding: 0.4rem 0.7rem;
-  min-height: 2.75rem;         /* 44 px: ținta minimă de atingere, nu mărimea textului */
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--bg);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-#unelte button:hover { border-color: var(--gold); }
-
-#unelte button[aria-pressed="true"] {
-  background: var(--gold);
-  border-color: var(--gold);
-  color: var(--bg);
-}
-
-#unelte .ajutor {
-  margin: 0 0 0.7rem;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--muted);
-}
-
-#unelte .banda label {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.88rem;
-  color: var(--muted);
-}
-
-#unelte input[type="number"] {
-  font: inherit;
-  width: 5rem;
-  min-height: 2.75rem;
-  padding: 0.3rem 0.4rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-#unelte dl {
+#busola .roza {
+  pointer-events: auto;
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.15rem 0.7rem;
-  margin: 0 0 0.7rem;
-  font-size: 0.88rem;
-}
-
-#unelte dt { color: var(--muted); }
-#unelte dd { margin: 0; font-variant-numeric: tabular-nums; }
-
-#unelte summary {
-  cursor: pointer;
-  font-size: 0.88rem;
-  color: var(--muted);
-  min-height: 2.2rem;
-  display: flex;
-  align-items: center;
-}
-
-#unelte textarea {
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0.4rem 0;
-  padding: 0.5rem;
-  font: 0.8rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+  place-items: center;
+  width: 6rem;               /* 96 px, mult peste ținta minimă de atingere de 44 px */
+  height: 6rem;
+  padding: 0;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 50%;
   background: var(--bg);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
   color: var(--ink);
-  resize: vertical;
+  font: inherit;
+  cursor: pointer;
 }
 
-/* Pe telefon panoul stă jos: sus ar acoperi tocmai terenul pe care desenezi. */
+#busola .roza:hover { border-color: var(--gold); }
+
+#busola svg { width: 5.25rem; height: 5.25rem; display: block; }
+
+#busola .disc    { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+#busola .ac-nord { fill: var(--accent); }
+#busola .ac-sud  { fill: var(--muted); }
+#busola .pivot   { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; }
+
+#busola .eticheta {
+  font-family: var(--sans);
+  font-size: 18px;
+  font-weight: 600;
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+#busola .eticheta.nord { fill: var(--accent); font-weight: 700; }
+
+#busola .citire {
+  pointer-events: none;
+  padding: 0.14rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;  /* cifra nu mai zvâcnește în lățime */
+  line-height: 1.3;
+}
+
+/* Anunțul pentru cititoarele de ecran. NU `display: none` — ascuns așa, un
+   aria-live nu mai anunță nimic. */
+#busola .anunt {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Pe telefon rozeta trece jos-dreapta: sus ar acoperi tocmai terenul. Aceeași
+   limită ca la panoul de unelte de dinainte. Rămâne peste 44 px. */
 @media (max-width: 34rem) {
-  #unelte {
+  #busola {
     top: auto;
-    bottom: 0.5rem;
-    left: 0.5rem;
-    right: 0.5rem;
-    width: auto;
-    max-height: 60vh;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   }
+  #busola .roza { width: 4.5rem; height: 4.5rem; }
+  #busola svg   { width: 3.9rem; height: 3.9rem; }
+  #busola .citire { font-size: 0.82rem; }
+}
+
+/* Modul de contrast forțat înlocuiește culorile autorului cu ale sistemului;
+   `fill` din variabile n-ar mai însemna nimic acolo. */
+@media (forced-colors: active) {
+  #busola .roza { background: Canvas; border-color: CanvasText; }
+  #busola .disc { fill: Canvas; stroke: CanvasText; }
+  #busola .ac-nord { fill: Highlight; }
+  #busola .ac-sud, #busola .eticheta, #busola .pivot { fill: CanvasText; }
 }
