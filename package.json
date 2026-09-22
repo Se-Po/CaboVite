@@ -8,8 +8,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "copy-decoders": "node scripts/copy-decoders.mjs",
-    "fetch-dem": "node scripts/fetch-dem.mjs",
-    "build-lagosteiros": "node scripts/build-lagosteiros.mjs",
     "build-zona": "node scripts/build-zona.mjs",
     "build-petic": "node scripts/build-petic.mjs",
     "citeste-poze": "node scripts/citeste-poze.mjs",

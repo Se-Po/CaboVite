@@ -2,17 +2,15 @@
 // ca o singură instanță refolosită — deocamdată doar relieful.
 
 /**
- * Încarcă heightmap-ul produs de `npm run fetch-dem`.
+ * Încarcă heightmap-ul produs de `npm run build-petic`, împreună cu baza lui,
+ * produsă de `npm run build-zona`.
  *
  * Fișierul e Uint16 little-endian, rând 0 = nord. Verificăm lungimea, pentru că
  * un fișier trunchiat ar produce un teren aberant în loc de o eroare limpede.
  *
- * Implicit: harta_v1 — peticul de 1 m, care își aduce singur baza (harta_v0, la
- * 2 m) prin cheia `baza` din sidecar. Celelalte hărți rămân pe disc și se cer
- * prin argumente, fără să se schimbe nimic aici:
- *   `/data/harta_v0-dem.*`     zona aleasă în pagină, LiDAR 2 m
- *   `/data/espichel-dem.*`     promontoriul întreg, Copernicus GLO-30 (30 m)
- *   `/data/lagosteiros-dem.*`  golful Lagosteiros, LiDAR 2 m
+ * Proiectul are o singură hartă, în două rezoluții. Implicit se cere `harta_v1`
+ * — peticul de 1 m — care își aduce singur baza, `harta_v0` la 2 m, prin cheia
+ * `baza` din sidecar. Numele bazei nu e scris nicăieri în cod: vine din date.
  *
  * `adancime` oprește lanțul de baze. O hartă care s-ar referi la ea însăși — o
  * greșeală de tastare în sidecar — ar încărca la nesfârșit altfel.

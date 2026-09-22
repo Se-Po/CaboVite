@@ -127,9 +127,9 @@ export function citesteIfd(buf, off, le = true, baza = 0, big = false) {
 /**
  * Antetul unei dale MDT de la DGT: TIFF little-endian, necomprimat, cu benzi.
  *
- * Versiunea unificată a celor trei copii din build-zona / build-petic /
- * build-lagosteiros. `stripOcteti` era întors doar de una dintre ele; îl întoarce
- * acum pentru toate, fiindcă nu costă nimic și lipsa lui era o inconsecvență.
+ * Versiunea unificată a copiilor din build-zona și build-petic. Întorcea și
+ * `stripOcteti` (tagul 279), cerut de un al treilea script, șters între timp;
+ * nimeni nu-l mai citea, deci a plecat odată cu el.
  */
 export function citesteTiffDGT(cale) {
   const buf = readFileSync(cale);
@@ -148,7 +148,7 @@ export function citesteTiffDGT(cale) {
     latime: d.scalar(256), inaltime: d.scalar(257), rezolutie: ps[0],
     x0: tp[3], y0: tp[4], // TiePoint dă colțul stânga-sus; în TM06 Y crește spre nord
     randuriPeStrip: d.scalar(278),
-    stripOffsets: d.valori(273), stripOcteti: d.valori(279),
+    stripOffsets: d.valori(273),
   };
 }
 

@@ -26,7 +26,8 @@ export function creeazaGeo(meta) {
   // de măsurat. Dar nodurile sunt simetrice față de centru în AMBELE convenții:
   // la muchii fiindcă stau în centrele celulelor, la noduri fiindcă marginea e
   // chiar primul nod. Deci ancorat pe centru, conversia nu mai depinde de care e.
-  // Verificat pe harta_v0, harta_v1 și lagosteiros: diferență exact zero.
+  // Verificat pe harta_v0 și harta_v1 — deci pe ambele convenții — plus pe o a
+  // treia hartă de atunci, ștearsă între timp: diferență exact zero.
   const centru = b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null;
 
   /** Metri de scenă → metri TM06. Exactă, nu aproximativă: e o translație. */
@@ -49,17 +50,6 @@ export function creeazaGeo(meta) {
    * muchii de celulă. Diferența ar fi o jumătate de celulă, adică ~1 m aici.
    */
   const laGeo = (x, z) => {
-    // Copernicus dă direct un bbox geografic; acolo nu e nimic de rotit.
-    const geo = meta.bbox;
-    if (geo) {
-      const u = (x / pasX + (w - 1) / 2) / (w - 1);
-      const v = (z / pasZ + (h - 1) / 2) / (h - 1);
-      return {
-        lon: +(geo.vest + u * (geo.est - geo.vest)).toFixed(6),
-        lat: +(geo.nord - v * (geo.nord - geo.sud)).toFixed(6),
-      };
-    }
-
     const c = meta.colturi_geo;
     if (!c || !b) return null;
     const t = laTM06(x, z);

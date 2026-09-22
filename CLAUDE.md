@@ -28,10 +28,10 @@ se poartă în română.
 | `npm run ortofoto` | culori din ortofotoul aerian DGT (RGB + infraroșu) |
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
 
-Scripturile de construit hărți (`fetch-dem`, `build-zona`, `build-petic`,
-`build-lagosteiros`) cer date-sursă care nu sunt în depozit; vezi mai jos.
-Codul lor comun — proiecția TM06, mersul prin IFD-urile unui TIFF, citirea unei
-hărți gata făcute, EXIF-ul — stă în `scripts/comun/`.
+Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
+nu sunt în depozit; vezi mai jos. Codul lor comun — proiecția TM06, mersul prin
+IFD-urile unui TIFF, citirea unei hărți gata făcute, EXIF-ul — stă în
+`scripts/comun/`.
 
 ## Arhitectură
 
@@ -86,8 +86,6 @@ nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`
 |---|---|---|
 | `harta_v1` | LiDAR DGT, MDT 50 cm mediat | petic de 534 × 700 m la 1 m, peste `harta_v0` |
 | `harta_v0` | LiDAR DGT 2024-2025, MDT 2 m | conturul ales în pagină, 4,00 km², 2 m |
-| `espichel-dem` | Copernicus DEM GLO-30 | promontoriul întreg, 4,12 × 3,93 km, ~30 m |
-| `lagosteiros-dem` | LiDAR DGT, MDT 2 m | golful Lagosteiros, 1,5 × 1,1 km, 2 m |
 
 O hartă poate avea cheia `baza`: atunci e un **petic** de rezoluție mai mare,
 iar `incarcaRelief()` încarcă și baza. Scena generează două plase — baza, cu o
@@ -98,6 +96,12 @@ comună e aceeași linie și nu rămâne nicio crăpătură.
 Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loaders.js`. Datele-sursă
 (`date-sursa/`) nu intră în depozit; hărțile produse, da — altfel pagina nu se
 poate încărca dintr-o clonă curată.
+
+Depozitul păstrează **exact** harta pe care o încarcă pagina, și nimic altceva:
+`harta_v1` plus baza ei, `harta_v0`. Hărțile de probă de dinainte — promontoriul
+întreg din Copernicus GLO-30 și golful Lagosteiros — au fost șterse împreună cu
+scripturile lor, tocmai ca să nu mai existe îndoială care hartă e „cea bună".
+Sunt recuperabile din istoricul git.
 
 Conturul unei hărți se scrie ca longitudine/latitudine în constanta
 `POLIGON_GEO` din capul lui `scripts/build-zona.mjs` (sau `build-petic.mjs`),
@@ -256,8 +260,9 @@ prima și `(lățime − 1) · pas` la a doua (2328 față de 2326; 534 față d
 se potrivește niciuna. Nu presupune.
 
 Ancorat pe **centrul** cutiei, conversia nu mai depinde deloc de convenție:
-nodurile sunt simetrice față de centru în ambele cazuri. Verificat pe `harta_v0`,
-`harta_v1` și `lagosteiros` — diferență exact zero. De aceea `geo.js` folosește
+nodurile sunt simetrice față de centru în ambele cazuri. Verificat pe `harta_v0`
+și `harta_v1` — deci pe ambele convenții — plus pe o a treia hartă de atunci,
+ștearsă între timp: diferență exact zero. De aceea `geo.js` folosește
 `TM06 = scenă + centrul cutiei`, iar nu un colț.
 
 ### Ce a ieșit la recenzie, și rămâne valabil
