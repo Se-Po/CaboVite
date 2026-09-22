@@ -13,6 +13,17 @@ function faraScena(motiv) {
   console.info('Pagina rulează fără scenă 3D:', motiv);
 }
 
+// Textul ÎNAINTE de scenă, nu după.
+//
+// Blocul ăsta stătea sub `try`, deci prima vopsire aștepta 4 225 774 de octeți
+// de relief și construirea a 1,36 milioane de triunghiuri. Principiul
+// proiectului spune că textul e conținutul și scena îl servește; codul spunea
+// invers. Mutat aici, nu mai așteaptă nimic.
+if (continut && !continut.textContent.trim()) {
+  continut.innerHTML =
+    '<p class="provizoriu">Textul capitolelor se adaugă la pasul următor.</p>';
+}
+
 try {
   const scena = await porneste(canvas);
   if (!scena) {
@@ -27,9 +38,4 @@ try {
   }
 } catch (e) {
   faraScena(e.message);
-}
-
-if (continut && !continut.textContent.trim()) {
-  continut.innerHTML =
-    '<p class="provizoriu">Textul capitolelor se adaugă la pasul următor.</p>';
 }

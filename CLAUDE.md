@@ -178,9 +178,9 @@ punctul, în trei sisteme, și cât de sus. Butonul copiază tot, cu punct zecim
 panoul e text românesc și se citește, textul copiat pleacă în altă parte.
 
 **Nu se dă raycast pe plasă.** `raycaster.intersectObject()` pe geometria
-neindexată de 2,75 milioane de triunghiuri costă **53 ms pe rază**, măsurat.
-Pe un câmp de înălțimi nu e nevoie: se merge pe rază cu pasul de 8 m, se prinde
-schimbarea de semn față de `inaltimeLa`, apoi 22 de bisecții. Măsurat acum:
+neindexată costă **53 ms pe rază**, măsurat pe cele 2,56 milioane de triunghiuri
+de atunci. Pe un câmp de înălțimi nu e nevoie: se merge pe rază cu pasul de
+8 m, se prinde schimbarea de semn față de `inaltimeLa`, apoi 22 de bisecții. Măsurat acum:
 **0,19 ms**. Și e *mai* exact — pe fiecare celulă testează chiar interpolarea pe
 care o citește `inaltimeLa`, nu triunghiurile plasei decupate.
 
@@ -217,6 +217,55 @@ peticului și până la 0,153 m pe cusătură.
 ancorate pe **centrul** lui `bbox_tm06` — vezi convenția de mai sus. Longitudinea
 și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
 mai multe ar fi precizie inventată peste o sursă rotunjită.
+
+## Cum se generează plasa terenului
+
+`src/scene/terrain.js` transformă grila de înălțimi într-un singur mesh cu
+fațete plate. Patru lucruri de acolo nu se pot ghici din cod fără măsurătoarea
+care le-a motivat.
+
+**Celulele de apă nu se generează.** Toate patru nodurile la `zMin_m` înseamnă
+umplutură, nu batimetrie — o spune `regula_apa` din sidecar. Sunt 477 166 din
+cele 907 427 de celule păstrate ale bazei (52,6%) și 122 858 din cele 373 800
+ale peticului (32,9%), iar marea e un plan **opac** de 40 km la `COTA_MARE`, pe
+sub care camera nu poate coborî: ținta stă la y = 60, `minDistance` e 80 și
+`maxPolarAngle` e π/2 − 0,04, deci camera rămâne peste 64,6 m. Erau desenate la
+fiecare cadru și nu se puteau vedea niciodată. Triunghiuri: 2 562 454 → 1 362 406.
+
+Se taie numai celulele cu TOATE patru nodurile la cotă; malul rămâne întreg. Iar
+`inaltimeLa` citește din `grila`, nu din plasă, deci panoul punctului măsoară
+peste apă exact ca înainte — verificat: un clic pe mare întoarce punctul la
+centimetru și eticheta „apă".
+
+**Nu există atribut `normal`.** Cu `flatShading: true`, shaderul r186 nu-l
+citește: sub `FLAT_SHADED` varianta `vNormal` nici nu se declară, iar
+`normal_fragment_begin` calculează `normalize(cross(dFdx, dFdy))` — planul
+fațetei, adică exact ce am fi scris. Pe geometrie neindexată cu normale de
+fațetă cele două sunt același plan. Scapă 92 248 344 de octeți din RAM și de pe
+placă, plus 127 ms de `computeVertexNormals()` la fiecare pornire.
+
+**Culoarea stă pe `Uint16` normalizat**, 6 octeți pe vârf în loc de 12. `Uint8`
+NU merge: valorile din atribut sunt liniare, iar un pas de 1/255 în liniar
+înseamnă la luminozitate mică ~2,5 niveluri de afișare — benzi pe faleza
+umbrită. Pe 16 biți eroarea e 0,0005–0,0011 dintr-un nivel din 255.
+
+**Conversia sRGB → liniar se face dintr-un tabel de 256 de intrări**, nu prin
+`Color.setHex` pe fiecare fațetă. E bit-identică — aceeași formulă din
+`ColorManagement.SRGBToLinear`, pe aceeași intrare `octet / 255` —, verificată
+în pagină față de `setHex` însuși pe șapte culori, inclusiv alb, negru și
+0x010101.
+
+**Sfera de încadrare se scrie, nu se calculează.** Dar nu se poate nici lăsa
+`null`: `WebGLRenderer` o calculează el pe calea de sortare, activă implicit.
+
+Efectul cumulat, măsurat pe pagină: atributele de vârf scad de la 276 745 032 la
+**73 569 924 de octeți (−73,4%)**, în RAM și pe GPU deodată.
+
+Proba care contează: randare într-o țintă fixă de 640 × 400, aceeași cameră,
+înainte și după. Din 256 000 de pixeli **diferă 176, adică 0,069%, fiecare cu
+exact 1 din 255 pe un singur canal** — cuantizarea culorii, răsturnând rotunjirea
+acolo unde pixelul stătea chiar pe pragul ei. Nu e „identic la pixel", și nu se
+scrie așa.
 
 ## Principii de design (nenegociabile)
 

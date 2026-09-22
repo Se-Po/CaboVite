@@ -25,6 +25,18 @@ export async function incarcaRelief(
   if (!rBin.ok) throw new Error(`relieful: HTTP ${rBin.status} la ${urlBin}`);
 
   const meta = await rMeta.json();
+
+  // Baza pleacă ACUM, nu după ce peticul a ajuns întreg și a fost convertit.
+  //
+  // Numele ei stă în sidecarul tocmai sosit, iar cele două descărcări n-au nimic
+  // de împărțit. Ce se câștigă e un dus-întors plus bucla de conversie, nu timpul
+  // de transfer: pe o legătură limitată de lățime de bandă tot 4,23 MB trebuie
+  // duși oricum. Se scoate din serie așteptarea, nu octeții.
+  const bazaGata = (meta.baza && adancime < 1)
+    ? incarcaRelief(`/data/${meta.baza}-dem.bin`, `/data/${meta.baza}-dem.json`, adancime + 1)
+    : null;
+  bazaGata?.catch(() => {});   // tratarea adevărată e la `await`, mai jos
+
   const buf = await rBin.arrayBuffer();
   const asteptat = meta.latime * meta.inaltime * 2;
   if (buf.byteLength !== asteptat)
@@ -43,9 +55,7 @@ export async function incarcaRelief(
     meta,
   };
 
-  if (meta.baza && adancime < 1)
-    relief.baza = await incarcaRelief(
-      `/data/${meta.baza}-dem.bin`, `/data/${meta.baza}-dem.json`, adancime + 1);
+  if (bazaGata) relief.baza = await bazaGata;
 
   return relief;
 }

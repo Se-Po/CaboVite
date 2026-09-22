@@ -57,9 +57,24 @@ export async function porneste(canvas) {
 }
 
 async function construieste(canvas, renderer, deEliberat, curata) {
+  // Relieful pleacă ACUM, înaintea așteptării de mai jos.
+  //
+  // Paleta măsurată e un JSON de 5 KB; relieful e 4,23 MB în patru fișiere. N-au
+  // nimic de împărțit, dar stăteau în serie: un dus-întors întreg, 50–200 ms pe
+  // mobil, doar ca să aștepte cine vine primul.
+  //
+  // `catch`-ul gol nu înghite nimic: marchează promisiunea ca tratată, ca o
+  // respingere sosită în fereastra de până la `await` să nu iasă ca
+  // `unhandledrejection`. Tratarea adevărată e mai jos, la `await`, de unde
+  // excepția urcă în `porneste()` ca înainte.
+  const reliefGata = incarcaRelief();
+  reliefGata.catch(() => {});
+
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
-  // Dacă ar veni după, ar trebui regenerată toată geometria ca să se vadă.
+  // Dacă ar veni după, ar trebui regenerată toată geometria ca să se vadă. Deci
+  // se așteaptă aici — dar acum așteptarea se suprapune peste descărcarea hărții,
+  // nu stă înaintea ei.
   await incarcaPaleta();
 
   const paleta = paletaCurenta();
@@ -83,13 +98,17 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   deEliberat.push(() => mare.dispose());
 
   // Aruncă la HTTP eșuat sau la fișier trunchiat — verificate amândouă în loaders.js.
-  const incarcat = await incarcaRelief();
+  const incarcat = await reliefGata;
 
   // Fișierul cerut poate fi un petic de rezoluție mai mare, care își aduce baza
   // cu el. Terenul principal rămâne baza; peticul e o a doua plasă, așezată în
   // gaura lăsată de ea. Două plase, nu una cu densitate variabilă: o singură
   // grilă are un singur pas, prin definiție.
-  const relief = incarcat.baza ?? incarcat;
+  // `let`, nu `const`: getterul de mai jos îl captează, iar obiectul întors
+  // trăiește în `globalThis.__scena` pe vecie. Fără să poată fi golit, `viu = false`
+  // ar ascunde doar referința, nu ar stinge-o — cei 6,63 MiB ai bazei ar rămâne
+  // vii după dispose(), exact ce spunea comentariul de jos că NU se întâmplă.
+  let relief = incarcat.baza ?? incarcat;
   const reliefPetic = incarcat.baza ? incarcat : null;
 
   // Datele extrase pentru o zonă aleasă poartă poligonul cu ele. Plasa se
@@ -206,13 +225,22 @@ async function construieste(canvas, renderer, deEliberat, curata) {
     renderer.render(scena, camera);
   });
 
-  // Relieful se dă printr-un getter care se stinge la dispose().
+  // Relieful se dă printr-un getter, iar referința se STINGE la dispose(), nu se
+  // ascunde doar.
   //
-  // `terrain.js` își pune anume `grila = null` când se eliberează, dar tabloul de
-  // înălțimi trăiește și aici, iar `main.js` ține obiectul în `globalThis.__scena`
-  // pentru totdeauna. Fără stingerea asta, cele 2,1 milioane de valori — bază plus
-  // petic, ~8,4 MB — ar rămâne vii după dispose() și ar anula intenția de acolo.
-  // Nu e memorie GPU, dar e memorie.
+  // Deosebirea nu e teoretică, s-a măsurat. Comentariul de aici spunea înainte că
+  // `terrain.js` își pune `grila = null` și că steagul de mai jos completează
+  // treaba — dar acolo `Y` citea tabloul printr-un AL DOILEA nume, `inaltimi`,
+  // deci `grila = null` nu elibera nimic: 0 din 6,63 MiB, pe modulul adevărat.
+  // Iar aici `relief` era `const`, deci `viu = false` ascundea referința fără s-o
+  // poată rupe, iar `main.js` ține obiectul în `globalThis.__scena` pe vecie.
+  //
+  // Amândouă s-au reparat, și era nevoie de amândouă: `terrain.js` ține peticul
+  // (1,43 MiB), getterul de aici ține baza (6,63 MiB). Una singură ar fi lăsat
+  // impresia unui dispose() curat fără să fie.
+  //
+  // Nu e memorie GPU, dar e memorie — iar atributele plasei, mult mai mari, le
+  // eliberează `teren.dispose()` prin `curata()`.
   let viu = true;
 
   return {
@@ -228,6 +256,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
     memorie: () => instantaneuMemorie(renderer),
     dispose() {
       viu = false;
+      relief = null;
       renderer.setAnimationLoop(null);
       controale.removeEventListener('change', cereRandare);
       controale.removeEventListener('start', laStart);
