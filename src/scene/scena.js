@@ -7,6 +7,8 @@ import { creeazaMare } from './mare.js';
 import { incarcaRelief } from './loaders.js';
 import { incarcaPaleta, paletaCurenta } from './palette.js';
 import { creeazaBusola } from './busola.js';
+import { creeazaGeo } from './geo.js';
+import { creeazaPunct } from './punct.js';
 import { instantaneuMemorie } from './dispose.js';
 
 // Orchestrarea scenei și randarea la cerere.
@@ -166,6 +168,25 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   });
   if (busola) deEliberat.push(() => busola.dispose());
 
+  // Conversiile se fac pe metadatele BAZEI, nu ale peticului: scena e centrată
+  // pe ea, iar peticul e doar o plasă mai fină așezată înăuntru. Tot de acolo
+  // vin și `colturi_geo`, pe care peticul nici nu le are.
+  const geo = creeazaGeo(relief.meta);
+
+  // Panoul punctului. Primește `inaltimeLa` COMPUS — cel care alege peticul de
+  // 1 m acolo unde există — fiindcă e o unealtă de măsurat, iar diferența dintre
+  // plase pe cusătură s-a măsurat la 0,153 m. Întoarce null dacă harta nu poate
+  // exprima un punct în longitudine/latitudine.
+  const punct = creeazaPunct({
+    gazda: canvas.parentElement ?? document.body,
+    canvas, camera, geo,
+    inaltimeLa: (x, z) =>
+      (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z)),
+    limitaDatelor,
+    zMin: relief.meta?.zMin_m,
+  });
+  if (punct) deEliberat.push(() => punct.dispose());
+
   renderer.setAnimationLoop(() => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
     // doar dacă desenează — deci animația busolei se agață aici, nu într-un al
@@ -194,7 +215,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, busola,
+    renderer, scena, camera, controale, teren, petic, busola, punct, geo,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are

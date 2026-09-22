@@ -201,3 +201,147 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #busola .ac-nord { fill: Highlight; }
   #busola .ac-sud, #busola .eticheta, #busola .pivot { fill: CanvasText; }
 }
+
+/* ------------------------------------------------------- punctul de sub clic
+ *
+ * Panoul cu coordonatele punctului ales. Unealtă, nu conținut: se șterge blocul
+ * ăsta împreună cu `creeazaPunct()` din scena.js, iar pagina rămâne întreagă.
+ *
+ * STÂNGA, fiindcă busola e dreapta — sus pe desktop, jos sub 34rem, unde busola
+ * coboară și ea. Cele două nu se ating pe nicio lățime.
+ *
+ * `pointer-events: none` pe recipient, `auto` numai pe buton: altfel panoul ar
+ * fura tocmai clicurile pe teren pe care e pus să le raporteze.
+ *
+ * Culorile după contrast, ca la busolă: `--ink` pe cifrele mari, `--muted` pe
+ * etichete și pe rândurile mici, `--accent` pe altitudinea fără acoperire —
+ * trebuie să sară în ochi că nu e o măsurătoare. `--gold` numai pe focus și
+ * hover, unde 3:1 ajunge.
+ */
+#punct {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 2;
+  pointer-events: none;
+  font-family: var(--sans);
+}
+
+#punct .cutie {
+  width: min(17rem, calc(100vw - 2rem));
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;  /* cifrele nu mai zvâcnesc la fiecare clic */
+}
+
+#punct .indemn {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+#punct dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.6rem;
+  margin: 0;
+}
+
+#punct dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  align-self: baseline;
+}
+
+#punct dd {
+  margin: 0;
+  text-align: right;
+}
+
+#punct .mari dd {
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Altitudinea fără acoperire: nu e o cifră, deci nu arată ca una. */
+#punct .mari dd.fara {
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+#punct .mici {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+#punct .mici dd {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+#punct .copiaza {
+  pointer-events: auto;
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;         /* 44 px: ținta minimă de atingere, nu mărimea textului */
+  margin-top: 0.6rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#punct .copiaza:hover { border-color: var(--gold); }
+
+/* Anunțul pentru cititoarele de ecran. NU `display: none` — ascuns așa, un
+   aria-live nu mai anunță nimic. */
+#punct .anunt {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Ultima din bloc, și nu întâmplător.
+ *
+ * `hidden` e doar `display: none` din foaia browserului, cu specificitatea
+ * (0,1,0): orice regulă de mai sus care are id în selector îl bate și l-ar anula
+ * tăcut. Aici specificitatea e (1,1,0) — egală cu a lui `.copiaza`, deci decide
+ * ordinea din fișier. De aceea stă la urmă: ca să acopere tot ce e deasupra ei. */
+#punct [hidden] { display: none; }
+
+/* Pe telefon coboară, ca busola, dar în colțul celălalt. */
+@media (max-width: 34rem) {
+  #punct {
+    top: auto;
+    left: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  #punct .cutie { width: min(14.5rem, calc(100vw - 7rem)); padding: 0.55rem 0.7rem; }
+  #punct .mari dd { font-size: 1rem; }
+  #punct .mici dd { font-size: 0.72rem; }
+}
+
+@media (forced-colors: active) {
+  #punct .cutie,
+  #punct .copiaza { background: Canvas; border-color: CanvasText; color: CanvasText; }
+  #punct .mari dd.fara { color: Highlight; }
+}

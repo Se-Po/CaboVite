@@ -171,6 +171,53 @@ dovada că punctul e cel adevărat, nu cel al grilei. Iar
 `__scena.busola.convergenta` trebuie să cadă la mai puțin de 0,001 de valoarea
 analitică: pragul e ales ca să pice dacă factorul elipsoidal lipsește.
 
+## Punctul de sub clic
+
+`src/scene/punct.js` — clic stâng pe scenă, iar panoul din stânga spune unde e
+punctul, în trei sisteme, și cât de sus. Butonul copiază tot, cu punct zecimal:
+panoul e text românesc și se citește, textul copiat pleacă în altă parte.
+
+**Nu se dă raycast pe plasă.** `raycaster.intersectObject()` pe geometria
+neindexată de 2,75 milioane de triunghiuri costă **53 ms pe rază**, măsurat.
+Pe un câmp de înălțimi nu e nevoie: se merge pe rază cu pasul de 8 m, se prinde
+schimbarea de semn față de `inaltimeLa`, apoi 22 de bisecții. Măsurat acum:
+**0,19 ms**. Și e *mai* exact — pe fiecare celulă testează chiar interpolarea pe
+care o citește `inaltimeLa`, nu triunghiurile plasei decupate.
+
+**Butonul stâng rămâne al lui OrbitControls.** Selectorul de altădată îl
+confisca; aici nu. Ce deosebește clicul de rotire e un prag de **5 px** între
+apăsare și ridicare. Ridicarea se ascultă pe `globalThis`, nu pe canvas:
+OrbitControls mută `pointermove`/`pointerup` pe `ownerDocument` cât ține
+tragerea, deci o tragere care se termină în afara canvasului n-ar mai declanșa
+niciodată ridicarea pe el, iar apăsarea ar rămâne agățată.
+
+**Coordonatele au mereu acoperire, altitudinea nu.** Raza lovește un loc real
+chiar și pe apă, deci lon/lat, scena și TM06 se arată întotdeauna. Altitudinea
+primește etichetă, după două reguli verificabile:
+
+- **„în afara hărții"** dacă punctul cade în afara lui `poligon_scena`. Contează:
+  `inaltimeLa` prinde indicii la marginea grilei, deci acolo întoarce o valoare
+  interpolată din celule care n-au fost nici măcar randate — la (900, 900) iese
+  130,54 m, care pare măsurătoare și nu e.
+- **„apă"** dacă altitudinea nu e strict pozitivă. Regula vine din sidecar, nu
+  din ochi: `regula_apa` spune „exact 0.0 m sau NODATA (−999); plaja, care are
+  valori mici dar nenule, rămâne uscat", iar celulele acelea sunt coborâte la
+  `zMin_m = −8`, „artificiu de randare, nu batimetrie". Deci uscatul măsurat e
+  strict pozitiv prin construcție; orice valoare negativă e umplutură sau
+  interpolare cu ea.
+
+`Y` din coordonatele de scenă **este** altitudinea, deci primește exact același
+tratament: fără acoperire, se scrie „—", nu o cifră.
+
+Altitudinea vine din `inaltimeLa` **compus** — peticul de 1 m acolo unde există,
+baza de 2 m în rest. Nu e cosmetic: diferența dintre plase e ~2 mm în mijlocul
+peticului și până la 0,153 m pe cusătură.
+
+`src/scene/geo.js` face conversiile scenă ↔ TM06 ↔ longitudine/latitudine,
+ancorate pe **centrul** lui `bbox_tm06` — vezi convenția de mai sus. Longitudinea
+și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
+mai multe ar fi precizie inventată peste o sursă rotunjită.
+
 ## Principii de design (nenegociabile)
 
 - **Accesibilitate:** fonturi mari, contrast ridicat. Cititorii pot fi vârstnici.
