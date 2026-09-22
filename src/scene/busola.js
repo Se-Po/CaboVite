@@ -214,10 +214,16 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi }
    *
    * Nu prin `setAzimuthalAngle()` — nu există în r186, numai getterul. Nici prin
    * `rotateLeft()`, care există și e public: acela adună un DELTA în
-   * `_sphericalDelta`, iar deltele se compun. Două clicuri repezi, sau un clic
-   * peste inerția utilizatorului, ar trece de nord cu exact cât mai rămăsese de
-   * aplicat. Aici punem theta ABSOLUT, deci ținta e aceeași indiferent ce mai
-   * era pe drum, iar anularea e instantanee: nu rămâne nimic într-un acumulator.
+   * `_sphericalDelta`, iar deltele se compun. Două clicuri repezi ar trece de
+   * țintă cu exact cât mai rămăsese de aplicat. Aici punem theta ABSOLUT, deci
+   * ținta nu depinde de câte clicuri au fost.
+   *
+   * ATENȚIE: asta NU ne apără și de inerția utilizatorului. `update()` adaugă
+   * acumulatorul peste poziția pe care tocmai am scris-o, deci un theta absolut
+   * aterizează lângă țintă dacă acumulatorul nu e gol. De golit se golește în
+   * `laClic()`, o singură dată; vezi nota de acolo. Comentariul de aici spunea
+   * înainte că „nu rămâne nimic într-un acumulator" — era adevărat despre
+   * `rotateLeft()` și fals despre inerție.
    *
    * `update()` reface `lookAt`, aplică limitele și emite `change`, de unde se
    * redesenează rozeta. E necesar aici, nu doar în buclă: cu `enableDamping`
@@ -273,6 +279,37 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi }
   const laStart = () => { zbor = null; };
 
   function laClic() {
+    // Întâi se descarcă inerția rămasă de la utilizator. Abia apoi se citește de
+    // unde plecăm — altfel `de` ar fi un unghi pe care camera tocmai îl părăsește.
+    //
+    // `update()` nu citește doar poziția camerei, ci îi ADAUGĂ acumulatorul:
+    // `_spherical.theta += _sphericalDelta.theta * dampingFactor`
+    // (OrbitControls.js:717). Cu amortizare pornită acumulatorul nu se golește
+    // niciodată, se stinge doar cu ×(1 − dampingFactor) pe cadru (:801). Singura
+    // ramură care îl golește e cea FĂRĂ amortizare (:808) — și aia e toată calea
+    // publică spre el, fiindcă `_sphericalDelta` e privat în r186.
+    //
+    // Cât greșea, măsurat: după o aruncare de 66° urmată imediat de clic, zborul
+    // ateriza la 0,098° de țintă. Puțin, fiindcă `aplicaTheta` reașază poziția la
+    // fiecare cadru și aruncă astfel contaminarea cadrului trecut — supraviețuia
+    // numai ultima felie. Dar pe calea `prefers-reduced-motion`, unde
+    // `aplicaTheta` se cheamă O SINGURĂ dată, se pierdea toată prima felie:
+    // `inerție × dampingFactor`, măsurat exact 0,8° pentru 10° rămase. Adică
+    // tocmai calea de accesibilitate greșea cel mai mult.
+    //
+    // `laStart` nu ajută aici: butonul rozetei nu e copil al canvasului, deci
+    // OrbitControls nu emite niciodată „start" la clicul pe el.
+    //
+    // Inerția se APLICĂ, nu se aruncă: ramura de la :808 o adaugă întreagă și abia
+    // apoi golește. E și mai cinstit — camera ajunge unde se ducea gestul, iar
+    // zborul pleacă de acolo. Saltul e mic în practică: acumulatorul se stinge la
+    // 60 Hz cât timp muți mâna spre rozetă, deci după o jumătate de secundă a mai
+    // rămas sub 10% din el.
+    const amortiza = controale.enableDamping;
+    controale.enableDamping = false;
+    controale.update();   // :808 golește `_sphericalDelta` ȘI `_panOffset`
+    controale.enableDamping = amortiza;
+
     const de = controale.getAzimuthalAngle();
     // theta pentru care rozeta citește exact AZIMUT_TINTA.
     //

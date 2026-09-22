@@ -163,6 +163,29 @@ sus", valoarea e 180: cifra fiind a poziției, stai în sud ca să privești spr
 exponențial; deltele se compun, deci două clicuri repezi trec de nord cu exact
 cât mai rămăsese de aplicat. `setAzimuthalAngle()` nu există.
 
+**Theta absolut nu ajunge, totuși — inerția trebuie descărcată întâi.**
+`update()` nu citește doar poziția camerei, ci îi ADAUGĂ acumulatorul:
+`_spherical.theta += _sphericalDelta.theta * dampingFactor` (OrbitControls.js:717).
+Cu amortizare pornită acumulatorul nu se golește niciodată — se stinge doar cu
+×(1 − dampingFactor) pe cadru (:801). Singura ramură care îl golește e cea fără
+amortizare (:808), iar `_sphericalDelta` e privat, deci aceea e toată calea
+publică spre el. `laClic()` stinge amortizarea, cheamă `update()` o dată și o
+repune — o singură dată la clic, nu pe fiecare cadru al zborului.
+
+`laStart` nu acoperă cazul: butonul rozetei nu e copil al canvasului, deci
+OrbitControls nu emite niciodată „start" la clicul pe el.
+
+Cât greșea, măsurat: după o aruncare de 66° urmată imediat de clic, zborul
+ateriza la **0,098°** de țintă — puțin, fiindcă `aplicaTheta` reașază poziția la
+fiecare cadru și aruncă astfel contaminarea cadrului trecut, deci supraviețuia
+numai ultima felie. Pe calea `prefers-reduced-motion` însă, unde `aplicaTheta`
+se cheamă o SINGURĂ dată, se pierdea toată prima felie: `inerție × dampingFactor`,
+măsurat exact **0,8°** pentru 10° rămase. Tocmai calea de accesibilitate greșea
+cel mai mult.
+
+Inerția se APLICĂ, nu se aruncă: ramura fără amortizare o adaugă întreagă înainte
+să golească. Camera ajunge unde se ducea gestul, iar zborul pleacă de acolo.
+
 **Probe care pot eșua.** La încadrarea de pornire busola scrie **213° SV**; cu
 nordul grilei ar scrie 214°, cu semnul lui γ inversat 215°. După clic,
 `__scena.controale.getAzimuthalAngle() * 180/Math.PI` trebuie să fie
