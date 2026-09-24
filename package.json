@@ -13,7 +13,8 @@
     "citeste-poze": "node scripts/citeste-poze.mjs",
     "culori-poze": "node scripts/culori-poze.mjs",
     "paleta": "node scripts/paleta.mjs",
-    "ortofoto": "node scripts/ortofoto.mjs"
+    "ortofoto": "node scripts/ortofoto.mjs",
+    "strat-ndvi": "node scripts/strat-ndvi.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

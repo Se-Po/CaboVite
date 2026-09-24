@@ -1,0 +1,88 @@
+{
+ "nume": "harta_v0-ndvi",
+ "harta": "harta_v0",
+ "descriere": "Indicele de vegetație (NDVI) pe fiecare nod al hărții, din ortofotoul DGT. Intră în culoarea terenului: spune unde e vegetație și cât de verde e.",
+ "generat": "2026-09-24T07:53:07.911Z",
+ "latime": 1164,
+ "inaltime": 1493,
+ "codare": {
+  "biti": 4,
+  "ordine": "nodul i în octetul i >> 1: jumătatea de jos dacă i e par, cea de sus dacă e impar; rândul 0 = nord, ca în -dem.bin",
+  "santinela": 0,
+  "santinela_inseamna": "fără NDVI: apă (z ≤ zMin_m + 0,01), pixel fără date (alfa < 128) sau nod pe care plasa nu-l folosește",
+  "decodare": "NDVI = niveluri[cod]"
+ },
+ "niveluri": [
+  null,
+  -0.1,
+  -0.05,
+  0,
+  0.05,
+  0.1,
+  0.15,
+  0.2,
+  0.25,
+  0.3,
+  0.35,
+  0.4,
+  0.45,
+  0.5,
+  0.55,
+  0.6
+ ],
+ "acoperire": "nodurile de uscat ale celulelor cu centrul în poligon_scena",
+ "ortofoto": {
+  "nivel_piramida": 3,
+  "pas_m": 2,
+  "bloc": 1,
+  "decalaj_pixeli": {
+   "coloana": 106,
+   "rand": 703
+  },
+  "niveluri_respinse_m": [],
+  "ndvi": "NDVI = (NIR − R) / (NIR + R), calculat DUPĂ media benzilor pe bloc — cum e construită și piramida"
+ },
+ "numarate": {
+  "noduri": 1737852,
+  "cu_ndvi": 492998,
+  "pe_cod": [
+   1244854,
+   29030,
+   47461,
+   60547,
+   64169,
+   33507,
+   26001,
+   26820,
+   30699,
+   38126,
+   43963,
+   43678,
+   32462,
+   14013,
+   2384,
+   138
+  ],
+  "eroare_cuantizare": {
+   "medie": 0.0133,
+   "max": 0.303
+  }
+ },
+ "verificari": {
+  "clase_ca_ortofoto": {
+   "tufaris": 122388,
+   "vegetatie_uscata": 122273,
+   "calcar": 61849,
+   "poteca": 185546,
+   "prag_verde": 0.3412698412698413
+  }
+ },
+ "sursa": {
+  "nume": "Ortofotomapa digital de Portugal Continental 2025, 25 cm",
+  "fisier": "ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif",
+  "producator": "Direção-Geral do Território (DGT)",
+  "licenta": "CC BY 4.0",
+  "atributie": "Indice de vegetație (NDVI) derivat din Ortofotos © Direção-Geral do Território, ORTOS-2025, CC BY 4.0",
+  "portal": "https://cdd.dgterritorio.gov.pt/"
+ }
+}

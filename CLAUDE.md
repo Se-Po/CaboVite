@@ -27,11 +27,13 @@ se poartă în română.
 | `npm run culori-poze` | grupează culorile din poze, scoate pagina de etichetat |
 | `npm run ortofoto` | culori din ortofotoul aerian DGT (RGB + infraroșu) |
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
+| `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
-nu sunt în depozit; vezi mai jos. Codul lor comun — proiecția TM06, mersul prin
-IFD-urile unui TIFF, citirea unei hărți gata făcute, EXIF-ul — stă în
-`scripts/comun/`.
+nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
+dala de ortofoto. Codul lor comun — proiecția TM06, mersul prin IFD-urile unui
+TIFF, citirea unei hărți gata făcute, citirea și alinierea ortofotoului, OKLab,
+EXIF-ul — stă în `scripts/comun/`.
 
 ## Arhitectură
 
@@ -101,8 +103,8 @@ Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loader
 (`date-sursa/`) nu intră în depozit; hărțile produse, da — altfel pagina nu se
 poate încărca dintr-o clonă curată.
 
-Depozitul păstrează **exact** harta pe care o încarcă pagina, și nimic altceva:
-`harta_v1` plus baza ei, `harta_v0`. Hărțile de probă de dinainte — promontoriul
+Depozitul păstrează **exact** harta pe care o încarcă pagina, cu straturile ei, și
+nimic altceva: `harta_v1` plus baza ei, `harta_v0`, fiecare cu `-ndvi` alături. Hărțile de probă de dinainte — promontoriul
 întreg din Copernicus GLO-30 și golful Lagosteiros — au fost șterse împreună cu
 scripturile lor, tocmai ca să nu mai existe îndoială care hartă e „cea bună".
 Sunt recuperabile din istoricul git.
@@ -111,6 +113,37 @@ Conturul unei hărți se scrie ca longitudine/latitudine în constanta
 `POLIGON_GEO` din capul lui `scripts/build-zona.mjs` (sau `build-petic.mjs`),
 iar scriptul îl proiectează în TM06 și decupează după el. Pagina doar îl citește
 din sidecar; nu are unealtă de desenat sau de măsurat contururi.
+
+### Stratul NDVI: `<nume>-ndvi.bin`
+
+Pe fiecare nod al hărții, indicele de vegetație din infraroșul ortofotoului. E un
+strat al aceleiași grile, nu o hartă nouă — de aceea poartă numele hărții, ca
+`-dem`. Îl produce `npm run strat-ndvi` și intră în depozit, fiindcă dala de
+ortofoto nu intră.
+
+- **4 biți pe nod**: nodul `i` în octetul `i >> 1`, pe jumătatea de jos dacă `i` e
+  par. Codul 0 = fără NDVI (apă, pixel fără date, nod pe care plasa nu-l
+  folosește); 1–15 = NDVI după tabelul `niveluri` din sidecar, pas 0,05 pe
+  [−0,10; 0,60]. Pagina decodează din tabel, nu dintr-o formulă.
+- **De ce 15 niveluri:** pasul e cât zgomotul sursei — două niveluri de piramidă ale
+  aceleiași imagini diferă cu mediana 0,014, p90 0,045. Un octet întreg ar stoca
+  zgomotul, cu +36% la transfer în loc de +13%. Măsurat: regula de culoare pe NDVI
+  cuantizat față de necuantizat diferă cu ΔE_OK×100 medie 0,37, p99 1,95.
+- **Peticul NU se citește de la nivelul de 1 m.** Nodurile lui cad acolo pe
+  COLȚURILE pixelilor (convenția „noduri", vezi mai jos), deci culorile ar ieși
+  deplasate cu 0,707 m spre sud-est. Se ia media benzilor pe blocuri 2×2 de la
+  nivelul de 0,5 m, iar NDVI-ul se calculează după medie. `aliniaza()` din
+  `scripts/comun/ortofoto.mjs` alege singur nivelul și refuză unul nealiniat;
+  verificarea de dinainte compara `bbox.xMin`, iar la `harta_v1` trecea tăcut.
+
+Scriptul se oprește singur dacă pică una dintre probe:
+- clasificarea din `ortofoto.mjs`, refăcută pe NDVI-ul lui, dă exact 122 388 /
+  122 273 / 61 849 / 185 546 (tufăriș / uscată / calcar / potecă) — orice decalaj
+  de un pixel o strică;
+- corelația NDVI dintre petic și bază, pe cele 62 902 noduri comune de uscat, are
+  maximul la deplasare (0, 0): **0,9840**, iar vecinii de ±0,5 m sunt la 0,98. Proba e
+  față de bază, nu față de alt nivel al ortofotoului: o greșeală comună de indice
+  ar trece de a doua.
 
 ### Convenția `bbox_tm06`: două scripturi, două înțelesuri
 
