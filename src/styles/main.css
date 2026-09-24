@@ -58,6 +58,36 @@ html, body {
   line-height: 1.78;
 }
 
+/* Atribuirea datelor. Un rând în fluxul paginii, după text, pe fundal opac: se
+   citește peste teren fără să depindă de culoarea de dedesubt. `--muted` pe
+   `--bg` are 6,5:1 pe tema deschisă și 7,1:1 pe cea întunecată; `--accent`,
+   pe legături, 7,6:1 și 7,2:1. Deschis, arată textele complete. */
+#surse {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  max-width: min(40rem, calc(100vw - 2rem));
+  margin: 0 auto 2rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+#surse summary { cursor: pointer; }
+#surse ul { margin: 0.5rem 0; padding-left: 1.2rem; }
+#surse p { margin: 0 0 0.3rem; }
+#surse a { color: var(--accent); }
+
+/* Pe telefon busola și panoul punctului coboară în colțurile de jos; spațiul de
+   dedesubt lasă subsolul să urce peste ele când pagina e derulată până la capăt. */
+@media (max-width: 34rem) {
+  #surse { margin-bottom: 9rem; }
+}
+
 /* Fără scenă, pagina rămâne o pagină obișnuită. */
 body[data-scena="indisponibila"] #continut { background: var(--bg); }
 

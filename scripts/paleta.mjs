@@ -88,9 +88,11 @@ const main = () => {
 
   // Ortofotoul e opțional: lanțul trebuie să meargă și numai din fotografii,
   // fiindcă dala de 283 MB nu intră în depozit și cine clonează n-o are.
-  let orto = {};
+  let orto = {}, sursaOrto = null;
   try {
-    orto = JSON.parse(readFileSync(join(DIR_ORTO, 'ortofoto-culori.json'), 'utf8')).clase;
+    const raport = JSON.parse(readFileSync(join(DIR_ORTO, 'ortofoto-culori.json'), 'utf8'));
+    orto = raport.clase;
+    sursaOrto = raport.sursa;
     console.log('ortofoto găsit — îl folosesc pentru materialele pe care pozele le-au văzut de departe\n');
   } catch {
     console.log('fără ortofoto — paleta iese numai din fotografii\n');
@@ -223,6 +225,14 @@ const main = () => {
       data: '2026-08-02, 11:48–13:31 ora locală',
       nota: 'O singură sesiune de fotografiat, deci o singură lumină — de aceea nu s-a mai făcut corecție de alb între poze.',
     },
+    // Albedourile luate din ortofoto sunt un produs derivat din ORTOS-2025, sub
+    // CC BY 4.0, deci cer atribuire oriunde se afișează — și se afișează pe fiecare
+    // fațetă de vegetație, cu sau fără stratul NDVI. De aceea atribuirea călătorește
+    // cu paleta, nu cu stratul. Lipsește numai dacă niciun material nu vine de acolo.
+    ortofoto: Object.values(materiale).some((m) => m.sursa === 'ortofoto') && sursaOrto
+      ? { nume: sursaOrto.nume, producator: sursaOrto.producator, licenta: sursaOrto.licenta,
+          atributie: sursaOrto.atributie, portal: sursaOrto.portal }
+      : undefined,
     // Reperele se scriu și aici, nu doar în date-sursa/poze/etichete.json, fiindcă
     // acela e gitignorat. Etichetele nu sunt date descărcate de undeva: sunt
     // judecata omului care a fost acolo și s-a uitat la decupaje, singura bucată

@@ -1,11 +1,18 @@
 {
- "generat": "2026-09-24T07:49:35.399Z",
+ "generat": "2026-09-24T08:08:37.985Z",
  "sursa": {
   "nume": "Fotografii proprii, Cabo Espichel",
   "aparat": "Google Pixel 8 Pro",
   "poze": 30,
   "data": "2026-08-02, 11:48–13:31 ora locală",
   "nota": "O singură sesiune de fotografiat, deci o singură lumină — de aceea nu s-a mai făcut corecție de alb între poze."
+ },
+ "ortofoto": {
+  "nume": "Ortofotomapa digital de Portugal Continental 2025, 25 cm",
+  "producator": "Direção-Geral do Território (DGT)",
+  "licenta": "CC BY 4.0",
+  "atributie": "Ortofotos: © Direção-Geral do Território, ORTOS-2025, CC BY 4.0",
+  "portal": "https://cdd.dgterritorio.gov.pt/"
  },
  "repere": {
   "#d2bea8": "poteca",

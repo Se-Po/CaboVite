@@ -98,6 +98,7 @@ const SPRE_SRGB = (() => {
  * pe fiecare fațetă.
  */
 let masurat = null;
+let atribuireOrtofoto = null;
 
 export async function incarcaPaleta(url = '/data/paleta-teren.json') {
   try {
@@ -109,6 +110,7 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
       culoare: (m.rgb[0] << 16) | (m.rgb[1] << 8) | m.rgb[2],
       liniar: m.rgb.map((v) => SPRE_LINIAR[v]),
     }]));
+    atribuireOrtofoto = j.ortofoto?.atributie ? j.ortofoto : null;
     const lipsa = ['poteca', 'calcar', 'vegetatie_uscata', 'tufaris'].filter((n) => !masurat[n]);
     if (lipsa.length) console.warn(`paleta măsurată n-are: ${lipsa.join(', ')} — terenul rămâne gri`);
   } catch (e) {
@@ -116,11 +118,20 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
     // griul de rezervă — exact cum arăta terenul înainte să existe fotografiile.
     console.warn('paleta măsurată nu s-a încărcat:', e.message);
     masurat = null;
+    atribuireOrtofoto = null;
   }
   return masurat;
 }
 
 export const paletaCurenta = () => ({ ...(esteNoapte() ? PALETA_NOAPTE : PALETA), masurat });
+
+/**
+ * Sursa care cere atribuire pentru culorile măsurate — `{atributie, producator,
+ * licenta, portal}` —, sau null. Albedourile vegetației vin din ortofotoul DGT,
+ * sub CC BY 4.0: se afișează pe fiecare fațetă de vegetație, deci atribuirea e
+ * datorată ori de câte ori terenul e pictat din paletă.
+ */
+export const atribuirePaleta = () => (masurat ? atribuireOrtofoto : null);
 
 // ------------------------------------------------------------------ regula
 

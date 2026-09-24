@@ -6,7 +6,7 @@ import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { incarcaRelief, straturiNdvi } from './loaders.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
-import { incarcaPaleta, paletaCurenta } from './palette.js';
+import { atribuirePaleta, incarcaPaleta, paletaCurenta } from './palette.js';
 import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
@@ -133,6 +133,17 @@ async function construieste(canvas, renderer, deEliberat, curata) {
     deEliberat.push(() => legenda.dispose());
   }
 
+  // Atribuirile datelor care chiar ajung pe ecran — relieful, culorile, stratul —,
+  // fără dubluri. Licența lor, CC BY 4.0, le cere oriunde se afișează datele. Se
+  // strâng ACUM, cât straturile mai sunt legate de variabila de mai sus.
+  const surse = [...new Map([
+    relief.meta?.sursa,
+    reliefPetic?.meta?.sursa,
+    atribuirePaleta(),
+    ndvi.baza?.meta?.sursa,
+    ndvi.petic?.meta?.sursa,
+  ].filter((s) => s?.atributie).map((s) => [s.atributie, s])).values()];
+
   const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
   scena.add(teren.obiect);
   // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza de
@@ -236,7 +247,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, busola, punct, geo,
+    renderer, scena, camera, controale, teren, petic, busola, punct, geo, surse,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
