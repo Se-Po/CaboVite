@@ -1,5 +1,5 @@
 {
- "generat": "2026-09-21T19:38:37.837Z",
+ "generat": "2026-09-24T07:49:35.399Z",
  "sursa": {
   "nume": "Fotografii proprii, Cabo Espichel",
   "aparat": "Google Pixel 8 Pro",
@@ -45,7 +45,12 @@
      207,
      241
     ],
-    "croma": 0.0546
+    "croma": 0.0546,
+    "oklab": {
+     "L": 0.8473,
+     "a": -0.0111,
+     "b": -0.0534
+    }
    },
    "ortofoto": null,
    "rol": "fundal",
@@ -55,6 +60,7 @@
     "b": -0.0534
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.663,
     "L_median": 0.768,
     "L_lumina": 0.847,
@@ -81,7 +87,12 @@
      149,
      140
     ],
-    "croma": 0.0159
+    "croma": 0.0159,
+    "oklab": {
+     "L": 0.6736,
+     "a": 0.0054,
+     "b": 0.0149
+    }
    },
    "ortofoto": {
     "culoare": "#a6a8a2",
@@ -90,7 +101,12 @@
      168,
      162
     ],
-    "croma": 0.0078
+    "croma": 0.0078,
+    "oklab": {
+     "L": 0.7274,
+     "a": -0.0039,
+     "b": 0.0068
+    }
    },
    "rol": "teren",
    "oklab": {
@@ -99,6 +115,7 @@
     "b": 0.0149
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.419,
     "L_median": 0.498,
     "L_lumina": 0.674,
@@ -125,7 +142,12 @@
      141,
      198
     ],
-    "croma": 0.0963
+    "croma": 0.0963,
+    "oklab": {
+     "L": 0.6389,
+     "a": -0.0203,
+     "b": -0.0941
+    }
    },
    "ortofoto": null,
    "rol": "fundal",
@@ -135,6 +157,7 @@
     "b": -0.0941
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.395,
     "L_median": 0.541,
     "L_lumina": 0.639,
@@ -161,7 +184,12 @@
      200,
      176
     ],
-    "croma": 0.0387
+    "croma": 0.0387,
+    "oklab": {
+     "L": 0.8417,
+     "a": 0.012,
+     "b": 0.0368
+    }
    },
    "ortofoto": {
     "culoare": "#bcafa0",
@@ -170,7 +198,12 @@
      175,
      160
     ],
-    "croma": 0.0259
+    "croma": 0.0259,
+    "oklab": {
+     "L": 0.7605,
+     "a": 0.0075,
+     "b": 0.0248
+    }
    },
    "rol": "teren",
    "oklab": {
@@ -179,6 +212,7 @@
     "b": 0.0368
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.771,
     "L_median": 0.822,
     "L_lumina": 0.842,
@@ -205,7 +239,12 @@
      135,
      129
     ],
-    "croma": 0.0143
+    "croma": 0.0143,
+    "oklab": {
+     "L": 0.6299,
+     "a": 0.0069,
+     "b": 0.0126
+    }
    },
    "ortofoto": {
     "culoare": "#717b76",
@@ -214,15 +253,21 @@
      123,
      118
     ],
-    "croma": 0.0145
+    "croma": 0.0145,
+    "oklab": {
+     "L": 0.5732,
+     "a": -0.0141,
+     "b": 0.0035
+    }
    },
    "rol": "teren",
    "oklab": {
-    "L": 0.6299,
-    "a": 0.0069,
-    "b": 0.0126
+    "L": 0.5732,
+    "a": -0.0141,
+    "b": 0.0035
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.591,
     "L_median": 0.605,
     "L_lumina": 0.63,
@@ -249,7 +294,12 @@
      68,
      71
     ],
-    "croma": 0.0123
+    "croma": 0.0123,
+    "oklab": {
+     "L": 0.3791,
+     "a": -0.009,
+     "b": -0.0084
+    }
    },
    "ortofoto": {
     "culoare": "#516868",
@@ -258,15 +308,21 @@
      104,
      104
     ],
-    "croma": 0.0272
+    "croma": 0.0272,
+    "oklab": {
+     "L": 0.4988,
+     "a": -0.026,
+     "b": -0.0083
+    }
    },
    "rol": "teren",
    "oklab": {
-    "L": 0.3791,
-    "a": -0.009,
-    "b": -0.0084
+    "L": 0.4988,
+    "a": -0.026,
+    "b": -0.0083
    },
    "masurat": {
+    "sursa": "fotografii",
     "L_minim": 0.279,
     "L_median": 0.368,
     "L_lumina": 0.379,

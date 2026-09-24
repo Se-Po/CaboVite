@@ -17,11 +17,14 @@
 // (-96000, -135000) cu pas 0,25 m, iar nivelul 3 al piramidei lui are exact 2 m,
 // pasul lui harta_v0. Decalajul iese număr întreg de pixeli, deci pixelul
 // ortofotoului cade peste nodul LiDAR fără reeșantionare.
+//
+// Cititorul ortofotoului și conversiile OKLab stau în scripts/comun/, fiindcă le
+// folosește și stratul NDVI al paginii (strat-ndvi.mjs).
 
-import { openSync, readSync, closeSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import jpeg from 'jpeg-js';
-import { citesteIfd, deschideTiff } from './comun/tiff.mjs';
+import { PRAG_NDVI, aliniaza, cuantila, deschideOrtofoto, fereastra, ndvi } from './comun/ortofoto.mjs';
+import { dinOklab, hex, laOklab } from './comun/oklab.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { inPoligon, laTM06 } from './comun/tm06.mjs';
 import { cereDirector } from './comun/cere.mjs';
@@ -35,129 +38,6 @@ const DIR = 'date-sursa/ortofoto';
 const PALETA_POZE = 'public/data';
 const IESIRE = DIR;
 const HARTA = process.argv[2] || 'harta_v0';
-
-// Pragul de vegetație pe indicele de infraroșu. Ales după histograma datelor,
-// nu din literatură: vezi raportul pe care-l scrie scriptul.
-const PRAG_NDVI = 0.15;
-
-/** Deschide COG-ul și întoarce nivelul de piramidă cu rezoluția cerută. */
-function deschideOrtofoto(cale, pasDorit) {
-  const fd = openSync(cale, 'r');
-  const cap = Buffer.alloc(4 * 1024 * 1024);
-  readSync(fd, cap, 0, cap.length, 0);
-  const { le, big, off } = deschideTiff(cap);
-
-  const niveluri = [];
-  let d = citesteIfd(cap, off, le, 0, big), i = 0;
-  const pasBaza = d.valori(33550)[0];
-  const tp = d.valori(33922);
-  const x0 = tp[3], y0 = tp[4];
-  const latimeBaza = d.scalar(256);
-  while (d && i < 12) {
-    niveluri.push({ nivel: i, d, pas: pasBaza * (latimeBaza / d.scalar(256)) });
-    if (!d.urmator) break;
-    d = citesteIfd(cap, d.urmator, le, 0, big);
-    i++;
-  }
-
-  const ales = niveluri.find((n) => Math.abs(n.pas - pasDorit) < 1e-6);
-  if (!ales)
-    throw new Error(`ortofotoul n-are un nivel la ${pasDorit} m; are ${niveluri.map((n) => n.pas.toFixed(2)).join(', ')}`);
-
-  const t = ales.d;
-  const tabeleE = t.etichete.get(347);
-  const tabele = Buffer.alloc(tabeleE ? tabeleE.nr : 0);
-  if (tabeleE) readSync(fd, tabele, 0, tabele.length, tabeleE.date);
-
-  return {
-    fd, x0, y0, pas: ales.pas, nivel: ales.nivel, niveluri,
-    w: t.scalar(256), h: t.scalar(257),
-    tw: t.scalar(322), th: t.scalar(323),
-    benzi: t.scalar(277),
-    offsets: t.valori(324), octeti: t.valori(325),
-    tabele,
-  };
-}
-
-/**
- * O dală, decodată.
- *
- * Fiecare dală e un flux JPEG *prescurtat*: îi lipsește tabela de cuantizare,
- * care stă o singură dată în tag-ul JPEGTables, ca să nu se repete de 12600 de
- * ori. Se lipește înapoi imediat după marcajul SOI al dalei. Cu
- * PlanarConfiguration = 2 fiecare bandă are dalele ei, deci fiecare flux e o
- * imagine cu un singur canal — fără subeșantionare de crominanță.
- */
-function citesteDala(o, banda, tx, ty) {
-  const nx = Math.ceil(o.w / o.tw), ny = Math.ceil(o.h / o.th);
-  const idx = banda * nx * ny + ty * nx + tx;
-  const n = o.octeti[idx];
-  if (!n) return null;
-  const brut = Buffer.alloc(n);
-  readSync(o.fd, brut, 0, n, o.offsets[idx]);
-  const flux = o.tabele.length
-    ? Buffer.concat([brut.subarray(0, 2), o.tabele.subarray(2, o.tabele.length - 2), brut.subarray(2)])
-    : brut;
-  const img = jpeg.decode(flux, { useTArray: true });
-  // jpeg-js dă RGBA chiar și pentru o imagine cu un singur canal; luăm primul.
-  const out = new Uint8Array(img.width * img.height);
-  for (let i = 0; i < out.length; i++) out[i] = img.data[i * 4];
-  return { date: out, w: img.width, h: img.height };
-}
-
-/** Citește o fereastră dreptunghiulară dintr-o bandă, în pixeli ai nivelului. */
-function fereastra(o, banda, c0, r0, lat, inalt) {
-  const out = new Uint8Array(lat * inalt);
-  const txMin = Math.floor(c0 / o.tw), txMax = Math.floor((c0 + lat - 1) / o.tw);
-  const tyMin = Math.floor(r0 / o.th), tyMax = Math.floor((r0 + inalt - 1) / o.th);
-  for (let ty = tyMin; ty <= tyMax; ty++)
-    for (let tx = txMin; tx <= txMax; tx++) {
-      const d = citesteDala(o, banda, tx, ty);
-      if (!d) continue;
-      const px0 = tx * o.tw, py0 = ty * o.th;
-      const x1 = Math.max(c0, px0), x2 = Math.min(c0 + lat, px0 + d.w);
-      const y1 = Math.max(r0, py0), y2 = Math.min(r0 + inalt, py0 + d.h);
-      for (let y = y1; y < y2; y++)
-        for (let x = x1; x < x2; x++)
-          out[(y - r0) * lat + (x - c0)] = d.date[(y - py0) * d.w + (x - px0)];
-    }
-  return out;
-}
-
-// ------------------------------------------------------------------- OKLab
-
-const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const gama = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
-
-function laOklab(R, G, B) {
-  const r = linear(R / 255), g = linear(G / 255), b = linear(B / 255);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [
-    0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-  ];
-}
-
-function dinOklab([L, A, B]) {
-  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
-  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
-  const s = (L - 0.0894841775 * A - 1.2914855480 * B) ** 3;
-  return [
-     4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-  ].map((c) => Math.round(Math.min(255, Math.max(0, gama(Math.min(1, Math.max(0, c))) * 255))));
-}
-
-const hex = (rgb) => '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('');
-
-function cuantila(v, q) {
-  const s = Float64Array.from(v).sort();
-  return s[Math.min(s.length - 1, Math.floor(q * s.length))];
-}
 
 // --------------------------------------------------------------------- main
 
@@ -176,13 +56,10 @@ const main = () => {
   console.log(`  ales nivelul ${o.nivel}, ${o.pas} m/px — pasul lui ${HARTA}`);
   console.log(`  colț TM06: ${o.x0}, ${o.y0}   dale ${o.tw}×${o.th}, ${o.benzi} benzi\n`);
 
-  // Alinierea. Dacă decalajul nu iese întreg, grilele nu se potrivesc și orice
-  // culoare ar fi deplasată cu o fracțiune de celulă — mai bine oprim.
-  const b = harta.bbox;
-  const fc0 = (b.xMin - o.x0) / o.pas, fr0 = (o.y0 - b.yMax) / o.pas;
-  if (Math.abs(fc0 - Math.round(fc0)) > 1e-6 || Math.abs(fr0 - Math.round(fr0)) > 1e-6)
-    throw new Error(`grilele nu se aliniază: decalaj ${fc0.toFixed(3)}, ${fr0.toFixed(3)} pixeli`);
-  const c0 = Math.round(fc0), r0 = Math.round(fr0);
+  // Alinierea. Dacă amprenta nodului nu începe pe o margine de pixel, orice
+  // culoare ar fi deplasată cu o fracțiune de celulă — mai bine oprim. Vezi
+  // `aliniaza` pentru capcana care trecea de verificarea de dinainte.
+  const { c0, r0 } = aliniaza(harta, o);
   console.log(`aliniere: decalaj ${c0} × ${r0} pixeli, exact — fără reeșantionare`);
 
   const W = harta.w, H = harta.h;
@@ -215,14 +92,14 @@ const main = () => {
       if (harta.esteApa(x, y)) { nrApa++; continue; }
 
       const R = banda[0][i], G = banda[1][i], B = banda[2][i], N = banda[3][i];
-      const ndvi = (N + R) ? (N - R) / (N + R) : 0;
-      histNdvi[Math.max(0, Math.min(40, Math.round((ndvi + 1) * 20)))]++;
+      const v = ndvi(R, N);
+      histNdvi[Math.max(0, Math.min(40, Math.round((v + 1) * 20)))]++;
 
       const lab = laOklab(R, G, B);
-      const vegetal = ndvi >= PRAG_NDVI;
+      const vegetal = v >= PRAG_NDVI;
       // Umbra se separă, nu se amestecă: la fel ca la fotografii, albedoul se ia
       // din partea luminată, altfel iese materialul plus o dominantă rece.
-      (vegetal ? clase.vegetatie : clase.roca).push({ lab, ndvi, R, G, B, N, x, y,
+      (vegetal ? clase.vegetatie : clase.roca).push({ lab, ndvi: v, R, G, B, N, x, y,
         panta: harta.pantaLa(x, y) ?? 0, alt: harta.laTM(x, y) });
     }
 

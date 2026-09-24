@@ -20,6 +20,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cereFisier } from './comun/cere.mjs';
+import { dinOklab, hex, laOklab } from './comun/oklab.mjs';
 
 const DIR = 'date-sursa/poze';
 const DIR_ORTO = 'date-sursa/ortofoto';
@@ -63,36 +64,8 @@ const SURSA = {
 // cele două ar sta la capete opuse ale hărții pe verticală.
 const TEREN = new Set(['calcar', 'tufaris', 'vegetatie_uscata', 'poteca']);
 
-// ----------------------------------------------------------------- OKLab dus-întors
+// ----------------------------------------------------------------- ajutătoare
 
-const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const gama = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
-
-function laOklab(R, G, B) {
-  const r = linear(R / 255), g = linear(G / 255), b = linear(B / 255);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [
-    0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-  ];
-}
-
-function dinOklab([L, A, B]) {
-  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
-  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
-  const s = (L - 0.0894841775 * A - 1.2914855480 * B) ** 3;
-  const rgb = [
-     4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-  ];
-  return rgb.map((c) => Math.round(Math.min(255, Math.max(0, gama(Math.min(1, Math.max(0, c))) * 255))));
-}
-
-const hex = (rgb) => '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('');
 const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
 /** Cuantila unei valori ponderate — media ar fi trasă de petice mari și întunecate. */
@@ -177,9 +150,11 @@ const main = () => {
     const albedo = dinOklab([lumina, A, B]);
     const croma = Math.hypot(A, B);
 
-    const dinPoze = { culoare: hex(albedo), rgb: albedo, croma: +croma.toFixed(4) };
+    const oklabPoze = { L: +lumina.toFixed(4), a: +A.toFixed(4), b: +B.toFixed(4) };
+    const dinPoze = { culoare: hex(albedo), rgb: albedo, croma: +croma.toFixed(4), oklab: oklabPoze };
     const dinOrto = orto[material]
-      ? { culoare: orto[material].culoare, rgb: orto[material].rgb, croma: orto[material].croma }
+      ? { culoare: orto[material].culoare, rgb: orto[material].rgb, croma: orto[material].croma,
+          oklab: orto[material].oklab }
       : null;
     const sursa = dinOrto && SURSA[material] === 'ortofoto' ? 'ortofoto' : 'fotografii';
     const ales = sursa === 'ortofoto' ? dinOrto : dinPoze;
@@ -196,8 +171,16 @@ const main = () => {
       fotografii: dinPoze,
       ortofoto: dinOrto,
       rol: TEREN.has(material) ? 'teren' : 'fundal',
-      oklab: { L: +lumina.toFixed(4), a: +A.toFixed(4), b: +B.toFixed(4) },
+      // `oklab` descrie culoarea ALEASĂ, ca `culoare` și `rgb`. Înainte venea
+      // mereu din fotografii, deci la tufăriș și la vegetația uscată — luate din
+      // ortofoto — spunea L 0,379 despre o culoare care are L 0,499. Oricine îl
+      // citea primea fotografia, nu albedoul folosit.
+      oklab: ales.oklab,
+      // Statistica fotografiilor, oricare ar fi sursa aleasă: cât de întunecat și
+      // cât de luminat a fost VĂZUT materialul în poze. Nu descrie `culoare`
+      // acolo unde sursa e ortofotoul — de aceea o spune singură.
       masurat: {
+        sursa: 'fotografii',
         L_minim: +cuantila(L, 0.02).toFixed(3),
         L_median: +median.toFixed(3),
         L_lumina: +lumina.toFixed(3),

@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import jpeg from 'jpeg-js';
 import { pngDataUri } from './comun/png.mjs';
 import { cereFisier } from './comun/cere.mjs';
+import { laOklab } from './comun/oklab.mjs';
 
 const DIR = 'date-sursa/poze';
 const LAT_MIC = 220;    // pentru grupare: destul pentru culoare, 1/340 din pixeli
@@ -30,20 +31,7 @@ const DECUPAJ = 72;
 // cât de diferite par două culori: două verzuri depărtate numeric pot fi aproape
 // identice pentru ochi, iar două griuri apropiate numeric, vizibil diferite.
 // OKLab e construit tocmai ca distanța din el să corespundă percepției.
-
-const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-
-function laOklab(R, G, B) {
-  const r = linear(R / 255), g = linear(G / 255), b = linear(B / 255);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [
-    0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
-  ];
-}
+// Conversia stă în scripts/comun/oklab.mjs, comună cu ortofoto și paleta.
 
 const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
