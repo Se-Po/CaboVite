@@ -14,7 +14,8 @@
     "culori-poze": "node scripts/culori-poze.mjs",
     "paleta": "node scripts/paleta.mjs",
     "ortofoto": "node scripts/ortofoto.mjs",
-    "strat-ndvi": "node scripts/strat-ndvi.mjs"
+    "strat-ndvi": "node scripts/strat-ndvi.mjs",
+    "verifica-teren": "node scripts/verifica-teren.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

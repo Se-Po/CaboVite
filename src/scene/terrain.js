@@ -76,8 +76,8 @@ const SPRE_LINIAR = (() => {
 // scria codul dinainte, e 0,0005–0,0011 dintr-un nivel de afișare din 255.
 const CUANTA = 65535;
 
-function culoareFateta(panta, altitudine, paleta) {
-  const c = culoareTeren(panta, altitudine, paleta);
+function culoareFateta(panta, altitudine, paleta, ndvi, culoare) {
+  const c = culoare(panta, altitudine, paleta, ndvi);
   // `Math.floor`, ca `Color.setHex`: o culoare cu parte zecimală n-ar trebui să
   // se rotunjească altfel aici decât s-ar fi rotunjit acolo.
   if (typeof c === 'number' && Number.isFinite(c)) return Math.floor(c);
@@ -111,14 +111,58 @@ export function inPoligon(x, z, puncte) {
 }
 
 /**
+ * Masca bazei: înăuntrul conturului cu care a fost extrasă harta și în afara
+ * găurii de sub petic.
+ *
+ * Datele extrase pentru o zonă aleasă poartă poligonul cu ele. Plasa se
+ * generează numai înăuntrul lui: cutia dreptunghiulară din care e decupată are
+ * cu 74% mai multe celule, aproape toate apă. Gaura e exact dreptunghiul
+ * peticului; marginile lui sunt noduri ale bazei, deci cele două plase se
+ * termină pe aceeași linie.
+ *
+ * Peticul NU o primește: masca cere `!subPetic`, iar peticul stă în întregime
+ * înăuntrul acelui dreptunghi, deci aplicată lui l-ar șterge cu totul. Cine
+ * „repară" asimetria dând-o amândurora pierde peticul fără nicio eroare.
+ *
+ * Stă aici, nu în scena.js, ca unealta `npm run verifica-teren` să construiască
+ * în Node EXACT plasa paginii, cu același cod, nu cu o copie care se desparte încet.
+ *
+ * @returns {{limitaDatelor: Array|null, subPetic: Function|null, pastreaza: Function|undefined}}
+ */
+export function mascaBazei(relief, reliefPetic) {
+  const poligonDate = relief.meta?.poligon_scena;
+  const limitaDatelor = Array.isArray(poligonDate) && poligonDate.length >= 3
+    ? poligonDate
+    : null;
+
+  const g = reliefPetic?.meta?.gaura_scena;
+  const subPetic = g
+    ? (x, z) => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1
+    : null;
+
+  const pastreaza = (limitaDatelor || subPetic)
+    ? (x, z) => (!limitaDatelor || inPoligon(x, z, limitaDatelor)) &&
+                !(subPetic && subPetic(x, z))
+    : undefined;
+
+  return { limitaDatelor, subPetic, pastreaza };
+}
+
+/**
  * @param {{latime,inaltime,pasX,pasZ,inaltimi,meta?}} relief — de la incarcaRelief()
  * @param {{material?: THREE.Material, pastreaza?: (x: number, z: number) => boolean,
- *          deplasare?: {x: number, z: number}, paleta?: object}} optiuni
+ *          deplasare?: {x: number, z: number}, paleta?: object,
+ *          ndvi?: {coduri: Uint8Array, niveluri: Float64Array} | null,
+ *          culoare?: Function}} optiuni
  *   `pastreaza` primește centrul unei celule, în metri de scenă, și decide dacă
  *   ea intră în plasă. Așa capătă harta forma conturului cu care a fost extrasă
  *   (`poligon_scena` din sidecar) și așa se taie gaura de sub petic: celulele
  *   din afară nu se generează deloc, deci scade și numărul de triunghiuri.
  *   `deplasare` mută întreaga grilă în scenă — vezi comentariul de la `dep`.
+ *   `ndvi` e stratul de la incarcaStrat(), pentru ACEEAȘI grilă; lipsă sau null,
+ *   regula de culoare primește `undefined` și merge pe calea fără strat.
+ *   `culoare` înlocuiește regula — pentru previzualizarea datelor și pentru
+ *   unealta care verifică ce primește regula. Implicit e culoareTeren().
  */
 export function creeazaTeren(relief, optiuni = {}) {
   const { latime: w, inaltime: h, pasX, pasZ } = relief;
@@ -151,6 +195,29 @@ export function creeazaTeren(relief, optiuni = {}) {
   // ca rezervă, ca fișierul să-și țină promisiunea din capul lui: funcție pură.
   const paleta = optiuni.paleta ?? paletaCurenta();
   const pastreaza = optiuni.pastreaza;
+  const culoare = optiuni.culoare ?? culoareTeren;
+
+  // Stratul NDVI, dacă a venit. Pe fațetă, media nodurilor care AU valoare:
+  // la mal un vârf e apă (codul 0, NaN la decodare), iar apa n-are infraroșu de
+  // vegetație — media cu el ar trage fațeta de uscat spre rocă fără temei.
+  // Nicio valoare → `undefined`, aceeași cale ca un strat lipsă.
+  //
+  // `let`, și golite imediat după buclă. Închiderile de mai jos — `inaltimeLa`,
+  // `dispose` — țin viu tot contextul funcției, deci și orice tablou la care se
+  // mai ajunge dintr-un nume de aici; e capcana de la `grila`. Stratul nu mai
+  // folosește la nimic după ce culoarea s-a copt.
+  let coduri = optiuni.ndvi?.coduri ?? null;
+  let niveluri = optiuni.ndvi?.niveluri ?? null;
+  const ndviNod = (i) => niveluri[(coduri[i >> 1] >> ((i & 1) << 2)) & 15];
+  const ndviFateta = (ia, ib, ic) => {
+    if (!coduri) return undefined;
+    let s = 0, n = 0;
+    const a = ndviNod(ia), b = ndviNod(ib), c = ndviNod(ic);
+    if (a === a) { s += a; n++; }   // NaN !== NaN: codul 0 nu intră în medie
+    if (b === b) { s += b; n++; }
+    if (c === c) { s += c; n++; }
+    return n ? s / n : undefined;
+  };
 
   // Cota de umplutură. Fără sidecar nu se taie nicio celulă de apă — mai bine
   // desenăm în plus decât să ștergem uscat pe baza unei presupuneri.
@@ -195,7 +262,7 @@ export function creeazaTeren(relief, optiuni = {}) {
   let yMin = Infinity, yMax = -Infinity;
   const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
 
-  const scrieTriunghi = (a, b, c) => {
+  const scrieTriunghi = (a, b, c, ia, ib, ic) => {
     // Normala fațetei se calculează, dar NU se scrie nicăieri: îi trebuie doar
     // pantei, de unde iese culoarea. Vezi nota despre `flatShading` de mai jos.
     ab.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
@@ -204,7 +271,7 @@ export function creeazaTeren(relief, optiuni = {}) {
 
     const panta = 1 - Math.abs(n.y);
     const alt = (a[1] + b[1] + c[1]) / 3;
-    const hex = culoareFateta(panta, alt, paleta);
+    const hex = culoareFateta(panta, alt, paleta, ndviFateta(ia, ib, ic), culoare);
     const cr = Math.round(SPRE_LINIAR[(hex >> 16) & 255] * CUANTA);
     const cg = Math.round(SPRE_LINIAR[(hex >> 8) & 255] * CUANTA);
     const cb = Math.round(SPRE_LINIAR[hex & 255] * CUANTA);
@@ -226,19 +293,22 @@ export function creeazaTeren(relief, optiuni = {}) {
       const B = [X(c + 1), Y(r, c + 1), Z(r)];
       const C = [X(c), Y(r + 1, c), Z(r + 1)];
       const D = [X(c + 1), Y(r + 1, c + 1), Z(r + 1)];
+      const iA = r * w + c, iB = iA + 1, iC = iA + w, iD = iC + 1;   // nodurile, pentru strat
 
       // Alegem diagonala cu diferența de nivel mai mică. Contează la faleză: o
       // diagonală fixă ar tăia linia peretelui în zigzag și ar înclina o fațetă
       // peste treaptă, întinzând-o.
       if (Math.abs(A[1] - D[1]) <= Math.abs(B[1] - C[1])) {
-        scrieTriunghi(A, C, D);
-        scrieTriunghi(A, D, B);
+        scrieTriunghi(A, C, D, iA, iC, iD);
+        scrieTriunghi(A, D, B, iA, iD, iB);
       } else {
-        scrieTriunghi(A, C, B);
-        scrieTriunghi(C, D, B);
+        scrieTriunghi(A, C, B, iA, iC, iB);
+        scrieTriunghi(C, D, B, iC, iD, iB);
       }
     }
   }
+  coduri = null;
+  niveluri = null;
 
   const nrTriunghiuri = p / 9;
   const geometrie = new THREE.BufferGeometry();

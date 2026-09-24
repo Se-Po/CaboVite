@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { creeazaRenderer, redimensioneaza } from './renderer.js';
 import { creeazaCamera, incadreazaLaAspect } from './camera.js';
 import { creeazaLumini } from './lights.js';
-import { creeazaTeren, inPoligon } from './terrain.js';
+import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
-import { incarcaRelief } from './loaders.js';
+import { incarcaRelief, straturiNdvi } from './loaders.js';
+import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
 import { incarcaPaleta, paletaCurenta } from './palette.js';
 import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
@@ -111,50 +112,41 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   let relief = incarcat.baza ?? incarcat;
   const reliefPetic = incarcat.baza ? incarcat : null;
 
-  // Datele extrase pentru o zonă aleasă poartă poligonul cu ele. Plasa se
-  // generează numai înăuntrul lui: cutia dreptunghiulară din care e decupată
-  // are cu 74% mai multe celule, aproape toate apă.
-  const poligonDate = relief.meta?.poligon_scena;
-  const limitaDatelor = Array.isArray(poligonDate) && poligonDate.length >= 3
-    ? poligonDate
-    : null;
-
-  // Gaura din bază: exact dreptunghiul peticului. Marginile lui sunt noduri ale
-  // bazei, deci cele două plase se termină pe aceeași linie.
-  const g = reliefPetic?.meta?.gaura_scena;
-  const subPetic = g
-    ? (x, z) => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1
-    : null;
+  // Masca bazei — conturul hărții, minus gaura de sub petic. Stă în terrain.js,
+  // cu motivele ei, ca unealta de verificare să construiască aceeași plasă.
+  // Peticul NU o primește; vezi acolo de ce.
+  const { limitaDatelor, subPetic, pastreaza } = mascaBazei(relief, reliefPetic);
 
   let cerut = true;
   const cereRandare = () => { cerut = true; };
 
-  /**
-   * Masca bazei: înăuntrul conturului cu care a fost extrasă harta și în afara
-   * găurii. Se calculează o singură dată — nimic nu o mai schimbă după pornire.
-   *
-   * Peticul NU o primește: masca cere `!subPetic`, iar peticul stă în întregime
-   * înăuntrul acelui dreptunghi, deci aplicată lui l-ar șterge cu totul. Cine
-   * „repară" asimetria dând-o amândurora pierde peticul fără nicio eroare.
-   */
-  const pastreaza = (limitaDatelor || subPetic)
-    ? (x, z) => (!limitaDatelor || inPoligon(x, z, limitaDatelor)) &&
-                !(subPetic && subPetic(x, z))
-    : undefined;
+  // Straturile NDVI, totul sau nimic, desprinse de pe relief ca să nu rămână vii
+  // după coacerea culorii. `let`, și golit după ce ambele plase s-au construit.
+  let ndvi = straturiNdvi(relief, reliefPetic);
 
-  const teren = creeazaTeren(relief, { pastreaza, paleta });
+  // `?previzualizare=ndvi` pictează datele din care se face culoarea, nu culoarea.
+  // Cu o scară vădit nenaturală, ca nimeni să n-o ia drept teren.
+  const mod = modPrevizualizare();
+  const culoare = culoarePrevizualizare(mod);
+  if (culoare) {
+    const legenda = creeazaLegenda(canvas.parentElement ?? document.body, mod);
+    deEliberat.push(() => legenda.dispose());
+  }
+
+  const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
   scena.add(teren.obiect);
   // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza de
   // ~250 MB trebuie să fie deja în listă ca s-o elibereze `curata()`.
   deEliberat.push(() => teren.dispose());
 
   const petic = reliefPetic
-    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta })
+    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic, culoare })
     : null;
   if (petic) {
     scena.add(petic.obiect);
     deEliberat.push(() => petic.dispose());
   }
+  ndvi = null;
 
   // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
   // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,

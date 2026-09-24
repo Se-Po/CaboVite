@@ -92,6 +92,8 @@ export function amesteca(a, b, t) {
  *           Vine din normala fațetei: panta = 1 - normala.y.
  * `altitudine` — metri deasupra nivelului mării, negativ sub apă.
  * `p` — paleta curentă (zi sau noapte), plus `p.masurat` dacă s-a încărcat.
+ * `ndvi` — indicele de vegetație al fațetei, din infraroșul ortofotoului: media
+ *           nodurilor ei care au valoare. `undefined` dacă stratul lipsește.
  *
  * Ce e în `p.masurat`, măsurat din cele 30 de fotografii ale tale:
  *
@@ -136,6 +138,6 @@ export function amesteca(a, b, t) {
  *
  * Întoarce o culoare 0xRRGGBB.
  */
-export function culoareTeren(panta, altitudine, p) {
+export function culoareTeren(panta, altitudine, p, ndvi) {
   // TODO(human)
 }
