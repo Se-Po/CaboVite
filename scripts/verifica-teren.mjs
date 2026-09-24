@@ -12,10 +12,15 @@
 // fațetă cu fațetă, și se pot încerca toate căile de eșec ale încărcătorului
 // fără să strici un fișier pe disc.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
-import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
-import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
+import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
+import { PALETA, PALETA_NOAPTE, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
+import { COTA_MARE } from '../src/scene/mare.js';
+import { laOklab } from './comun/oklab.mjs';
+import { aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
+import { incarcaHarta } from './comun/relief.mjs';
 
 const TRIUNGHIURI = 1362406;          // bază 860 522 + petic 501 884
 const OCTETI_ATRIBUTE = 73569924;     // position Float32 + color Uint16, ambele plase
@@ -84,12 +89,17 @@ function fateteDeLaZero(relief, pastreaza) {
   const X = (c) => (c - (w - 1) / 2) * pasX + dep.x, Z = (r) => (r - (h - 1) / 2) * pasZ + dep.z;
   const zApa = relief.meta.zMin_m;
   const ndvi = stratDeLaZero(relief.meta.nume);
-  const fatete = [];
+  const fatete = [], apa = [], sus = [], cx = [], cz = [], noduri = [];
   let fara = 0;
   const f = (...n) => {
     const v = n.map(ndvi).filter((x) => x !== null);
     for (const i of n) if (z[i] > zApa + 0.01 && ndvi(i) === null) fara++;
     fatete.push(v.length ? v.reduce((s, x) => s + x, 0) / v.length : undefined);
+    apa.push(n.filter((i) => z[i] <= zApa + 0.01).length);
+    sus.push(Math.max(...n.map((i) => z[i])));
+    cx.push(n.reduce((s, i) => s + X(i % w), 0) / 3);
+    cz.push(n.reduce((s, i) => s + Z(Math.floor(i / w)), 0) / 3);
+    noduri.push(n);
   };
   for (let r = 0; r < h - 1; r++)
     for (let c = 0; c < w - 1; c++) {
@@ -99,8 +109,28 @@ function fateteDeLaZero(relief, pastreaza) {
       if (Math.abs(z[a] - z[d]) <= Math.abs(z[b] - z[cc])) { f(a, cc, d); f(a, d, b); }
       else { f(a, cc, b); f(cc, d, b); }
     }
-  return { fatete, fara };
+  return { fatete, fara, apa, sus, cx, cz, noduri };
 }
+
+// ------------------------------------------------------------ culoarea, în OKLab
+
+const oklabHex = (c) => laOklab((c >> 16) & 255, (c >> 8) & 255, c & 255);
+const dE = (a, b) => 100 * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const lin = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+// Fără rotunjire la octet: media a două plase poate diferi cu o fracțiune de
+// nivel, iar o rotunjire ar face din ea exact 0 sau exact un nivel întreg.
+const gam = (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+/** Culoarea medie a unor fațete, mediată în liniar — cum le-ar amesteca ochiul de departe. */
+function medie(culori) {
+  const s = [0, 0, 0];
+  for (const c of culori) { s[0] += lin((c >> 16) & 255); s[1] += lin((c >> 8) & 255); s[2] += lin(c & 255); }
+  return laOklab(...s.map((x) => gam(x / culori.length)));
+}
+const cuantile = (v) => {
+  const s = Float64Array.from(v).sort();
+  const q = (p) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+  return { medie: s.reduce((a, x) => a + x, 0) / s.length, mediana: q(0.5), p90: q(0.9), p99: q(0.99) };
+};
 
 // ------------------------------------------------------------ probele
 
@@ -160,6 +190,104 @@ async function main() {
       `${nume}: ${eroare ? 'ARUNCĂ ' + eroare.message : `amândouă fără strat, ${avertismente.length} avertisment(e)`}`);
   }
   globalThis.fetch = dinDisc;
+  avertismente = [];
+
+  console.log('\n4. Regula, pe datele adevărate');
+  const primite = { baza: [], petic: [] };
+  const cuRegula = (care) => (panta, altitudine, p, ndvi) => {
+    const c = culoareTeren(panta, altitudine, p, ndvi);
+    primite[care].push([panta, altitudine, ndvi, c]);
+    return c;
+  };
+  const sr = await construieste(cuRegula);
+  // Timpul regulii: aceeași plasă a bazei, cu regula și cu o culoare fixă, cel
+  // mai bun din trei. Diferența e ce adaugă regula la pornire.
+  const cronometru = (culoare) => {
+    let min = Infinity;
+    for (let k = 0; k < 3; k++) {
+      const t0 = performance.now();
+      creeazaTeren(sr.relief, { pastreaza: sr.pastreaza, paleta: paletaCurenta(), ndvi: sr.ndvi.baza, culoare }).dispose();
+      min = Math.min(min, performance.now() - t0);
+    }
+    return min;
+  };
+  const msRegula = cronometru(culoareTeren), msGri = cronometru(() => 0x8a8578);
+  console.log(`      baza, construită: ${msRegula.toFixed(0)} ms cu regula, ${msGri.toFixed(0)} ms cu o culoare fixă `
+    + `(+${(msRegula - msGri).toFixed(0)} ms)`);
+  proba(avertismente.length === 0, `niciun avertisment de la regulă (${avertismente.length})`);
+
+  const masurat = paletaCurenta().masurat;
+  const calcar = masurat.calcar.culoare;
+  const lang = { baza: fateteDeLaZero(sr.relief, sr.pastreaza), petic: fateteDeLaZero(sr.reliefPetic, undefined) };
+  for (const care of ['baza', 'petic']) {
+    const p = primite[care], L = lang[care];
+    let mal = 0, malAlt = 0, malSub = 0, faraStrat = 0, faraStratVizibil = 0, invalide = 0, tema = 0;
+    for (let i = 0; i < p.length; i++) {
+      const [panta, alt, ndvi, c] = p[i];
+      // Fațetele de la apă care ies deasupra mării. Cele care stau întregi sub ea nu
+      // se văd niciodată — marea e opacă și camera nu coboară sub ea —, iar pe
+      // petic există câteva: în inelul de cusătură relieful e interpolat între
+      // umplutura de −8 m și uscat, deci un vârf „de uscat" poate sta la −7 m.
+      if ((L.apa[i] === 1 || L.apa[i] === 2) && L.sus[i] <= COTA_MARE) malSub++;
+      else if (L.apa[i] === 1 || L.apa[i] === 2) {
+        mal++;
+        const d = [16, 8, 0].map((s) => Math.abs(((c >> s) & 255) - ((calcar >> s) & 255)));
+        if (Math.max(...d) > 1) malAlt++;
+      }
+      if (ndvi === undefined) { faraStrat++; if (L.apa[i] < 3) faraStratVizibil++; }
+      for (const [pp, nn] of [[{ masurat }, undefined], [{ masurat: null }, ndvi], [{ masurat: null }, undefined]]) {
+        const x = culoareTeren(panta, alt, pp, nn);
+        if (!Number.isInteger(x) || x < 0 || x > 0xffffff) invalide++;
+      }
+      if (culoareTeren(panta, alt, { ...PALETA, masurat }, ndvi) !== culoareTeren(panta, alt, { ...PALETA_NOAPTE, masurat }, ndvi)) tema++;
+    }
+    proba(malAlt === 0, `${care}: ${mal} fațete de la apă peste nivelul mării, ${malAlt} care nu ies calcar (${malSub} întregi sub mare)`);
+    proba(faraStratVizibil === 0, `${care}: ${faraStrat} fațete pe calea fără strat, toate scufundate întregi (${faraStratVizibil} vizibile)`);
+    proba(invalide === 0, `${care}: căile degradate (fără strat, fără măsurători, fără amândouă) — ${invalide} culori invalide`);
+    proba(tema === 0, `${care}: ${tema} fațete care se schimbă între tema de zi și cea de noapte`);
+  }
+
+  // Peticul față de ce ar picta baza sub el. Baza n-are fațete acolo — gaura —,
+  // deci se construiește o a treia plasă, numai din celulele găurii.
+  const { limitaDatelor, subPetic } = mascaBazei(sr.relief, sr.reliefPetic);
+  const inGaura = (x, zz) => (!limitaDatelor || inPoligon(x, zz, limitaDatelor)) && subPetic(x, zz);
+  primite.baza = [];
+  const sub = creeazaTeren(sr.relief, { pastreaza: inGaura, paleta: paletaCurenta(), ndvi: sr.ndvi.baza, culoare: cuRegula('baza') });
+  const lSub = fateteDeLaZero(sr.relief, inGaura);
+  const g = sr.reliefPetic.meta.gaura_scena;
+  const langaMargine = (x, zz) => Math.min(x - g.x0, g.x1 - x, zz - g.z0, g.z1 - zz) < 20;
+  const vizibile = (p, L, f) => p.filter((_, i) => L.apa[i] < 3 && f(L.cx[i], L.cz[i])).map((a) => a[3]);
+  const tot = () => true;
+  const dZona = dE(medie(vizibile(primite.baza, lSub, tot)), medie(vizibile(primite.petic, lang.petic, tot)));
+  const dFasie = dE(medie(vizibile(primite.baza, lSub, langaMargine)), medie(vizibile(primite.petic, lang.petic, langaMargine)));
+  proba(dZona <= 1, `peticul față de baza de sub el: ΔE al mediilor ${dZona.toFixed(3)} pe toată zona (prag 1)`);
+  proba(dFasie <= 1, `  și ${dFasie.toFixed(3)} pe fâșia de 20 m de la margine`);
+  sub.dispose();
+
+  // Față de ortofotoul însuși — numai dacă dala e pe disc; nu intră în depozit.
+  const DIR = 'date-sursa/ortofoto';
+  const tif = existsSync(DIR) && readdirSync(DIR).find((f) => /\.tif{1,2}$/i.test(f));
+  if (tif) {
+    const h = incarcaHarta(sr.relief.meta.nume);
+    const o = deschideOrtofoto(join(DIR, tif), h.pas);
+    const { c0, r0 } = aliniaza(h, o);
+    const benzi = [0, 1, 2].map((b) => fereastra(o, b, c0, r0, h.w, h.h));
+    const lab = (i) => laOklab(benzi[0][i], benzi[1][i], benzi[2][i]);
+    const d = [];
+    const toate = [];
+    const inreg = (panta, alt, p, ndvi) => { const c = culoareTeren(panta, alt, p, ndvi); toate.push(c); return c; };
+    creeazaTeren(sr.relief, { pastreaza: sr.pastreaza, paleta: paletaCurenta(), ndvi: sr.ndvi.baza, culoare: inreg }).dispose();
+    for (let i = 0; i < toate.length; i++) {
+      if (lang.baza.apa[i] !== 0) continue;
+      const v = lang.baza.noduri[i].map(lab);
+      d.push(dE(oklabHex(toate[i]), [0, 1, 2].map((k) => (v[0][k] + v[1][k] + v[2][k]) / 3)));
+    }
+    const q = cuantile(d);
+    console.log(`      față de ortofoto, pe ${d.length} fațete de uscat ale bazei: ΔE medie ${q.medie.toFixed(2)}, `
+      + `mediană ${q.mediana.toFixed(2)}, p90 ${q.p90.toFixed(2)}  (măsurat la proiectare: 10,22 / 8,48 / 18,77)`);
+  } else {
+    console.log('      față de ortofoto: sărit, dala nu e în date-sursa/ortofoto');
+  }
 
   console.warn = warnOriginal;
   console.log(picate ? `\n${picate} probe picate.` : '\nToate probele au trecut.');

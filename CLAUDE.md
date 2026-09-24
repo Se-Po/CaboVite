@@ -28,6 +28,7 @@ se poartă în română.
 | `npm run ortofoto` | culori din ortofotoul aerian DGT (RGB + infraroșu) |
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
+| `npm run verifica-teren` | construiește plasa cu codul paginii, în Node, și verifică ce primește și ce pictează regula de culoare |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -322,6 +323,56 @@ Proba care contează: randare într-o țintă fixă de 640 × 400, aceeași came
 exact 1 din 255 pe un singur canal** — cuantizarea culorii, răsturnând rotunjirea
 acolo unde pixelul stătea chiar pe pragul ei. Nu e „identic la pixel", și nu se
 scrie așa.
+
+## Cum se colorează terenul
+
+`culoareTeren(panta, altitudine, p, ndvi)` din `src/scene/palette.js`. Regula a fost
+multă vreme `TODO(human)`, ca decizie de autor; autorul a delegat-o explicit, iar
+ea s-a scris din măsurători. Comentariul de deasupra ei poartă cifra care a decis
+fiecare parametru.
+
+**De ce are nevoie de NDVI.** Numai din pantă și altitudine nu se află unde e
+vegetația. Tufărișul și vegetația uscată au aceeași pantă mediană (14,1° față de
+12,6°) și aceeași altitudine mediană (103,3 față de 103,4 m); cea mai bună regulă
+posibilă pe cele două le desparte la întâmplare pe date nevăzute, iar antrenată pe
+sudul hărții și aplicată pe nord cade sub clasa majoritară. Informația stă în
+infraroșul ortofotoului — vezi stratul NDVI, la hărți.
+
+**Ce face:**
+- roca: potecă → calcar după pantă, lin între 20° și 40°;
+- vegetația: uscată → tufăriș după NDVI, liniar între medianele claselor, 0,261 →
+  0,410. Nu sunt două populații: NDVI-ul vegetației are un singur vârf, iar pragul
+  vechi de 0,341 îl tăia la mediană;
+- cât din fiecare: rampă pe NDVI, de la mediana rocii (0,017) la a vegetației uscate;
+- faleza: peste 55° vegetația se stinge, peste 70° e numai rocă — ortofotoul vede
+  peretele din muchie;
+- amestecul se face în RGB **liniar**, cum reflectă o fațetă acoperită pe jumătate;
+- fără strat: vegetația după cotă, în patru noduri măsurate;
+- fără `p.masurat`: `GRI_REZERVA`.
+
+**Apa n-are caz special, și nu trebuie să aibă.** Fațetele de la mal coboară la
+umplutura de −8 m pe cel mult 2 m în plan, deci au panta de peste 76° și ies calcar
+exact. Pe petic câteva fațete de la apă stau întregi sub mare, în inelul de
+cusătură, unde relieful e interpolat între −8 m și uscat: nu se văd niciodată.
+
+**Albedo, nu aparență.** Regula nu corectează lumina. Cu soarele la 18°, platoul
+chiar iese mai închis decât în pozele de la amiază; asta se reglează în lumini sau
+în expunere, nu în culoare.
+
+**Probe care pot eșua** — toate în `npm run verifica-teren`:
+- argumentul primit de fiecare din cele 1 362 406 fațete e egal cu o recalculare
+  independentă din `.bin`: **0 nepotriviri**. Proba chiar pică dacă un indice de nod
+  e greșit — încercat;
+- toate fațetele de la apă de deasupra mării ies calcar (3 986 pe bază, 2 714 pe petic);
+- calea fără strat o iau numai fațetele scufundate întregi (700 + 549);
+- **0** fațete diferă între tema de zi și cea de noapte;
+- peticul față de ce ar picta baza sub el: ΔE_OK×100 al mediilor **0,245** pe toată
+  zona, 0,115 pe fâșia de 20 m de la margine — dreptunghiul peticului nu se vede;
+- cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 855 836 de fațete de
+  uscat ale bazei, **10,22** medie / 8,49 mediană. Cu ancore potrivite pe ortofoto
+  ar fi 5,46: diferența e că paleta e albedo, iar ortofotoul are umbrele în el.
+
+Regula costă +23 ms la construcția bazei, în Node.
 
 ## Principii de design (nenegociabile)
 

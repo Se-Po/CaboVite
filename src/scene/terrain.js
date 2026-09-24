@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { culoareTeren, paletaCurenta } from './palette.js';
+import { GRI_REZERVA, SPRE_LINIAR, culoareTeren, paletaCurenta } from './palette.js';
 
 // Terenul: din grila de înălțimi într-un singur mesh cu fațete plate.
 //
@@ -36,35 +36,10 @@ import { culoareTeren, paletaCurenta } from './palette.js';
 // care bucla îl avea deja în mână.
 //
 // La fel, conversia sRGB → liniar se făcea o dată pe fațetă, adică 7,7 milioane
-// de `Math.pow`, deși intrarea are 256 de valori posibile pe canal.
+// de `Math.pow`, deși intrarea are 256 de valori posibile pe canal. Tabelul
+// `SPRE_LINIAR` stă acum în palette.js, lângă regula care îl folosește și ea.
 
 let avertizat = false;
-const GRI_PROVIZORIU = 0x8a8578;
-
-/**
- * sRGB → liniar, o dată pentru fiecare din cele 256 de valori posibile.
- *
- * `culoare.setHex(hex, SRGBColorSpace)` face trei `Math.pow` la fiecare apel, iar
- * apelul e unul pe fațetă: 2,56 milioane de fațete înseamnă 7,7 milioane de `pow`
- * la fiecare pornire a paginii. Intrarea are însă doar 256 de valori distincte pe
- * canal — e un octet.
- *
- * Tabelul e BIT-IDENTIC cu ce face three, nu doar apropiat: aceeași formulă din
- * `ColorManagement.SRGBToLinear`, pe aceeași intrare `octet / 255`. Verificat în
- * pagină, comparând cu `Color.setHex` însuși pe 0x8a8578, 0x24211c, 0x3d6b4c,
- * 0x9d958c, alb, negru și 0x010101: potrivire exactă pe toate șapte.
- *
- * Float64, nu Float32: valorile se înmulțesc mai jos cu 65535 înainte de
- * rotunjire, iar o rotunjire intermediară la float32 ar intra în cifra cuantizată.
- */
-const SPRE_LINIAR = (() => {
-  const t = new Float64Array(256);
-  for (let i = 0; i < 256; i++) {
-    const c = i / 255;
-    t[i] = c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
-  }
-  return t;
-})();
 
 // Culoarea stă pe 16 biți normalizați, nu pe 32 în virgulă mobilă: 6 octeți pe
 // vârf în loc de 12.
@@ -83,9 +58,9 @@ function culoareFateta(panta, altitudine, paleta, ndvi, culoare) {
   if (typeof c === 'number' && Number.isFinite(c)) return Math.floor(c);
   if (!avertizat) {
     avertizat = true;
-    console.warn('culoareTeren() nu întoarce încă o culoare — folosesc gri provizoriu.');
+    console.warn(`regula de culoare a întors ${c}, nu o culoare — folosesc gri de rezervă.`);
   }
-  return GRI_PROVIZORIU;
+  return GRI_REZERVA;
 }
 
 /**
