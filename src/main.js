@@ -20,10 +20,22 @@ const subsol = document.querySelector('#surse');
  * în mijlocul ecranului, peste scenă. `<details>` se deschide și de la tastatură,
  * fără niciun cod.
  *
- * Textul vine din sidecaruri, nu e scris aici: se schimbă o dată cu datele.
- * `textContent`, nu `innerHTML`: sunt date, nu marcaj.
+ * Atribuirile vin din sidecaruri; ce s-a prelucrat spune scena, fiindcă numai ea
+ * știe ce a folosit. `textContent`, nu `innerHTML`: sunt date, nu marcaj.
+ *
+ * Nu aruncă. E chemată după ce scena a pornit; o excepție de aici ar ajunge în
+ * `catch`-ul de mai jos, care scoate canvasul — și ar lăsa scena vie, cu bucla ei
+ * și cei 73 MB de plasă, sub o pagină care pretinde că n-are scenă.
  */
 function arataSurse(surse) {
+  try {
+    scrieSurse(surse);
+  } catch (e) {
+    console.warn('atribuirea datelor nu s-a putut afișa:', e.message);
+  }
+}
+
+function scrieSurse(surse) {
   if (!subsol || !surse?.length) return;
   const el = (tag, text) => { const e = document.createElement(tag); if (text) e.textContent = text; return e; };
   const unice = (cheie) => [...new Set(surse.map((s) => s[cheie]).filter(Boolean))];
@@ -31,14 +43,22 @@ function arataSurse(surse) {
   const rezumat = el('summary', `Date: © ${unice('producator').join(', ')} · ${unice('licenta').join(', ')} · prelucrate`);
   const lista = el('ul');
   for (const s of surse) lista.append(el('li', s.atributie));
-  const nota = el('p', 'Prelucrate pentru această pagină: relieful decupat și reeșantionat, culorile terenului '
-    + 'și indicele de vegetație derivate din ortofoto. Licența: ');
-  const licenta = el('a', 'CC BY 4.0');
-  licenta.href = 'https://creativecommons.org/licenses/by/4.0/';
-  nota.append(licenta, '.');
+  const nota = el('p', `Prelucrate pentru această pagină: ${unice('prelucrare').join('; ')}. Licența: `);
+  unice('licenta').forEach((l, i) => {
+    if (i) nota.append(', ');
+    if (l !== 'CC BY 4.0') { nota.append(l); return; }
+    const a = el('a', l);
+    a.href = 'https://creativecommons.org/licenses/by/4.0/';
+    nota.append(a);
+  });
+  nota.append('.');
   for (const p of unice('portal')) {
-    const a = el('a', new URL(p).host);
-    a.href = p;
+    // Un portal scris fără schemă nu e un motiv să pierzi atribuirea: rămâne textul.
+    let url;
+    try { url = new URL(p); } catch { continue; }
+    if (!/^https?:$/.test(url.protocol)) continue;
+    const a = el('a', url.host);
+    a.href = url.href;
     nota.append(' Datele: ', a, '.');
   }
   const detalii = el('details');

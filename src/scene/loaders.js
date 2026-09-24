@@ -35,8 +35,9 @@ export async function incarcaRelief(
   //
   // Numele ei stă în sidecarul tocmai sosit, iar cele două descărcări n-au nimic
   // de împărțit. Ce se câștigă e un dus-întors plus bucla de conversie, nu timpul
-  // de transfer: pe o legătură limitată de lățime de bandă tot 4,23 MB trebuie
-  // duși oricum. Se scoate din serie așteptarea, nu octeții.
+  // de transfer: pe o legătură limitată de lățime de bandă cei 5,29 MB ai
+  // reliefului și straturilor trebuie duși oricum. Se scoate din serie
+  // așteptarea, nu octeții.
   const bazaGata = (meta.baza && adancime < 1)
     ? incarcaRelief(`/data/${meta.baza}-dem.bin`, `/data/${meta.baza}-dem.json`, adancime + 1)
     : null;
@@ -81,8 +82,8 @@ export async function incarcaRelief(
  * colorează pe calea care nu-l cere.
  *
  * Validarea e pe CONȚINUT, nu pe `r.ok`. Vite răspunde la un fișier lipsă cu 200
- * și pagina index — text/html, 451 de octeți —, în dev și în preview deopotrivă.
- * Un `r.ok` ar trece, iar pagina index ar fi decodată ca strat.
+ * și pagina index (text/html), în dev și în preview deopotrivă. Un `r.ok` ar
+ * trece; sidecarul pică la `json()`, iar binarul la verificarea lungimii.
  *
  * @returns {Promise<{coduri: Uint8Array, niveluri: Float64Array, meta: object} | null>}
  */
@@ -110,8 +111,10 @@ export async function incarcaStrat(nume, latime, inaltime) {
     const asteptat = Math.ceil((latime * inaltime) / 2);
     if (buf.byteLength !== asteptat) return lipsa(`${buf.byteLength} octeți, așteptat ${asteptat}`);
 
-    // Float64, ca 0,15 să rămână 0,15: pragurile regulii de culoare cad exact pe
-    // niveluri, iar un Float32 le-ar muta cu o fracțiune de miliardime.
+    // Float64, ca nivelurile să rămână exact cele din sidecar: un Float32 le-ar
+    // muta cu până la 2,4e-8 (la 0,6). Regulii nu-i pasă — rampele ei sunt
+    // continue —, dar recalcularea independentă din `npm run verifica-teren`
+    // compară la 1e-12 și ar raporta nepotriviri. Cu 16 intrări, costul e nul.
     const niveluri = Float64Array.from(meta.niveluri, (v) => (typeof v === 'number' ? v : NaN));
     niveluri[0] = NaN;   // codul 0 înseamnă „fără NDVI", orice ar scrie în tabel
     return { coduri: new Uint8Array(buf), niveluri, meta };

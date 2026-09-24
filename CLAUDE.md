@@ -126,21 +126,35 @@ ortofoto nu intră.
   par. Codul 0 = fără NDVI (apă, pixel fără date, nod pe care plasa nu-l
   folosește); 1–15 = NDVI după tabelul `niveluri` din sidecar, pas 0,05 pe
   [−0,10; 0,60]. Pagina decodează din tabel, nu dintr-o formulă.
-- **De ce 15 niveluri:** pasul e cât zgomotul sursei — două niveluri de piramidă ale
-  aceleiași imagini diferă cu mediana 0,014, p90 0,045. Un octet întreg ar stoca
-  zgomotul, cu +36% la transfer în loc de +13%. Măsurat: regula de culoare pe NDVI
-  cuantizat față de necuantizat diferă cu ΔE_OK×100 medie 0,37, p99 1,95.
+- **De ce 15 niveluri:** pasul e cât zgomotul datelor citite. Pe `harta_v0`,
+  NDVI-ul nivelului de 2 m diferă de media aceleiași imagini la 0,25 m cu mediana
+  0,014, p90 0,040 — recomprimarea JPEG a nivelului, nu terenul. Un octet întreg
+  l-ar stoca, cu +36% la transfer în loc de +13%. Măsurat: regula de culoare pe
+  NDVI cuantizat față de necuantizat diferă cu ΔE_OK×100 medie 0,37, p99 1,95.
+- **Baza citește nivelul de 2 m ca atare, cu zgomotul lui.** Nivelul de 0,5 m
+  mediat 4 × 4 ar avea mediana 0,002 față de 0,25 m, iar nivelul de 2 m dă alt cod
+  decât datele fine la 34% din noduri. Pe culoare efectul e în jur de 0,35 ΔE, sub
+  prag. S-a păstrat nivelul de 2 m ca proba de clase să rămână comparabilă cu
+  `ortofoto.mjs`; trecerea la 0,5 m e o îmbunătățire posibilă, nu o reparație.
 - **Peticul NU se citește de la nivelul de 1 m.** Nodurile lui cad acolo pe
   COLȚURILE pixelilor (convenția „noduri", vezi mai jos), deci culorile ar ieși
   deplasate cu 0,707 m spre sud-est. Se ia media benzilor pe blocuri 2×2 de la
-  nivelul de 0,5 m, iar NDVI-ul se calculează după medie. `aliniaza()` din
-  `scripts/comun/ortofoto.mjs` alege singur nivelul și refuză unul nealiniat;
-  verificarea de dinainte compara `bbox.xMin`, iar la `harta_v1` trecea tăcut.
+  nivelul de 0,5 m, iar NDVI-ul se calculează după medie. Nivelul îl alege
+  `deschideAliniat()` din `scripts/strat-ndvi.mjs`: cel mai grosier pe care
+  nodurile se aliniază exact (2 m la `harta_v0`, 0,5 m cu blocuri 2×2 la
+  `harta_v1`). `aliniaza()` din `scripts/comun/ortofoto.mjs` nu alege nimic:
+  primește un nivel, ține cont de convenția de noduri și aruncă dacă nu se
+  aliniază. Verificarea de dinainte compara `bbox.xMin`, iar la `harta_v1`
+  trecea tăcut. Tot în `comun/`, `fereastra()` refuză o fereastră care iese din
+  dală, în loc să citească tăcut dale din alt loc.
 
 Scriptul se oprește singur dacă pică una dintre probe:
 - clasificarea din `ortofoto.mjs`, refăcută pe NDVI-ul lui, dă exact 122 388 /
-  122 273 / 61 849 / 185 546 (tufăriș / uscată / calcar / potecă) — orice decalaj
-  de un pixel o strică;
+  122 273 / 61 849 / 185 546 (tufăriș / uscată / calcar / potecă). Dovedește că
+  cele două scripturi citesc același lucru, NU alinierea absolută: amândouă
+  folosesc `aliniaza()` și `fereastra()`, deci un decalaj comun ar trece.
+  Alinierea bazei stă pe aritmetică — nodul cade pe centrul pixelului, decalajul
+  106 × 703 iese întreg;
 - corelația NDVI dintre petic și bază, pe cele 62 902 noduri comune de uscat, are
   maximul la deplasare (0, 0): **0,9840**, iar vecinii de ±0,5 m sunt la 0,98. Proba e
   față de bază, nu față de alt nivel al ortofotoului: o greșeală comună de indice
@@ -368,9 +382,12 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
 - **0** fațete diferă între tema de zi și cea de noapte;
 - peticul față de ce ar picta baza sub el: ΔE_OK×100 al mediilor **0,245** pe toată
   zona, 0,115 pe fâșia de 20 m de la margine — dreptunghiul peticului nu se vede;
-- cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 855 836 de fațete de
-  uscat ale bazei, **10,22** medie / 8,49 mediană. Cu ancore potrivite pe ortofoto
-  ar fi 5,46: diferența e că paleta e albedo, iar ortofotoul are umbrele în el.
+- numai cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 855 836 de
+  fațete de uscat ale bazei, **10,22** medie / 8,49 mediană; pragul e 11. Pe
+  aceleași fațete griul de rezervă dă 11,70, iar regula fără strat 15,56 — deci
+  pragul prinde o regulă căzută înapoi pe gri sau un strat ignorat. Cu ancore potrivite pe
+  ortofoto ar fi 5,46: diferența e că paleta e albedo, iar ortofotoul are umbrele
+  în el. Cifra aceea nu se calculează în unealtă.
 
 Regula costă +23 ms la construcția bazei, în Node.
 
@@ -456,7 +473,10 @@ tratează ambele.
 Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v0` și
 `harta_v1`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până
 la `harta_v0` iese **106 × 703 pixeli, întregi**: pixelul ortofotoului cade peste
-nodul LiDAR fără reeșantionare. Scriptul verifică asta și se oprește dacă nu iese.
+nodul LiDAR fără reeșantionare. La `harta_v1` pasul se potrivește, dar
+alinierea NU: pe convenția „noduri", amprenta primului nod începe la 1180,5 ×
+2298,5 pixeli, deci nodurile cad pe colțurile pixelilor. Peticul se citește de la
+nivelul de 0,5 m, mediat 2 × 2 — vezi stratul NDVI, mai sus. Scriptul verifică asta și se oprește dacă nu iese.
 Control independent: numărul de celule de uscat din contur, 492 056, e identic cu
 `acoperire.uscat_masurat_in_poligon` din sidecar.
 

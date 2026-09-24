@@ -20,9 +20,11 @@
 //     folosește. Codurile 1–15 = NDVI cuantizat, după tabelul `niveluri`.
 //   - pagina decodează din tabelul din sidecar, nu dintr-o formulă scrisă în cod.
 //
-// De ce 15 niveluri și nu 255: pasul de 0,05 e cât zgomotul sursei. Două niveluri
-// de piramidă ale ACELEIAȘI imagini diferă în NDVI cu mediana 0,014 și p90 0,045;
-// un octet întreg ar stoca zgomotul, cu +36% la transfer în loc de ~+12%.
+// De ce 15 niveluri și nu 255: pasul de 0,05 e cât zgomotul datelor citite. Pe
+// harta_v0, NDVI-ul nivelului de 2 m diferă de media aceleiași imagini la 0,25 m
+// cu mediana 0,014 și p90 0,040 — zgomotul de recomprimare al nivelului, nu al
+// terenului. Un octet întreg l-ar stoca, cu +36% la transfer în loc de +13%
+// (brotli, ca totalul tipărit la sfârșit).
 
 import { closeSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,10 +45,13 @@ const RAPORT_ORTOFOTO = join(DIR, 'ortofoto-culori.json');
 /**
  * Tabelul de decodare: indicele e codul, valoarea e NDVI-ul.
  *
- * Pas 0,05 pe [−0,10; 0,60]. Pragurile regulii de culoare cad exact pe niveluri
- * (0,10 · 0,15 · 0,20) sau la cel mult 0,011 de unul (0,261 · 0,410). Sub −0,10
+ * Pas 0,05 pe [−0,10; 0,60]. Regula de culoare n-are praguri tăiate, ci rampe
+ * liniare între 0,017 (roca), 0,261 (vegetația uscată) și 0,410 (tufărișul), iar
+ * NDVI-ul fațetei e media a trei noduri: punctele acestea nu trebuie să cadă pe
+ * niveluri, și nici nu cad (cel mai departe e 0,017, la 0,017 de 0,00). Efectul
+ * cuantizării e măsurat: 0,37 ΔE în medie, p99 1,95 — vezi palette.js. Sub −0,10
  * e oricum rocă goală, peste 0,60 oricum vegetație deasă: capetele se prind.
- * Rotunjit la două zecimale, ca 0,15 să fie 0,15 și în JSON, nu 0,15000000000000002.
+ * Rotunjit la două zecimale: fără asta, −0,10 + 0,05·3 iese 0,05000000000000002.
  */
 const NIVELURI = [null, ...Array.from({ length: 15 }, (_, i) => +(-0.10 + 0.05 * i).toFixed(2))];
 
@@ -133,8 +138,12 @@ function masoara(cale, harta) {
 
 /**
  * Proba de control: clasificarea din ortofoto.mjs, refăcută pe NDVI-ul de aici,
- * trebuie să dea exact numerele din raportul lui. Dovedește că fereastra citită
- * e aceeași și că NDVI-ul e același — orice decalaj de un pixel le strică.
+ * trebuie să dea exact numerele din raportul lui. Dovedește că strat-ndvi citește
+ * același nivel, aceeași fereastră și același NDVI ca ortofoto.mjs, și că raportul
+ * e la zi. NU dovedește alinierea absolută: amândouă cheamă aliniaza() și
+ * fereastra() din comun/, deci un decalaj comun le-ar da aceleași numere.
+ * Alinierea bazei se sprijină pe aritmetică — nodul cade pe centrul pixelului,
+ * decalajul 106 × 703 iese întreg —, nu pe proba asta.
  */
 function probaClase(harta, m, raport) {
   const contur = harta.meta.poligon_geo.map((p) => laTM06(p.lon, p.lat));
@@ -164,7 +173,9 @@ function probaClase(harta, m, raport) {
 /**
  * Proba de aliniere ABSOLUTĂ a peticului: față de bază, nu față de alt nivel al
  * ortofotoului calculat cu aceeași funcție — o greșeală comună de indice ar trece
- * de aceea nevăzută. Baza e deja dovedită de proba de clase.
+ * de aceea nevăzută. Baza însăși nu e dovedită aici, ci prin aritmetică — vezi
+ * probaClase. Proba de față prinde ce diferă între cele două: convenția de noduri
+ * a peticului față de cea de muchii a bazei, nivelul și blocul.
  *
  * Nodurile peticului cad din doi în doi peste nodurile bazei. Pe cele comune, de
  * uscat în amândouă, NDVI-ul peticului se recalculează cu blocul mutat cu câte

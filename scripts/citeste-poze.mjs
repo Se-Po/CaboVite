@@ -11,7 +11,9 @@
 // știm unde stătea aparatul cu o eroare de câțiva metri, citim înălțimea din
 // LiDAR acolo — la 1 m. Harta e un altimetru mai bun decât telefonul. Tot de
 // acolo iese și panta. Așa fiecare poză devine o probă etichetată
-// (pantă, altitudine), adică exact ce cere culoareTeren() din src/scene/palette.js.
+// (pantă, altitudine). culoareTeren() din src/scene/palette.js le primește și pe
+// ele, dar unde e vegetația decide din NDVI-ul ortofotoului (scripts/strat-ndvi.mjs);
+// numai din pantă și altitudine lucrează doar calea ei de rezervă, fără strat.
 
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

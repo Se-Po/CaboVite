@@ -94,8 +94,19 @@ export function citesteDala(o, banda, tx, ty) {
   return { date: out, w: img.width, h: img.height };
 }
 
-/** Citește o fereastră dreptunghiulară dintr-o bandă, în pixeli ai nivelului. */
+/**
+ * Citește o fereastră dreptunghiulară dintr-o bandă, în pixeli ai nivelului.
+ *
+ * Fereastra trebuie să încapă întreagă în nivel. Nu se taie și nu se umple: un
+ * indice de dală ieșit din grilă — tx = −1, de pildă — ar cădea în
+ * `banda·nx·ny + ty·nx + tx` pe ULTIMA dală a rândului de deasupra, la 8 km
+ * distanță, cu alfa 255. O hartă care trece de marginea dalei ar primi culori
+ * din alt loc, fără nicio eroare.
+ */
 export function fereastra(o, banda, c0, r0, lat, inalt) {
+  if (c0 < 0 || r0 < 0 || c0 + lat > o.w || r0 + inalt > o.h)
+    throw new Error(`fereastra ${c0}…${c0 + lat - 1} × ${r0}…${r0 + inalt - 1} iese din nivelul de ${o.pas} m `
+      + `(${o.w} × ${o.h} pixeli): harta nu încape în dala de ortofoto`);
   const out = new Uint8Array(lat * inalt);
   const txMin = Math.floor(c0 / o.tw), txMax = Math.floor((c0 + lat - 1) / o.tw);
   const tyMin = Math.floor(r0 / o.th), tyMax = Math.floor((r0 + inalt - 1) / o.th);
@@ -118,8 +129,14 @@ export function fereastra(o, banda, c0, r0, lat, inalt) {
  *
  * Pentru o hartă al cărei pas e un multiplu al pixelului: nodul primește media
  * exactă a amprentei lui. Așa se construiește și piramida ortofotoului — nivelul
- * de 2 m e media blocului de la 0,25 m —, deci un bloc de 1 × 1 de la nivelul
- * potrivit și un bloc mai mare de la un nivel mai fin dau aceeași mărime.
+ * de 2 m e media blocului de la 0,25 m.
+ *
+ * Un bloc de 1 × 1 de la nivelul potrivit și un bloc mai mare de la un nivel mai
+ * fin estimează deci aceeași medie, dar NU dau aceeași valoare: fiecare nivel al
+ * piramidei e recomprimat JPEG separat și are abaterea lui pe pixel. Citit ca
+ * atare, un nivel grosier o păstrează întreagă; mediat pe bloc, unul fin o
+ * micșorează. Pe harta_v0, față de media de la 0,25 m, NDVI-ul diferă cu mediana
+ * 0,014 la nivelul de 2 m și 0,002 la cel de 0,5 m mediat 4 × 4.
  */
 export function fereastraMedie(o, banda, c0, r0, lat, inalt, bloc) {
   const brut = fereastra(o, banda, c0, r0, lat * bloc, inalt * bloc);
@@ -163,6 +180,7 @@ export function aliniaza(harta, o) {
   if (Math.abs(fc - Math.round(fc)) > 1e-6 || Math.abs(fr - Math.round(fr)) > 1e-6)
     throw new Error(`${harta.nume} nu se aliniază cu nivelul de ${o.pas} m: amprenta primului nod `
       + `începe la ${fc} × ${fr} pixeli, nu pe o margine de pixel. `
-      + `Pe o hartă cu convenția „${harta.conventie}", un nivel mai fin, mediat pe blocuri, se poate alinia.`);
+      + `Pe o hartă cu convenția „${harta.conventie}" se aliniază un nivel mai fin, mediat pe blocuri — `
+      + `așa citește strat-ndvi.mjs; ortofoto.mjs citește numai nivelul egal cu pasul hărții.`);
   return { c0: Math.round(fc), r0: Math.round(fr), bloc: Math.round(bloc) };
 }

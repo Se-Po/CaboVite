@@ -183,11 +183,15 @@ const main = () => {
     console.log(' ───────────────────────────────────────────');
     for (const k of ['calcar', 'poteca', 'vegetatie_uscata', 'tufaris']) {
       if (!poze[k] || !rezultat[k]) continue;
-      const a = poze[k], b2 = rezultat[k];
+      // Partea „de la sol" e măsurătoarea FOTOGRAFIILOR, nu culoarea aleasă în
+      // paletă: la tufăriș și la vegetația uscată aleasă e chiar ortofotoul, iar
+      // tabelul ar compara ortofotoul cu el însuși — R+0 G+0 B+0 tocmai acolo unde
+      // se vede drumul de aer.
+      const a = poze[k].fotografii ?? poze[k], b2 = rezultat[k];
       const dr = b2.rgb[0] - a.rgb[0], dg = b2.rgb[1] - a.rgb[1], db = b2.rgb[2] - a.rgb[2];
       const semn = (v) => (v >= 0 ? '+' : '') + v;
       console.log(` ${k.padEnd(17)} ${a.culoare} → ${b2.culoare}   R${semn(dr)} G${semn(dg)} B${semn(db)}`
-        + `   croma ${a.masurat.croma.toFixed(3)} → ${b2.croma.toFixed(3)}`);
+        + `   croma ${a.croma.toFixed(3)} → ${b2.croma.toFixed(3)}`);
     }
   } catch { /* paleta din poze poate lipsi; ortofotoul stă singur în picioare */ }
 

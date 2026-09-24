@@ -4,8 +4,8 @@
 //
 // Nu scrie nimic. Construiește plasa cu CODUL PAGINII — incarcaRelief,
 // mascaBazei, creeazaTeren din src/scene/ — cu `fetch` înlocuit de o citire din
-// public/, și o confruntă cu o recalculare independentă. Oprește cu cod 1 la
-// prima probă picată.
+// public/, și o confruntă cu o recalculare independentă. Rulează toate probele —
+// o singură rulare arată tot ce a picat — și iese cu cod 1 dacă a picat vreuna.
 //
 // De ce în Node și nu în browser: în pagină culoarea se coace în atribut și
 // argumentele regulii nu mai există după construcție. Aici se pot înregistra,
@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
 import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
-import { PALETA, PALETA_NOAPTE, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
+import { GRI_REZERVA, PALETA, PALETA_NOAPTE, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
 import { aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
@@ -24,6 +24,10 @@ import { incarcaHarta } from './comun/relief.mjs';
 
 const TRIUNGHIURI = 1362406;          // bază 860 522 + petic 501 884
 const OCTETI_ATRIBUTE = 73569924;     // position Float32 + color Uint16, ambele plase
+// ΔE_OK×100 față de ortofoto, pe fațetele de uscat ale bazei. Regula dă 10,22;
+// pragul stă sub griul de rezervă măsurat pe aceleași fațete — tipărit alături —,
+// deci o regulă care a căzut înapoi pe gri, sau una stricată, pică.
+const PRAG_ORTOFOTO = 11;
 
 let picate = 0;
 const proba = (bun, text) => {
@@ -283,8 +287,18 @@ async function main() {
       d.push(dE(oklabHex(toate[i]), [0, 1, 2].map((k) => (v[0][k] + v[1][k] + v[2][k]) / 3)));
     }
     const q = cuantile(d);
-    console.log(`      față de ortofoto, pe ${d.length} fațete de uscat ale bazei: ΔE medie ${q.medie.toFixed(2)}, `
-      + `mediană ${q.mediana.toFixed(2)}, p90 ${q.p90.toFixed(2)}  (măsurat la proiectare: 10,22 / 8,48 / 18,77)`);
+    // Pe aceleași fațete, griul de rezervă — terenul de dinainte de regulă.
+    const gri = oklabHex(GRI_REZERVA);
+    let sGri = 0;
+    for (let i = 0; i < toate.length; i++) {
+      if (lang.baza.apa[i] !== 0) continue;
+      const v = lang.baza.noduri[i].map(lab);
+      sGri += dE(gri, [0, 1, 2].map((k) => (v[0][k] + v[1][k] + v[2][k]) / 3));
+    }
+    const qGri = sGri / d.length;
+    proba(q.medie <= PRAG_ORTOFOTO, `față de ortofoto, pe ${d.length} fațete de uscat ale bazei: ΔE medie ${q.medie.toFixed(2)} `
+      + `(prag ${PRAG_ORTOFOTO}; griul de rezervă, pe aceleași fațete: ${qGri.toFixed(2)}), `
+      + `mediană ${q.mediana.toFixed(2)}, p90 ${q.p90.toFixed(2)}`);
   } else {
     console.log('      față de ortofoto: sărit, dala nu e în date-sursa/ortofoto');
   }

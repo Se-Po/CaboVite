@@ -203,7 +203,7 @@ export function creeazaTeren(relief, optiuni = {}) {
   //
   // Înainte, `pastreaza` se chema o dată la numărat și încă o dată la scris:
   // 3 470 392 de apeluri pe bază, fiecare cu o buclă peste laturile poligonului.
-  // Masca costă 1 735 196 de octeți temporari — 0,6% din ce alocă plasa — și
+  // Masca costă 1 735 196 de octeți temporari — 3,7% din atributele bazei — și
   // închide și o gaură de regresie: alocarea de mai jos se sprijinea pe faptul
   // că `pastreaza` dă de două ori exact același răspuns.
   //
@@ -230,8 +230,12 @@ export function creeazaTeren(relief, optiuni = {}) {
     }
   }
 
-  const pozitii = new Float32Array(nrCelule * 2 * 9);
-  const culori = new Uint16Array(nrCelule * 2 * 9);
+  // `let`, golite după ce intră în geometrie: `scrieTriunghi` le citește, deci
+  // altfel ar sta în contextul închiderilor lângă `inaltimeLa` și `dispose`, iar
+  // după dispose() cei ~73 MB ai ambelor plase ar rămâne în RAM cât trăiește
+  // `globalThis.__scena`. Aceeași capcană ca la `grila` și la strat.
+  let pozitii = new Float32Array(nrCelule * 2 * 9);
+  let culori = new Uint16Array(nrCelule * 2 * 9);
 
   let p = 0;
   let yMin = Infinity, yMax = -Infinity;
@@ -291,6 +295,8 @@ export function creeazaTeren(relief, optiuni = {}) {
   // Al treilea argument e `normalized`: GL împarte el însuși la 65535, deci în
   // shader ajung tot valori în [0, 1], exact ca înainte.
   geometrie.setAttribute('color', new THREE.BufferAttribute(culori, 3, true));
+  pozitii = null;
+  culori = null;
 
   // NU există atribut `normal`, și nu e o scăpare.
   //
@@ -364,6 +370,12 @@ export function creeazaTeren(relief, optiuni = {}) {
       if (!viu) return; // schimbarea de capitol poate chema de două ori
       viu = false;
       geometrie.dispose();
+      // `dispose()` eliberează numai bufferele de pe placă; tablourile JS rămân în
+      // atribute, iar obiectul întors trăiește în `globalThis.__scena`. Scoase din
+      // geometrie, nu le mai ține nimic. DUPĂ dispose(): altfel three n-ar mai
+      // găsi atributele ca să le elibereze bufferele.
+      geometrie.deleteAttribute('position');
+      geometrie.deleteAttribute('color');
       // Materialul se eliberează doar dacă l-am făcut noi; dacă a fost injectat,
       // e al apelantului. Fără texturi aici — culorile sunt pe vertecși.
       if (materialPropriu) material.dispose();

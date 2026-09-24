@@ -1,5 +1,6 @@
-// Culorile scenei: fundalul — cer și mare — moștenit din pagina existentă
-// (CaboEspichel/index.html), și terenul, măsurat la fața locului.
+// Culorile scenei. Marea din tema deschisă e `--c-i` din pagina existentă
+// (CaboEspichel/index.html); cerul și ambele culori ale temei întunecate sunt
+// alese aici; terenul e măsurat la fața locului.
 
 // O capcană de care m-am lovit: variabilele paginii vechi sunt culori de
 // INTERFAȚĂ. În tema întunecată `--c-i` devine #8cbcdb — albastru deschis,
@@ -89,9 +90,8 @@ const SPRE_SRGB = (() => {
  * Culorile măsurate în fotografiile de la fața locului și în ortofoto.
  *
  * Se încarcă din `public/data/paleta-teren.json`, produs de `npm run paleta`. Stau
- * separat de PALETA, care e moștenită din pagina veche și e o paletă de
- * interfață — ce se adoptă din măsurători și ce nu e o decizie, nu o
- * suprascriere automată.
+ * separat de PALETA, care e o paletă de fundal pentru cer și mare — ce se adoptă
+ * din măsurători și ce nu e o decizie, nu o suprascriere automată.
  *
  * Fiecare material are `rgb`, `culoare` (0xRRGGBB) și `liniar` — cele trei canale
  * în RGB liniar, calculate aici o singură dată, ca regula să nu le reconvertească
@@ -111,7 +111,7 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
       liniar: m.rgb.map((v) => SPRE_LINIAR[v]),
     }]));
     atribuireOrtofoto = j.ortofoto?.atributie ? j.ortofoto : null;
-    const lipsa = ['poteca', 'calcar', 'vegetatie_uscata', 'tufaris'].filter((n) => !masurat[n]);
+    const lipsa = MATERIALE_TEREN.filter((n) => !masurat[n]);
     if (lipsa.length) console.warn(`paleta măsurată n-are: ${lipsa.join(', ')} — terenul rămâne gri`);
   } catch (e) {
     // Pagina trebuie să rămână o pagină. Fără măsurători, culoareTeren() întoarce
@@ -124,6 +124,16 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
 }
 
 export const paletaCurenta = () => ({ ...(esteNoapte() ? PALETA_NOAPTE : PALETA), masurat });
+
+/** Cele patru materiale de teren, fără de care regula întoarce GRI_REZERVA. */
+const MATERIALE_TEREN = ['poteca', 'calcar', 'vegetatie_uscata', 'tufaris'];
+
+/**
+ * Dacă terenul se pictează chiar din măsurători cu paleta dată — adică dacă
+ * regula are toate cele patru materiale. Altfel iese gri, iar ce e în paletă nu
+ * ajunge pe ecran și n-are ce atribui.
+ */
+export const terenMasurat = (p) => MATERIALE_TEREN.every((n) => p?.masurat?.[n]?.liniar);
 
 /**
  * Sursa care cere atribuire pentru culorile măsurate — `{atributie, producator,
@@ -219,13 +229,15 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  *
  * Apa. Fațetele de la mal coboară până la umplutura de −8 m pe cel mult 2 m în plan,
  * deci au panta de cel puțin 0,757 (76°), peste pragul falezei: ies calcar exact, pe
- * toate cele 3 986 care se văd. Cele 700 + 549 cu toate vârfurile la −8 m n-au NDVI
- * și iau calea fără strat — stau întregi sub planul opac al mării.
+ * toate cele care se văd: 3 986 pe bază, 2 714 pe petic. Cele 700 + 549 cu toate
+ * vârfurile la −8 m n-au NDVI și iau calea fără strat — stau întregi sub planul
+ * opac al mării. Tot sub mare stau și 26 de fațete ale peticului, în inelul de
+ * cusătură, unde relieful e interpolat între umplutură și uscat.
  *
- * ─── Cât de bine, măsurat pe cele 860 522 de fațete ale bazei
+ * ─── Cât de bine, măsurat pe cele 855 836 de fațete de uscat ale bazei
  *
  * ΔE_OK×100 față de culoarea ortofotoului în vârfuri: 10,22 medie cu albedourile
- * paletei (8,48 mediană), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
+ * paletei (8,49 mediană), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
  * regula. Fără strat: 15,56 / 9,56. Cuantizarea stratului pe 15 niveluri schimbă
  * culoarea cu 0,37 în medie, p99 1,95. Fațetele care ies în evidență față de
  * vecinii lor (ΔE > 5 față de media celor 3 × 3 celule din jur): 8,1% aici, 17% cu

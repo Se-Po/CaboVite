@@ -6,7 +6,7 @@ import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { incarcaRelief, straturiNdvi } from './loaders.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
-import { atribuirePaleta, incarcaPaleta, paletaCurenta } from './palette.js';
+import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './palette.js';
 import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
@@ -27,7 +27,7 @@ export async function porneste(canvas) {
   // Tot ce se alocă de aici încolo se înscrie aici, în ordinea creării.
   //
   // Pornirea poate eșua în mai multe locuri, nu doar la încărcarea reliefului:
-  // `creeazaTeren()` alocă tablouri proporționale cu grila — ~250 MB pentru baza
+  // `creeazaTeren()` alocă tablouri proporționale cu grila — ~48 MB pentru baza
   // de 1164 × 1493 — iar un RangeError acolo e plauzibil tocmai pe telefonul de
   // 390 px. `main.js` prinde excepția și scoate canvasul, dar scoaterea din DOM
   // nu eliberează nimic: contextul WebGL rămâne viu până îl adună browserul, iar
@@ -60,7 +60,8 @@ export async function porneste(canvas) {
 async function construieste(canvas, renderer, deEliberat, curata) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
-  // Paleta măsurată e un JSON de 5 KB; relieful e 4,23 MB în patru fișiere. N-au
+  // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
+  // în opt fișiere. N-au
   // nimic de împărțit, dar stăteau în serie: un dus-întors întreg, 50–200 ms pe
   // mobil, doar ca să aștepte cine vine primul.
   //
@@ -133,21 +134,29 @@ async function construieste(canvas, renderer, deEliberat, curata) {
     deEliberat.push(() => legenda.dispose());
   }
 
-  // Atribuirile datelor care chiar ajung pe ecran — relieful, culorile, stratul —,
-  // fără dubluri. Licența lor, CC BY 4.0, le cere oriunde se afișează datele. Se
-  // strâng ACUM, cât straturile mai sunt legate de variabila de mai sus.
+  // Atribuirile datelor care chiar ajung pe ecran, fără dubluri, fiecare cu ce
+  // s-a făcut din ea. Licența lor, CC BY 4.0, le cere oriunde se afișează datele
+  // și cere și mențiunea prelucrării. Se strâng ACUM, cât straturile mai sunt
+  // legate de variabila de mai sus.
+  //
+  // „Pe ecran" contează: fără paletă completă terenul iese gri și regula nu mai
+  // citește nici NDVI-ul; în previzualizare se vede NDVI-ul, dar nu culorile.
+  const culoriMasurate = !culoare && terenMasurat(paleta);
+  const ndviPeEcran = Boolean(ndvi.baza) && (Boolean(culoare) || culoriMasurate);
+  const RELIEF = 'relieful, decupat după conturul zonei și adus la grila scenei';
+  const NDVI = 'indicele de vegetație, calculat din roșul și infraroșul ortofotoului';
   const surse = [...new Map([
-    relief.meta?.sursa,
-    reliefPetic?.meta?.sursa,
-    atribuirePaleta(),
-    ndvi.baza?.meta?.sursa,
-    ndvi.petic?.meta?.sursa,
-  ].filter((s) => s?.atributie).map((s) => [s.atributie, s])).values()];
+    [relief.meta?.sursa, RELIEF],
+    [reliefPetic?.meta?.sursa, RELIEF],
+    [culoriMasurate ? atribuirePaleta() : null, 'culorile vegetației, măsurate pe ortofoto'],
+    [ndviPeEcran ? ndvi.baza?.meta?.sursa : null, NDVI],
+    [ndviPeEcran ? ndvi.petic?.meta?.sursa : null, NDVI],
+  ].filter(([s]) => s?.atributie).map(([s, prelucrare]) => [s.atributie, { ...s, prelucrare }])).values()];
 
   const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
   scena.add(teren.obiect);
   // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza de
-  // ~250 MB trebuie să fie deja în listă ca s-o elibereze `curata()`.
+  // ~48 MB trebuie să fie deja în listă ca s-o elibereze `curata()`.
   deEliberat.push(() => teren.dispose());
 
   const petic = reliefPetic
@@ -243,7 +252,9 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   // impresia unui dispose() curat fără să fie.
   //
   // Nu e memorie GPU, dar e memorie — iar atributele plasei, mult mai mari, le
-  // eliberează `teren.dispose()` prin `curata()`.
+  // eliberează `teren.dispose()` prin `curata()`: și de pe placă, și din RAM,
+  // fiindcă îi scoate atributele din geometrie. Vezi acolo de ce nu ajungea
+  // `geometrie.dispose()` singur.
   let viu = true;
 
   return {

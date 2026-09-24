@@ -58,16 +58,27 @@ html, body {
   line-height: 1.78;
 }
 
-/* Atribuirea datelor. Un rând în fluxul paginii, după text, pe fundal opac: se
-   citește peste teren fără să depindă de culoarea de dedesubt. `--muted` pe
-   `--bg` are 6,5:1 pe tema deschisă și 7,1:1 pe cea întunecată; `--accent`,
-   pe legături, 7,6:1 și 7,2:1. Deschis, arată textele complete. */
+/* Atribuirea datelor: un rând pe fundal opac, care se citește peste teren fără
+   să depindă de culoarea de dedesubt. `--muted` pe `--bg` are 6,5:1 pe tema
+   deschisă și 7,1:1 pe cea întunecată; `--accent`, pe legături, 7,6:1 și 7,2:1.
+   Deschis, arată textele complete.
+
+   Pe ecran lat stă FIX, jos la mijloc, ca atribuirea unei hărți. În fluxul
+   paginii, după textul provizoriu de azi, cădea în banda panoului punctului
+   (sus-stânga, până la y 228 după un clic): până la ~1074 px lățime rândul
+   ajungea sub panou, iar pe butonul „Copiază" atingerea nu mai ajungea la el.
+   Jos la mijloc nu e nimic pe lățimile peste 34rem — busola și panoul stau sus. */
 #surse {
-  position: relative;
-  z-index: 1;
-  width: fit-content;
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 3;   /* deschis, stă peste panouri: l-a deschis cineva ca să-l citească */
+  width: max-content;
   max-width: min(40rem, calc(100vw - 2rem));
-  margin: 0 auto 2rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  margin: 0;
   padding: 0.35rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -82,10 +93,21 @@ html, body {
 #surse p { margin: 0 0 0.3rem; }
 #surse a { color: var(--accent); }
 
-/* Pe telefon busola și panoul punctului coboară în colțurile de jos; spațiul de
-   dedesubt lasă subsolul să urce peste ele când pagina e derulată până la capăt. */
+/* Pe telefon, jos nu e loc: busola și panoul punctului coboară în colțuri. Acolo
+   subsolul stă în fluxul paginii, după text, iar marginea de dedesubt îl lasă să
+   urce peste ele când pagina e derulată până la capăt. Măsura e panoul DESCHIS,
+   nu cel de la pornire: după un clic are 196 px plus 12 px până la margine. */
 @media (max-width: 34rem) {
-  #surse { margin-bottom: 9rem; }
+  #surse {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    z-index: 1;
+    width: fit-content;
+    max-height: none;
+    margin: 0 auto calc(14rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Fără scenă, pagina rămâne o pagină obișnuită. */
@@ -375,13 +397,14 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * Numai cu ?previzualizare=… în adresă. Unealtă de verificat datele, nu
  * conținut: se șterge împreună cu src/scene/previzualizare.js.
  *
- * Jos în dreapta pe desktop; sub 34rem busola și panoul coboară amândouă, deci
- * legenda urcă în colțul rămas liber.
+ * Jos în dreapta pe desktop, deasupra rândului de atribuire. Sub 34rem busola și
+ * panoul coboară amândouă, deci legenda urcă sus — unde e textul, care coboară
+ * sub ea; vezi regula de la capătul blocului.
  */
 #legenda {
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
+  bottom: 4.5rem;   /* deasupra rândului de atribuire, fix jos la mijloc */
   z-index: 2;
   pointer-events: none;
   width: min(16rem, calc(100vw - 2rem));
@@ -401,8 +424,11 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #legenda .fara { color: var(--muted); font-size: 0.78rem; }
 #legenda .mostra { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.35rem; vertical-align: -0.1rem; border-radius: 2px; }
 
+/* Sub 34rem jos e ocupat de busolă și de panou, iar sus e textul. Legenda urcă
+   sus, iar textul coboară sub ea cât timp există. */
 @media (max-width: 34rem) {
   #legenda { top: 1rem; bottom: auto; right: 0.75rem; }
+  body:has(#legenda) #continut { padding-top: 9rem; }
 }
 
 @media (forced-colors: active) {

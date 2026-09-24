@@ -8,8 +8,12 @@
 // terenul, deci scara e VĂDIT nenaturală — nimeni nu trebuie s-o ia drept culori.
 //
 // Fără parametrul din adresă modulul nu face nimic, iar plasa iese cu regula
-// adevărată. Se șterge fișierul împreună cu cele trei rânduri din scena.js, iar
-// pagina rămâne întreagă.
+// adevărată. Ca să-l scoți: fișierul acesta; în scena.js importul lui, blocul care
+// începe cu comentariul `?previzualizare=ndvi` (`mod`, `culoare`, legenda) și
+// argumentul `culoare` din cele două apeluri creeazaTeren, plus `culoare` din
+// calculul surselor; în main.css blocul #legenda. `npm run build` NU prinde un
+// `culoare` uitat — ar ieși ReferenceError abia la pornire, iar pagina ar rămâne
+// fără scenă. Rulează `npm run verifica-teren` și deschide pagina.
 
 /** Modul cerut în adresă, sau null. */
 export function modPrevizualizare() {
