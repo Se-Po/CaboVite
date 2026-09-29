@@ -7,16 +7,28 @@
 //
 // Rulează: npm run build-petic          (pas de 1 m)
 //          npm run build-petic -- 0.5   (rezoluția nativă)
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { laTM06 } from './comun/tm06.mjs';
 import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
-const NUME = 'harta_v1';
-const BAZA = 'harta_v0';
+// harta_v3 = același petic ca harta_v1, pe baza reparată harta_v2. Peticul citește
+// baza numai în banda de cusătură (coloanele 484…752), departe de fâșia refăcută,
+// deci .bin-ul iese identic la octet; se schimbă doar baza numită în sidecar.
+const NUME = 'harta_v3';
+const BAZA = 'harta_v2';
 
 const DIR = 'date-sursa/lidar-50cm';
 const IESIRE = 'public/data';
+
+// Dalele din care se face peticul, numite una câte una — NU tot directorul.
+// Dreptunghiul peticului e conturul tăiat la cutia dalelor (`acop`, mai jos), iar
+// conturul coboară la y −138063, sub marginea lui 105163 (−138000): azi îl
+// reteză chiar cutia. O dală în plus în director, oricare coboară sub −138000
+// (104162, cerută de build-zona, sau 106162), ar lărgi cutia fără să aducă date
+// sub petic: 64 de rânduri noi, fără nicio probă, deci ~26 500 de celule de uscat
+// tăiate ca apă — găuri prin care se vede marea.
+const DALE = ['MDT-50cm-105163-06-2024_v01.tif'];
 const NODATA = -999;
 const REZ_SURSA = 0.5;
 
@@ -90,14 +102,13 @@ function incarcaBaza() {
 // --------------------------------------------------------------------- main
 
 const main = () => {
-  if (!existsSync(DIR)) throw new Error(`${DIR} nu există — pune acolo dalele MDT-50cm`);
-  const fisiere = readdirSync(DIR).filter((f) => f.toLowerCase().endsWith('.tif'));
-  if (!fisiere.length) throw new Error(`niciun .tif în ${DIR}`);
+  const lipsa = DALE.filter((f) => !existsSync(join(DIR, f)));
+  if (lipsa.length) throw new Error(`lipsesc din ${DIR}: ${lipsa.join(', ')} — vezi DALE`);
 
   const baza = incarcaBaza();
   console.log(`bază: ${BAZA}, ${baza.w} × ${baza.h} la ${baza.pas} m`);
 
-  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
+  const dale = DALE.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
   if (dale.some((d) => d.rezolutie !== REZ_SURSA))
     throw new Error(`dale cu altă rezoluție decât ${REZ_SURSA} m`);
   const acop = {
@@ -145,6 +156,7 @@ const main = () => {
       cerut.x0 < lim.x0 - 0.01 || cerut.x1 > lim.x1 + 0.01)
     console.log(`  (conturul cerut a fost retezat la acoperirea dalelor)`);
 
+
   // ------------------------------------------------- valorile, din dalele 0,5 m
   //
   // Valoarea unui nod e media pătratului de `pas` × `pas` centrat pe el, nu un
@@ -152,6 +164,8 @@ const main = () => {
   // al LiDAR-ului și ar arunca restul măsurătorilor.
   const sume = new Float64Array(w * h);
   const nrProbe = new Uint16Array(w * h);
+  // Toate probele unui nod, și cele de apă: acoperirea reală, nu cutia dalelor.
+  const acoperit = new Uint16Array(w * h);
   const jum = pas / 2;
 
   for (const d of dale) {
@@ -168,6 +182,7 @@ const main = () => {
         const nc = Math.round((x - X0) / pas);
         if (nc < 0 || nc >= w) continue;
         const v = rand[cc];
+        acoperit[nr * w + nc]++;
         if (esteApa(v)) continue;
         sume[nr * w + nc] += v;
         nrProbe[nr * w + nc]++;
@@ -176,6 +191,18 @@ const main = () => {
     process.stdout.write('.');
   }
   console.log('');
+
+  // Cutia dalelor nu e acoperirea lor: un gol între dale ar intra în ea, iar
+  // nodurile de acolo ar ieși tăcut apă. Un nod acoperit întreg primește exact
+  // (pas / 0,5)² probe, oricâte dale ar împărți pătratul lui.
+  const cerute = Math.round((pas / REZ_SURSA) ** 2);
+  let neacoperite = 0, primul = -1;
+  for (let i = 0; i < acoperit.length; i++)
+    if (acoperit[i] < cerute) { neacoperite++; if (primul < 0) primul = i; }
+  if (neacoperite)
+    throw new Error(`${neacoperite} noduri ale peticului au sub ele mai puțin de ${cerute} probe din DALE `
+      + `(primul la TM06 ${X0 + (primul % w) * pas}, ${Y1 - Math.floor(primul / w) * pas}). `
+      + 'Dreptunghiul a ieșit din cutia dalelor, nu din acoperirea lor.');
 
   const grila = new Float32Array(w * h);
   let uscat = 0, zmin = Infinity, zmax = -Infinity;
@@ -268,7 +295,7 @@ const main = () => {
       licenta: 'CC BY 4.0',
       atributie: 'Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0',
       portal: 'https://cdd.dgterritorio.gov.pt/',
-      dale: fisiere,
+      dale: DALE,
     },
   }, null, 2));
 

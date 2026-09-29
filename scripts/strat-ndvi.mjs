@@ -1,11 +1,11 @@
 // Stratul NDVI al paginii: pe fiecare nod al hărții, cât de verde e în infraroșu.
 //
-//   npm run strat-ndvi [nume-hartă]        implicit harta_v1, plus baza ei
+//   npm run strat-ndvi [nume-hartă]        implicit harta_v3, plus baza ei
 //
 // De ce e nevoie de el. `culoareTeren()` primea numai panta și altitudinea, iar
 // din ele nu se poate afla unde e vegetația: tufărișul și vegetația uscată au
 // aceeași pantă mediană (14,1° față de 12,6°) și aceeași altitudine mediană
-// (103,3 față de 103,4 m). Cea mai bună regulă posibilă pe cele două iese la
+// (103,4 m amândouă). Cea mai bună regulă posibilă pe cele două iese la
 // întâmplare între ele, pe date nevăzute. Informația stă în banda de infraroșu a
 // ortofotoului — iar dala de 283 MB nu intră în depozit, deci pagina primește
 // NDVI-ul gata măsurat, într-un fișier mic, ca relieful.
@@ -315,7 +315,7 @@ const main = () => {
   const cale = join(DIR, fisier);
   const raport = JSON.parse(readFileSync(RAPORT_ORTOFOTO, 'utf8'));
 
-  const harta = incarcaHarta(process.argv[2] || 'harta_v1');
+  const harta = incarcaHarta(process.argv[2] || 'harta_v3');
   const baza = harta.meta.baza ? incarcaHarta(harta.meta.baza) : null;
   const toate = baza ? [baza, harta] : [harta];
 
@@ -330,7 +330,15 @@ const main = () => {
   const verificari = new Map(toate.map((hh) => [hh.nume, {}]));
 
   // 1. Clasele de control, pe harta pe care s-a făcut raportul ortofotoului.
+  // Cu o bază încărcată, un raport pe altă hartă nu mai e o probă sărită în
+  // tăcere: straturile ar ieși scrise fără singura verificare care leagă cele două
+  // scripturi, și asta exact când s-a schimbat harta. Baza e mereu o hartă pe care
+  // ortofoto.mjs o poate măsura. Fără bază — o hartă singură, poate una pe care
+  // ortofoto.mjs nu se aliniază deloc — proba se sare, spus limpede.
   const hc = toate.find((hh) => hh.nume === raport.metoda.harta);
+  if (!hc && baza)
+    throw new Error(`raportul ortofotoului e pe ${raport.metoda.harta}, nu pe ${toate.map((hh) => hh.nume).join(' / ')}: `
+      + `proba de clase n-ar avea cu ce compara. Rulează întâi: npm run ortofoto -- ${baza.nume}`);
   if (hc) {
     const p = probaClase(hc, mas.get(hc.nume), raport);
     console.log(`\nproba de clase pe ${hc.nume}: ${JSON.stringify(p.aici)}`);
@@ -338,7 +346,7 @@ const main = () => {
     console.log(`  identice cu ${RAPORT_ORTOFOTO}; pragul verde ${p.pragVerde}`);
     verificari.get(hc.nume).clase_ca_ortofoto = { ...p.aici, prag_verde: p.pragVerde };
   } else {
-    console.log(`\nproba de clase sărită: raportul ortofotoului e pe ${raport.metoda.harta}`);
+    console.log(`\nPROBA DE CLASE SĂRITĂ: raportul ortofotoului e pe ${raport.metoda.harta}, iar ${harta.nume} n-are bază`);
   }
 
   // 2. Alinierea absolută a peticului, și cusătura.

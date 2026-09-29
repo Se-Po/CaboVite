@@ -22,9 +22,9 @@ import { laOklab } from './comun/oklab.mjs';
 import { aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 
-const TRIUNGHIURI = 1362406;          // bază 860 522 + petic 501 884
-const OCTETI_ATRIBUTE = 73569924;     // position Float32 + color Uint16, ambele plase
-// ΔE_OK×100 față de ortofoto, pe fațetele de uscat ale bazei. Regula dă 10,22;
+const TRIUNGHIURI = 1362122;          // bază 860 238 + petic 501 884
+const OCTETI_ATRIBUTE = 73554588;     // 54 × TRIUNGHIURI: position Float32 + color Uint16, ambele plase
+// ΔE_OK×100 față de ortofoto, pe fațetele de uscat ale bazei. Regula dă 10,21;
 // pragul stă sub griul de rezervă măsurat pe aceleași fațete — tipărit alături —,
 // deci o regulă care a căzut înapoi pe gri, sau una stricată, pică.
 const PRAG_ORTOFOTO = 11;
@@ -174,13 +174,13 @@ async function main() {
   console.log('\n3. Căile de eșec ale stratului: scena trebuie să pornească la fiecare');
   const citeste = (u) => readFileSync('public' + u);
   const variante = {
-    'fișier lipsă, servit ca pagina index (Vite)': (u) => (u.includes('harta_v0-ndvi') ? dinDisc('/nu-exista') : dinDisc(u)),
-    'HTTP 404 pe .bin': (u) => (u.endsWith('harta_v0-ndvi.bin') ? new Response('', { status: 404 }) : dinDisc(u)),
-    '.bin trunchiat': (u) => (u.endsWith('harta_v0-ndvi.bin') ? new Response(citeste(u).subarray(0, 1000)) : dinDisc(u)),
-    'sidecar al altei hărți': (u) => (u.endsWith('harta_v0-ndvi.json')
+    'fișier lipsă, servit ca pagina index (Vite)': (u) => (u.includes('harta_v2-ndvi') ? dinDisc('/nu-exista') : dinDisc(u)),
+    'HTTP 404 pe .bin': (u) => (u.endsWith('harta_v2-ndvi.bin') ? new Response('', { status: 404 }) : dinDisc(u)),
+    '.bin trunchiat': (u) => (u.endsWith('harta_v2-ndvi.bin') ? new Response(citeste(u).subarray(0, 1000)) : dinDisc(u)),
+    'sidecar al altei hărți': (u) => (u.endsWith('harta_v2-ndvi.json')
       ? new Response(JSON.stringify({ ...JSON.parse(citeste(u)), harta: 'harta_v9' })) : dinDisc(u)),
-    'JSON stricat': (u) => (u.endsWith('harta_v1-ndvi.json') ? new Response('{') : dinDisc(u)),
-    'eroare de rețea': (u) => (u.endsWith('harta_v1-ndvi.bin') ? Promise.reject(new TypeError('Failed to fetch')) : dinDisc(u)),
+    'JSON stricat': (u) => (u.endsWith('harta_v3-ndvi.json') ? new Response('{') : dinDisc(u)),
+    'eroare de rețea': (u) => (u.endsWith('harta_v3-ndvi.bin') ? Promise.reject(new TypeError('Failed to fetch')) : dinDisc(u)),
   };
   for (const [nume, f] of Object.entries(variante)) {
     globalThis.fetch = async (u) => f(u);

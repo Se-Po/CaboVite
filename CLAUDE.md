@@ -86,13 +86,13 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
 ## Hărțile de relief
 
 Hărțile se numesc `harta_vN` și trăiesc în `public/data/<nume>-dem.bin` +
-`.json`. O hartă nouă — alt contur sau altă rezoluție — primește un nume nou;
+`.json`. O hartă nouă — alt contur, altă rezoluție sau alt conținut — primește un nume nou;
 nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`.
 
 | hartă | sursă | acoperire |
 |---|---|---|
-| `harta_v1` | LiDAR DGT, MDT 50 cm mediat | petic de 534 × 700 m la 1 m, peste `harta_v0` |
-| `harta_v0` | LiDAR DGT 2024-2025, MDT 2 m | conturul ales în pagină, 4,00 km², 2 m |
+| `harta_v3` | LiDAR DGT, MDT 50 cm mediat | petic de 534 × 700 m la 1 m, peste `harta_v2`; același `.bin`, la octet, ca `harta_v1` |
+| `harta_v2` | LiDAR DGT 2024-2025, MDT 2 m; fâșia 104162 din MDT 50 cm | conturul ales în pagină, 4,00 km², 2 m; `harta_v0` cu fâșia 104162 pusă la locul ei |
 
 O hartă poate avea cheia `baza`: atunci e un **petic** de rezoluție mai mare,
 iar `incarcaRelief()` încarcă și baza. Scena generează două plase — baza, cu o
@@ -105,7 +105,8 @@ Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loader
 poate încărca dintr-o clonă curată.
 
 Depozitul păstrează **exact** harta pe care o încarcă pagina, cu straturile ei, și
-nimic altceva: `harta_v1` plus baza ei, `harta_v0`, fiecare cu `-ndvi` alături. Hărțile de probă de dinainte — promontoriul
+nimic altceva: `harta_v3` plus baza ei, `harta_v2`, fiecare cu `-ndvi` alături. `harta_v0` și `harta_v1` au plecat odată
+cu reparația dalei 104162 (vezi „Dalele 104xxx"). Hărțile de probă de dinainte — promontoriul
 întreg din Copernicus GLO-30 și golful Lagosteiros — au fost șterse împreună cu
 scripturile lor, tocmai ca să nu mai existe îndoială care hartă e „cea bună".
 Sunt recuperabile din istoricul git.
@@ -141,8 +142,8 @@ ortofoto nu intră.
   deplasate cu 0,707 m spre sud-est. Se ia media benzilor pe blocuri 2×2 de la
   nivelul de 0,5 m, iar NDVI-ul se calculează după medie. Nivelul îl alege
   `deschideAliniat()` din `scripts/strat-ndvi.mjs`: cel mai grosier pe care
-  nodurile se aliniază exact (2 m la `harta_v0`, 0,5 m cu blocuri 2×2 la
-  `harta_v1`). `aliniaza()` din `scripts/comun/ortofoto.mjs` nu alege nimic:
+  nodurile se aliniază exact (2 m la `harta_v2`, 0,5 m cu blocuri 2×2 la
+  `harta_v3`). `aliniaza()` din `scripts/comun/ortofoto.mjs` nu alege nimic:
   primește un nivel, ține cont de convenția de noduri și aruncă dacă nu se
   aliniază. Verificarea de dinainte compara `bbox.xMin`, iar la `harta_v1`
   trecea tăcut. Tot în `comun/`, `fereastra()` refuză o fereastră care iese din
@@ -150,7 +151,9 @@ ortofoto nu intră.
 
 Scriptul se oprește singur dacă pică una dintre probe:
 - clasificarea din `ortofoto.mjs`, refăcută pe NDVI-ul lui, dă exact 122 388 /
-  122 273 / 61 849 / 185 546 (tufăriș / uscată / calcar / potecă). Dovedește că
+  122 256 / 61 813 / 185 438 (tufăriș / uscată / calcar / potecă). Raportul trebuie să
+  fie pe una dintre hărțile încărcate: cu o bază încărcată, altfel scriptul aruncă —
+  înainte sărea proba în tăcere. O hartă fără bază o sare, scris cu majuscule. Dovedește că
   cele două scripturi citesc același lucru, NU alinierea absolută: amândouă
   folosesc `aliniaza()` și `fereastra()`, deci un decalaj comun ar trece.
   Alinierea bazei stă pe aritmetică — nodul cade pe centrul pixelului, decalajul
@@ -171,6 +174,76 @@ prima și `(lățime − 1) · pas` la a doua (2328 față de 2326; 534 față d
 `scripts/comun/relief.mjs` **deduce** convenția din aritmetică și aruncă dacă nu
 se potrivește niciuna. Nu presupune.
 
+### Dalele 104xxx: o jumătate de celulă
+
+Dalele de 2 m din coloana de vest — `MDT-2m-104161`, `104162`, `104163` — nu stau
+pe grila celorlalte. Au colțul la x0 = −95441 (impar) și 221 de coloane, iar a
+221-a e NODATA pe toate rândurile: umplutură, fiindcă 441 m nu se împart la 2.
+Centrele pixelilor cad la x par, nodurile hărții la x impar. În `build-zona`,
+`(x − X_MIN) / 2` ieșea atunci un întreg exact — o egalitate —, iar `floor` alegea
+nodul estic: **`harta_v0` avea fiecare pixel din 104162 cu 1 m spre est**. Erau
+6 421 de noduri de uscat, în vârful de vest; pe faleză, înălțimea greșea cu până
+la 14,5 m (mediana 0,48 m). 104161 și 104163 n-au uscat.
+
+Ce a dovedit-o, nu doar a sugerat-o:
+- `MDT-50cm-104162` are aceeași origine, −95441, și se termină exact la −95000.
+  Înregistrarea 2 m ↔ 50 cm iese la (0, 0), dar e **relativă**: două antete
+  greșite la fel ar trece.
+- Proba **absolută** e cusătura la 0,5 m cu `MDT-50cm-105162`, dală standard:
+  distanța dintre centrele ultimei coloane din stânga și ale primei din dreapta
+  iese **0,50 / 0,47 m**, pe 432 de rânduri. Antet corect ⇒ 0,5; dală mutată cu
+  1 m ⇒ −0,5. Controalele, între ele cusătura standard 105163/105162, citesc
+  0,40–0,55.
+- `MDT-50cm-105162` e **LZW** (`Compression = 5`, predictor 1, un rând pe bandă).
+  `tiff.mjs` nu-l citește; proba l-a decodat cu un decodor scris pe loc, verificat
+  prin înregistrarea față de dala de 2 m 105162: minim la (0, 0).
+
+Reparația, în `build-zona.mjs`:
+- O dală de 2 m al cărei colț nu cade pe muchiile de celulă ale hărții nu se mai
+  lipește cu `floor`. Fără uscat (104161, 104163) se sare; cu uscat, celulele
+  cuprinse ÎNTREGI în amprenta ei se refac din dala de 50 cm cu același indice;
+  dacă aceea lipsește, `throw`. Marginea de est a lui 104162 (−94999) taie celula
+  de la −94999 în două, iar aceea rămâne a lui 105162.
+- Regula unui bloc 4 × 4, calibrată pe 105163, unde există ambele produse: apă
+  numai dacă toate 16 sub-celule sunt apă, altfel media celor 16 cu marea ca 0 m.
+  Așa își face DGT produsul de 2 m: 632 de celule cu altă mască din 250 000
+  („apă dacă oricare": 1 829), RMS 0,07–0,12 m pe blocurile amestecate („media pe
+  uscat": 0,14–0,62). NODATA nu stă niciodată lângă uscat, deci regula n-o simte.
+  `build-petic` ignoră apa la medie — altă convenție, fără urmări acolo, fiindcă
+  peticul e în interior.
+- Proba de înregistrare rămâne în script și oprește dacă minimul nu e la (0, 0)
+  sau dacă 1 m nu se deosebește de 0: azi 0,435 m la (0, 0), 1,52 m la 1 m.
+- Alt pas înseamnă altă hartă: `npm run build-zona -- 4` cere acum și un nume nou
+  (`-- 4 harta_vN`). Înainte scria tăcut peste harta pe care stau peticul și NDVI-ul.
+
+Acceptarea, pe `harta_v2`: diferă de `harta_v0` exact 6 406 noduri din fâșie (161
+trec din uscat în apă) și cele 14 190 limitate, de mai jos; **0** în rest. Refăcută
+independent din 50 cm, fâșia iese la RMS 0,0007 m, sub o cuantă; mutată cu 0,5 m,
+0,86 m. Pe cusătura cu 105162, testul pe perechi de rânduri dă 35% de rânduri
+care preferă un gol de 3 m — cât nulul, 0,34 —, față de 49% pe `harta_v0`.
+
+**Cusăturile dalelor DGT de 2 m au un artefact propriu.** Coloana exterioară a
+fiecărei dale citește, pe cusături sigur bune, un gol de 2,6–3,6 m în loc de 2.
+O probă de continuitate pe cusătură trebuie să sară o coloană de margine de
+fiecare parte și să aibă controale pe cusături cunoscute; altfel confirmă ce te
+aștepți. La 0,5 m artefactul nu apare.
+
+**Uint16 nu taie.** zMax e maximul din CONTUR, dar cutia are relief mai înalt în
+afara lui, până la 150 m. În `harta_v0`, 14 190 de noduri de acolo treceau de
+65535 și se înfășurau până la „apă". Niciunul nu e colț de celulă randată;
+`build-zona` le limitează acum la 65535, iar zScara rămâne aceeași.
+
+**`build-petic` citește o listă, nu un director.** `DALE` numește dalele de
+50 cm. Cutia lor (`acop`) reteză conturul peticului, care coboară la −138063,
+sub marginea lui 105163. Orice dală în plus care coboară sub −138000 lărgește
+cutia și, odată cu ea, peticul, cu 64 de rânduri. Cu 104162 sau 106162, care nu
+stau sub petic, banda ar rămâne fără date: 34 240 de noduri fără nicio probă și
+~26 500 de celule de uscat tăiate ca apă — găuri în teren. Cu 105162 banda ar avea
+date, dar peticul tot s-ar schimba, deci ar fi altă hartă. O gardă numără probele
+fiecărui nod, cu tot cu apa: un nod acoperit întreg are exact (pas / 0,5)², oricâte
+dale i-ar împărți pătratul. `date-sursa/lidar-50cm/` are acum și 104163 (numai apă și NODATA)
+și 105162 (LZW), pe care nu le citește niciun script.
+
 ## Busola și nordul adevărat
 
 Scena e așezată pe grila TM06: `+X` e estul grilei, `−Z` e **nordul grilei**.
@@ -180,8 +253,8 @@ nordul adevărat cade cu 0,67° la **est** de nordul grilei. Pe rozetă asta fac
 0,47 px — deci nu se vede, și tocmai de aceea nu se verifică din ochi.
 
 γ **nu e scris ca o constantă.** `src/scene/busola.js` îl deduce din
-`colturi_geo` al hărții de **bază** — `harta_v1` n-are cheia asta, numai
-`harta_v0` — ca media azimutului celor două muchii verticale. Scalarea
+`colturi_geo` al hărții de **bază** — `harta_v3` n-are cheia asta, numai
+`harta_v2` — ca media azimutului celor două muchii verticale. Scalarea
 longitudinii NU e `cos(φ)`, ci `cos(φ)·N(φ)/M(φ)` pe GRS80; cu `cos(φ)` singur γ
 iese sistematic mai mic cu 0,414%. Fără `colturi_geo`, busola **nu se creează**
 și spune de ce: mai bine lipsește decât să arate cu convingere un nord care nu e.
@@ -296,12 +369,12 @@ fațete plate. Patru lucruri de acolo nu se pot ghici din cod fără măsurătoa
 care le-a motivat.
 
 **Celulele de apă nu se generează.** Toate patru nodurile la `zMin_m` înseamnă
-umplutură, nu batimetrie — o spune `regula_apa` din sidecar. Sunt 477 166 din
+umplutură, nu batimetrie — o spune `regula_apa` din sidecar. Sunt 477 308 din
 cele 907 427 de celule păstrate ale bazei (52,6%) și 122 858 din cele 373 800
 ale peticului (32,9%), iar marea e un plan **opac** de 40 km la `COTA_MARE`, pe
 sub care camera nu poate coborî: ținta stă la y = 60, `minDistance` e 80 și
 `maxPolarAngle` e π/2 − 0,04, deci camera rămâne peste 64,6 m. Erau desenate la
-fiecare cadru și nu se puteau vedea niciodată. Triunghiuri: 2 562 454 → 1 362 406.
+fiecare cadru și nu se puteau vedea niciodată. Triunghiuri: 2 562 454 → 1 362 122.
 
 Se taie numai celulele cu TOATE patru nodurile la cotă; malul rămâne întreg. Iar
 `inaltimeLa` citește din `grila`, nu din plasă, deci panoul punctului măsoară
@@ -330,7 +403,7 @@ umbrită. Pe 16 biți eroarea e 0,0005–0,0011 dintr-un nivel din 255.
 `null`: `WebGLRenderer` o calculează el pe calea de sortare, activă implicit.
 
 Efectul cumulat, măsurat pe pagină: atributele de vârf scad de la 276 745 032 la
-**73 569 924 de octeți (−73,4%)**, în RAM și pe GPU deodată.
+**73 554 588 de octeți (−73,4%)**, în RAM și pe GPU deodată.
 
 Proba care contează: randare într-o țintă fixă de 640 × 400, aceeași cameră,
 înainte și după. Din 256 000 de pixeli **diferă 176, adică 0,069%, fiecare cu
@@ -347,7 +420,7 @@ fiecare parametru.
 
 **De ce are nevoie de NDVI.** Numai din pantă și altitudine nu se află unde e
 vegetația. Tufărișul și vegetația uscată au aceeași pantă mediană (14,1° față de
-12,6°) și aceeași altitudine mediană (103,3 față de 103,4 m); cea mai bună regulă
+12,6°) și aceeași altitudine mediană (103,4 m amândouă); cea mai bună regulă
 posibilă pe cele două le desparte la întâmplare pe date nevăzute, iar antrenată pe
 sudul hărții și aplicată pe nord cade sub clasa majoritară. Informația stă în
 infraroșul ortofotoului — vezi stratul NDVI, la hărți.
@@ -374,19 +447,20 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
 în expunere, nu în culoare.
 
 **Probe care pot eșua** — toate în `npm run verifica-teren`:
-- argumentul primit de fiecare din cele 1 362 406 fațete e egal cu o recalculare
+- argumentul primit de fiecare din cele 1 362 122 de fațete e egal cu o recalculare
   independentă din `.bin`: **0 nepotriviri**. Proba chiar pică dacă un indice de nod
   e greșit — încercat;
-- toate fațetele de la apă de deasupra mării ies calcar (3 986 pe bază, 2 714 pe petic);
-- calea fără strat o iau numai fațetele scufundate întregi (700 + 549);
+- toate fațetele de la apă de deasupra mării ies calcar (4 023 pe bază, 2 714 pe petic);
+- calea fără strat o iau numai fațetele scufundate întregi (720 + 549);
 - **0** fațete diferă între tema de zi și cea de noapte;
 - peticul față de ce ar picta baza sub el: ΔE_OK×100 al mediilor **0,245** pe toată
   zona, 0,115 pe fâșia de 20 m de la margine — dreptunghiul peticului nu se vede;
-- numai cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 855 836 de
-  fațete de uscat ale bazei, **10,22** medie / 8,49 mediană; pragul e 11. Pe
-  aceleași fațete griul de rezervă dă 11,70, iar regula fără strat 15,56 — deci
+- numai cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 855 495 de
+  fațete de uscat ale bazei, **10,21** medie / 8,48 mediană; pragul e 11. Pe
+  aceleași fațete griul de rezervă dă 11,70, iar regula fără strat 15,55 (15,56 pe
+  `harta_v0`) — deci
   pragul prinde o regulă căzută înapoi pe gri sau un strat ignorat. Cu ancore potrivite pe
-  ortofoto ar fi 5,46: diferența e că paleta e albedo, iar ortofotoul are umbrele
+  ortofoto ar fi 5,46 (măsurat pe `harta_v0`): diferența e că paleta e albedo, iar ortofotoul are umbrele
   în el. Cifra aceea nu se calculează în unealtă.
 
 Regula costă +23 ms la construcția bazei, în Node.
@@ -470,15 +544,16 @@ magic 43, numărul de intrări dintr-un IFD pe 8 octeți, intrări de 20 de octe
 valori inline până în 8 octeți. `citesteIfd(..., big)` din `scripts/comun/tiff.mjs`
 tratează ambele.
 
-Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v0` și
-`harta_v1`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până
-la `harta_v0` iese **106 × 703 pixeli, întregi**: pixelul ortofotoului cade peste
-nodul LiDAR fără reeșantionare. La `harta_v1` pasul se potrivește, dar
+Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v2` și
+`harta_v3`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până
+la `harta_v2` iese **106 × 703 pixeli, întregi**: pixelul ortofotoului cade peste
+nodul LiDAR fără reeșantionare. La `harta_v3` pasul se potrivește, dar
 alinierea NU: pe convenția „noduri", amprenta primului nod începe la 1180,5 ×
 2298,5 pixeli, deci nodurile cad pe colțurile pixelilor. Peticul se citește de la
 nivelul de 0,5 m, mediat 2 × 2 — vezi stratul NDVI, mai sus. Scriptul verifică asta și se oprește dacă nu iese.
-Control independent: numărul de celule de uscat din contur, 492 056, e identic cu
-`acoperire.uscat_masurat_in_poligon` din sidecar.
+Control independent: numărul de celule de uscat din contur, 491 895 (492 056 pe
+`harta_v0`), e identic cu `acoperire.uscat_masurat_in_poligon` din sidecar, iar
+`ortofoto.mjs` aruncă dacă cele patru clase nu-l acoperă exact.
 
 Dalele sunt JPEG cu `JPEGTables` partajate (73 de octeți: SOI + o tabelă de
 cuantizare + EOI) și `PlanarConfiguration = 2`, deci fiecare dală e un flux JPEG

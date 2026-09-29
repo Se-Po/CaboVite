@@ -15,7 +15,7 @@
 //
 // Alinierea e exactă, nu potrivită: colțul ortofotoului e la TM06
 // (-96000, -135000) cu pas 0,25 m, iar nivelul 3 al piramidei lui are exact 2 m,
-// pasul lui harta_v0. Decalajul iese număr întreg de pixeli, deci pixelul
+// pasul lui harta_v2. Decalajul iese număr întreg de pixeli, deci pixelul
 // ortofotoului cade peste nodul LiDAR fără reeșantionare.
 //
 // Cititorul ortofotoului și conversiile OKLab stau în scripts/comun/, fiindcă le
@@ -37,7 +37,7 @@ const DIR = 'date-sursa/ortofoto';
 // rezultatul era un fișier livrat vizitatorului pe care nimic nu-l cerea.
 const PALETA_POZE = 'public/data';
 const IESIRE = DIR;
-const HARTA = process.argv[2] || 'harta_v0';
+const HARTA = process.argv[2] || 'harta_v2';
 
 // --------------------------------------------------------------------- main
 
@@ -142,6 +142,21 @@ const main = () => {
     calcar: clase.roca.filter((p) => p.panta >= PRAG_PANTA),
     poteca: clase.roca.filter((p) => p.panta < PRAG_PANTA),
   };
+
+  // Proba de numărare. build-zona a numărat uscatul din contur pe alt drum —
+  // celula testată în TM06, apa din dale —, iar aici e nodul, cu apa din .bin și
+  // numai pixelii de ortofoto care au date. Prinde un contur, o mască sau o
+  // convenție de noduri care diferă, și pixeli fără date peste uscat. NU prinde o
+  // fereastră de ortofoto mutată (uscatul nu se decide din culori) și nici
+  // pragurile (cele patru clase împart uscatul prin construcție).
+  const suma = Object.values(patru).reduce((s, p) => s + p.length, 0);
+  const asteptat = harta.meta.acoperire?.uscat_masurat_in_poligon;
+  if (asteptat === undefined)
+    console.log(`proba de numărare nu se poate face: ${HARTA} n-are acoperire.uscat_masurat_in_poligon (e un petic)\n`);
+  else if (suma !== asteptat)
+    throw new Error(`cele patru clase au ${suma} celule, dar ${HARTA} are ${asteptat} de uscat în contur. `
+      + 'Conturul, masca de apă, convenția de noduri sau pixelii fără date ai ortofotoului diferă.');
+  else console.log(`proba de numărare: ${suma} = uscat_masurat_in_poligon al lui ${HARTA}\n`);
 
   const rezultat = {};
   for (const [nume, ps] of Object.entries({ ...patru, vegetatie: clase.vegetatie, roca: clase.roca })) {

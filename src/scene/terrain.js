@@ -10,7 +10,7 @@ import { GRI_REZERVA, SPRE_LINIAR, culoareTeren, paletaCurenta } from './palette
 //
 // Jumătate din celulele hărții sunt apă: toate patru nodurile la `zMin_m`, cota
 // de umplutură pe care sidecarul o numește „artificiu de randare, nu batimetrie".
-// Numărate din fișierele .bin: 477 166 din cele 907 427 de celule păstrate ale
+// Numărate din fișierele .bin: 477 308 din cele 907 427 de celule păstrate ale
 // bazei (52,6%) și 122 858 din cele 373 800 ale peticului (32,9%).
 //
 // Marea e un plan OPAC de 40 km la −0,25 m, iar camera nu poate coborî sub el:

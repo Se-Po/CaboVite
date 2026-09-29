@@ -1,6 +1,6 @@
 {
-  "nume": "harta_v0",
-  "descriere": "Zona selectată la Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m, redus la 2 m. Uint16 little-endian, rând 0 = nord.",
+  "nume": "harta_v2",
+  "descriere": "Zona selectată la Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m, redus la 2 m; dalele nealiniate refăcute din MDT 50 cm (vezi corectii). Uint16 little-endian, rând 0 = nord.",
   "latime": 1164,
   "inaltime": 1493,
   "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
@@ -71,8 +71,8 @@
   ],
   "acoperire": {
     "celule_in_poligon": 1000887,
-    "uscat_masurat_in_poligon": 492056,
-    "uscat_masurat_in_cutie": 773369,
+    "uscat_masurat_in_poligon": 491895,
+    "uscat_masurat_in_cutie": 773208,
     "regula_apa": "exact 0.0 m sau NODATA (-999); plaja, care are valori mici dar nenule, rămâne uscat",
     "nota_colt_fara_dala": "Colțul de nord-vest al cutiei iese din acoperirea LiDAR (dala MDT-2m-104164 nu există). Verificat pe Copernicus GLO-30: acolo e mare, nu uscat — deci nu lipsește relief."
   },
@@ -80,8 +80,38 @@
     "exagerare_verticala": 1,
     "ascutire": "niciuna",
     "reducere": "niciuna — rezoluția nativă de 2 m",
-    "nota": "La 2 m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la -8 m — artificiu de randare, nu batimetrie."
+    "nota": "La 2 m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la -8 m — artificiu de randare, nu batimetrie.",
+    "limitare": "14190 noduri peste zMax (toate în afara conturului) limitate la 65535, nu înfășurate"
   },
+  "corectii": [
+    {
+      "dala": "MDT-2m-104162-06-2024_v01.tif",
+      "problema": "colțul la x0 -95441, y0 -138000, decalat față de muchiile de celulă ale hărții; lipită cu floor, fiecare pixel ar fi ajuns mutat cu 1 m spre est și 0 m spre nord",
+      "inlocuita_cu": "MDT-50cm-104162-06-2024_v01.tif",
+      "regula_bloc": "apă numai dacă toate cele 16 sub-celule de 50 cm sunt apă (0 sau NODATA); altfel media celor 16, cu apa socotită 0 m — regula care reproduce produsul DGT de 2 m pe 105163 (632 de celule cu altă mască din 250 000; RMS 0,07–0,12 m pe blocurile amestecate, ca pe uscatul curat)",
+      "celule": 110000,
+      "uscat": 6260,
+      "proba": {
+        "pixeli": 6421,
+        "rms_0": 0.4348,
+        "rms_1m": 1.522,
+        "minim_la": [
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "dale_sarite": [
+    {
+      "dala": "MDT-2m-104161-06-2024_v01.tif",
+      "motiv": "colț nealiniat (x0 -95441, y0 -139000), dar numai apă și NODATA"
+    },
+    {
+      "dala": "MDT-2m-104163-06-2024_v01.tif",
+      "motiv": "colț nealiniat (x0 -95441, y0 -137000), dar numai apă și NODATA"
+    }
+  ],
   "sursa": {
     "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 2 m",
     "producator": "Direção-Geral do Território (DGT)",
@@ -90,9 +120,6 @@
     "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
     "portal": "https://cdd.dgterritorio.gov.pt/",
     "dale": [
-      "MDT-2m-104161-06-2024_v01.tif",
-      "MDT-2m-104162-06-2024_v01.tif",
-      "MDT-2m-104163-06-2024_v01.tif",
       "MDT-2m-105161-06-2024_v01.tif",
       "MDT-2m-105162-06-2024_v01.tif",
       "MDT-2m-105163-06-2024_v01.tif",
@@ -100,7 +127,8 @@
       "MDT-2m-106161-06-2024_v01.tif",
       "MDT-2m-106162-06-2024_v01.tif",
       "MDT-2m-106163-06-2024_v01.tif",
-      "MDT-2m-106164-06-2024_v01.tif"
+      "MDT-2m-106164-06-2024_v01.tif",
+      "MDT-50cm-104162-06-2024_v01.tif"
     ]
   }
 }

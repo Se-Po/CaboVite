@@ -72,7 +72,7 @@ export const SPRE_LINIAR = (() => {
  * Liniar → sRGB pe 8 biți, dintr-un tabel de 16 384 de intrări.
  *
  * Regula amestecă în liniar și întoarce un octet sRGB: fără tabel, trei `pow` pe
- * fațetă. Măsurat în Node pe cele 860 522 de fațete ale bazei: 52 ms cu `pow`,
+ * fațetă. Măsurat în Node pe cele 860 522 de fațete ale bazei harta_v0: 52 ms cu `pow`,
  * 31 ms cu tabelul. Tabelul greșește cu cel mult un nivel din 255, pe 0,78% din
  * canale — pe cele foarte întunecate, unde curba sRGB e cea mai abruptă.
  */
@@ -148,8 +148,9 @@ export const atribuirePaleta = () => (masurat ? atribuireOrtofoto : null);
 const grade = (g) => 1 - Math.cos((g * Math.PI) / 180);   // panta = 1 − cos θ
 const S20 = grade(20), S40 = grade(40), S55 = grade(55), S70 = grade(70);
 
-// Medianele NDVI ale claselor din ortofoto, pe harta_v0: roca, vegetația uscată,
-// tufărișul. Sunt populațiile pe care s-au măsurat chiar albedourile vegetației.
+// Medianele NDVI ale claselor din ortofoto, pe harta_v2 (identice cu harta_v0 la
+// trei zecimale): roca, vegetația uscată, tufărișul. Sunt populațiile pe care
+// s-au măsurat chiar albedourile vegetației.
 const ROCA = 0.017, USCAT = 0.261, TUFARIS = 0.410;
 
 // Fără strat NDVI: câtă vegetație e la o cotă dată, citit din fracțiunea
@@ -197,7 +198,7 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  *
  * Numai din pantă și altitudine nu se află unde e vegetația. Tufărișul și
  * vegetația uscată au aceeași pantă mediană (14,1° față de 12,6°) și aceeași
- * altitudine mediană (103,3 față de 103,4 m). Cea mai bună regulă posibilă pe cele
+ * altitudine mediană (103,4 m amândouă). Cea mai bună regulă posibilă pe cele
  * două le desparte la întâmplare (53–57% pe date nevăzute), iar antrenată pe sudul
  * hărții și aplicată pe nord cade la 35,6%, sub clasa majoritară.
  *
@@ -229,19 +230,24 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  *
  * Apa. Fațetele de la mal coboară până la umplutura de −8 m pe cel mult 2 m în plan,
  * deci au panta de cel puțin 0,757 (76°), peste pragul falezei: ies calcar exact, pe
- * toate cele care se văd: 3 986 pe bază, 2 714 pe petic. Cele 700 + 549 cu toate
+ * toate cele care se văd: 4 023 pe bază, 2 714 pe petic. Cele 720 + 549 cu toate
  * vârfurile la −8 m n-au NDVI și iau calea fără strat — stau întregi sub planul
  * opac al mării. Tot sub mare stau și 26 de fațete ale peticului, în inelul de
  * cusătură, unde relieful e interpolat între umplutură și uscat.
  *
- * ─── Cât de bine, măsurat pe cele 855 836 de fațete de uscat ale bazei
+ * ─── Cât de bine, măsurat pe cele 855 495 de fațete de uscat ale bazei
  *
- * ΔE_OK×100 față de culoarea ortofotoului în vârfuri: 10,22 medie cu albedourile
- * paletei (8,49 mediană), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
+ * ΔE_OK×100 față de culoarea ortofotoului în vârfuri: 10,21 medie cu albedourile
+ * paletei (8,48 mediană), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
  * regula. Fără strat: 15,56 / 9,56. Cuantizarea stratului pe 15 niveluri schimbă
  * culoarea cu 0,37 în medie, p99 1,95. Fațetele care ies în evidență față de
  * vecinii lor (ΔE > 5 față de media celor 3 × 3 celule din jur): 8,1% aici, 17% cu
  * patru clase tăiate net, 4,5% în ortofotoul însuși.
+ *
+ * Cifrele pe care nu le reface nicio unealtă — 5,46, 15,56 / 9,56, 0,37 / 1,95 și
+ * procentele — sunt măsurate pe harta_v0. Pe harta_v2 diferă numai fâșia refăcută
+ * a dalei 104162, 1,3% din uscat. Cele reproduse de `verifica-teren` s-au mișcat
+ * puțin: 10,22 → 10,21, 8,49 → 8,48, iar fațetele 855 836 → 855 495.
  *
  * ─── Albedo, nu aparență
  *

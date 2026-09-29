@@ -163,7 +163,7 @@ export function fereastraMedie(o, banda, c0, r0, lat, inalt, bloc) {
  * Verificarea de dinainte compara `bbox.xMin` cu marginile pixelilor, ceea ce e
  * corect numai pentru hărțile cu convenția „muchii de celulă" (build-zona), unde
  * xMin chiar e marginea amprentei primului nod. La cele cu convenția „noduri"
- * (build-petic), xMin e NODUL însuși — vezi `jum` din relief.mjs. Pe harta_v1,
+ * (build-petic), xMin e NODUL însuși — vezi `jum` din relief.mjs. Pe harta_v3,
  * la nivelul de 1 m, `bbox.xMin` cădea pe o margine de pixel, deci verificarea
  * trecea, dar nodurile cădeau pe COLȚURILE pixelilor: culori deplasate cu 0,5 m
  * spre est și 0,5 m spre sud, fără nicio eroare.
