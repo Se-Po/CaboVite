@@ -4,6 +4,7 @@ import { creeazaCamera, incadreazaLaAspect } from './camera.js';
 import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
+import { creeazaCer } from './cer.js';
 import { incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
 import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
@@ -102,7 +103,24 @@ async function construieste(canvas, renderer, deEliberat, curata, continut) {
   scena.add(lumini.obiect);
   deEliberat.push(() => lumini.dispose());
 
-  const mare = creeazaMare(paleta);
+  // Cerul, cu soarele scenei. Separabil: dacă nu se poate face, rămân fundalul și
+  // ceața plate de mai sus.
+  let cer = null;
+  try {
+    cer = creeazaCer({ paleta, soare: lumini.soare });
+    scena.add(cer.obiect);
+    const c = cer;
+    deEliberat.push(() => c.dispose());
+    // Ce nu e mare, și stă oricum sub 5 km, se topește în media orizontului; tot ea
+    // e fundalul, acolo unde cerul n-ar ajunge.
+    const orizont = new THREE.Color().setRGB(...cer.orizont, THREE.SRGBColorSpace);
+    scena.fog.color.copy(orizont);
+    scena.background = orizont.clone();
+  } catch (e) {
+    console.warn('cerul sărit, rămâne fundalul plat:', e.message);
+  }
+
+  const mare = creeazaMare(paleta, cer);
   scena.add(mare.obiect);
   deEliberat.push(() => mare.dispose());
 

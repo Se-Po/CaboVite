@@ -448,7 +448,7 @@ care le-a motivat.
 **Celulele de apă nu se generează.** Toate patru nodurile la `zMin_m` înseamnă
 umplutură, nu batimetrie — o spune `regula_apa` din sidecar. Sunt 930 714 din
 cele 1 641 746 de celule păstrate ale bazei `harta_v4` (56,7%) și 122 858 din cele
-373 800 ale peticului (32,9%), iar marea e un plan **opac** de 40 km la `COTA_MARE`, pe
+373 800 ale peticului (32,9%), iar marea e un plan **opac** de 120 km la `COTA_MARE`, pe
 sub care camera nu poate coborî: ținta stă la y = 60, `minDistance` e 80 și
 `maxPolarAngle` e π/2 − 0,04, deci camera rămâne peste 64,6 m. Erau desenate la
 fiecare cadru și nu se puteau vedea niciodată. Triunghiuri, pe `harta_v2`:
@@ -544,6 +544,39 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
   în el. Cifra aceea nu se calculează în unealtă.
 
 Regula costă +23 ms la construcția bazei, în Node.
+
+## Cerul și ceața mării
+
+`src/scene/cer.js`: cerul Preetham din three (`Sky.js`), **senin** — norii lui cer un
+`time` care curge, iar scena desenează la cerere. Cutia are 40 km și stă pe planul
+îndepărtat (`gl_Position.z = w`); camera ajunge la cel mult 8 km de țintă.
+
+**Expunerea se calculează.** Sky.js e scris pentru ~0,5 sub ACES; sub AgX la 1 iese
+altfel. `expunereCer` e factorul la care orizontul OPUS soarelui are luminanța culorii
+de cer a temei (`paleta.cer`), deci pagina rămâne la fel de luminoasă ca înainte:
+2,18 ziua și 0,21 în tema întunecată, cu soarele Relief (18° / 244°); iar cu soarele
+zborului (39,5° / 94°), al vederii Satelit care vine, 0,79 și 0,075 — Preetham e mult mai luminos cu soarele sus.
+
+**Portul JS.** `cerLiniar()` și `agx()` refac în JS exact formulele shaderului și
+ale lui `AgXToneMapping` din r186 (matricile coloană cu coloană, ca în GLSL). Cu ele
+se află expunerea și media orizontului fără să se citească pixeli. Proba, în pagină,
+pe cinci direcții (orizont spre soare și opus, 30°, 60°, zenit): pixelii GPU și
+portul dau **aceiași octeți**, ΔE_OK×100 sub 0,1.
+
+**Ceața mării e pe fiecare pixel**, cu culoarea cerului la orizont pe azimutul
+privirii (`GLSL_CER`, cu uniformele cerului), trecută prin AgX și prin conversia de
+ieșire — ceața three se amestecă DUPĂ ele. O ceață de o singură culoare nu se poate
+potrivi cu un cer care variază după azimut. Legea e și ea alta decât a scenei:
+exponențială, `LUNGIME_CEATA_MARE` = 10 km. Cu cea liniară de 5–24 km, de la câteva
+sute de metri înălțime ceața completă cădea la 6 pixeli sub orizont, iar marea
+rămânea închisă până la linia cerului — o dungă. Planul mării are 120 km, de două
+ori planul îndepărtat, deci marginea lui nu se vede niciodată.
+
+Cusătura orizontului, cu privirea orizontală din larg, rândul de cer față de marea
+de sub el: ΔE 0,50 / 0 / 0,53 opus soarelui / spre el / lateral; o ceață de culoare
+constantă ar da 2,85 / 4,54 / 0,59. Restul scenei stă sub 5 km și primește ceața
+obișnuită, liniară, cu media orizontului ca culoare — aceeași lege ca înainte, deci
+terenul de aproape iese neschimbat. Cadre desenate în 2 s de repaus: 0.
 
 ## Sanctuarul
 
