@@ -1,0 +1,236 @@
+{
+ "nume": "harta_v4-orto_v1",
+ "harta": "harta_v4",
+ "versiune": "orto_v1",
+ "format": "KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, 5 niveluri de mip",
+ "conventie": "muchii de pixel: texelul (q, r) acoperă [x0 + q·pas, x0 + (q + 1)·pas] × [y1 − (r + 1)·pas, y1 − r·pas]; rândul 0 e nordul",
+ "bbox_tm06": {
+  "xMin": -95792,
+  "xMax": -93424,
+  "yMin": -139410,
+  "yMax": -136402
+ },
+ "pas_m": 1,
+ "latime": 2368,
+ "inaltime": 3008,
+ "niveluri": 5,
+ "octeti": 4069665,
+ "sha256": "230e4afcd75a3af1b489e5868642696d9888fb02bf270201df7bb0281a25484d",
+ "deplasare_aplicata_m": {
+  "dx": 0.25,
+  "dy": 0,
+  "sursa": "deplasarea pe sol din masoara-zbor"
+ },
+ "soare_zbor": {
+  "azimut_grila": 94,
+  "elevatie": 39.5,
+  "sursa": "umbrele din zona sanctuarului"
+ },
+ "mare": {
+  "srgb": [
+   25,
+   54,
+   84
+  ],
+  "estompare_m": [
+   25,
+   50
+  ],
+  "benzi": [
+   {
+    "de_la_m": 0,
+    "dE_fata_de_adanc": 13.58
+   },
+   {
+    "de_la_m": 25,
+    "dE_fata_de_adanc": 4.98
+   },
+   {
+    "de_la_m": 50,
+    "dE_fata_de_adanc": 1.99
+   },
+   {
+    "de_la_m": 75,
+    "dE_fata_de_adanc": 1.39
+   },
+   {
+    "de_la_m": 100,
+    "dE_fata_de_adanc": 1.01
+   },
+   {
+    "de_la_m": 125,
+    "dE_fata_de_adanc": 0.71
+   },
+   {
+    "de_la_m": 150,
+    "dE_fata_de_adanc": 0.57
+   },
+   {
+    "de_la_m": 175,
+    "dE_fata_de_adanc": 0.47
+   },
+   {
+    "de_la_m": 200,
+    "dE_fata_de_adanc": 0.36
+   },
+   {
+    "de_la_m": 225,
+    "dE_fata_de_adanc": 0.36
+   },
+   {
+    "de_la_m": 250,
+    "dE_fata_de_adanc": 0.37
+   },
+   {
+    "de_la_m": 275,
+    "dE_fata_de_adanc": 0.35
+   },
+   {
+    "de_la_m": 300,
+    "dE_fata_de_adanc": 0.33
+   },
+   {
+    "de_la_m": 325,
+    "dE_fata_de_adanc": 0.31
+   },
+   {
+    "de_la_m": 350,
+    "dE_fata_de_adanc": 0.28
+   },
+   {
+    "de_la_m": 375,
+    "dE_fata_de_adanc": 0.25
+   },
+   {
+    "de_la_m": 400,
+    "dE_fata_de_adanc": 0.15
+   },
+   {
+    "de_la_m": 425,
+    "dE_fata_de_adanc": 0.13
+   },
+   {
+    "de_la_m": 450,
+    "dE_fata_de_adanc": 0.15
+   },
+   {
+    "de_la_m": 475,
+    "dE_fata_de_adanc": 0.15
+   },
+   {
+    "de_la_m": 500,
+    "dE_fata_de_adanc": 0.12
+   },
+   {
+    "de_la_m": 525,
+    "dE_fata_de_adanc": 0.11
+   },
+   {
+    "de_la_m": 550,
+    "dE_fata_de_adanc": 0.12
+   },
+   {
+    "de_la_m": 575,
+    "dE_fata_de_adanc": 0.15
+   },
+   {
+    "de_la_m": 600,
+    "dE_fata_de_adanc": 0.14
+   },
+   {
+    "de_la_m": 625,
+    "dE_fata_de_adanc": 0.12
+   },
+   {
+    "de_la_m": 650,
+    "dE_fata_de_adanc": 0.07
+   },
+   {
+    "de_la_m": 675,
+    "dE_fata_de_adanc": 0.06
+   },
+   {
+    "de_la_m": 700,
+    "dE_fata_de_adanc": 0.1
+   },
+   {
+    "de_la_m": 725,
+    "dE_fata_de_adanc": 0.11
+   },
+   {
+    "de_la_m": 750,
+    "dE_fata_de_adanc": 0.11
+   },
+   {
+    "de_la_m": 775,
+    "dE_fata_de_adanc": 0.08
+   },
+   {
+    "de_la_m": 800,
+    "dE_fata_de_adanc": 0.26
+   }
+  ]
+ },
+ "unealta": "ktx version: v4.4.2",
+ "variante": {
+  "uastc": {
+   "octeti": 4069665,
+   "pierdere_dE": {
+    "medie": 0.248,
+    "p99": 1.416,
+    "max": 7.45
+   }
+  },
+  "etc1s": {
+   "octeti": 804206,
+   "pierdere_dE": {
+    "medie": 1.317,
+    "p99": 5.78,
+    "max": 16.927
+   }
+  }
+ },
+ "referinte_pagina": [
+  {
+   "nume": "terreiro",
+   "x": -94470,
+   "y": -137990,
+   "latura_m": 10,
+   "srgb": [
+    248,
+    241,
+    221
+   ]
+  },
+  {
+   "nume": "platoul de lângă far",
+   "x": -94700,
+   "y": -138560,
+   "latura_m": 10,
+   "srgb": [
+    173,
+    156,
+    141
+   ]
+  },
+  {
+   "nume": "versantul de nord",
+   "x": -94300,
+   "y": -137100,
+   "latura_m": 10,
+   "srgb": [
+    73,
+    96,
+    99
+   ]
+  }
+ ],
+ "sursa": {
+  "nume": "Ortofotomapa digital de Portugal Continental 2025, 25 cm",
+  "fisier": "ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif",
+  "producator": "Direção-Geral do Território (DGT)",
+  "licenta": "CC BY 4.0",
+  "atributie": "Ortofotos: © Direção-Geral do Território, ORTOS-2025, CC BY 4.0",
+  "portal": "https://cdd.dgterritorio.gov.pt/"
+ }
+}

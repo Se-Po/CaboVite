@@ -61,5 +61,16 @@ export function scriePng(w, h, rgb) {
   ]);
 }
 
+/**
+ * La fel, dar cu bucata `sRGB`: spune explicit că octeții sunt sRGB, ca un codor
+ * de texturi să nu ghicească funcția de transfer.
+ */
+export function scriePngSrgb(w, h, rgb) {
+  const png = scriePng(w, h, rgb);
+  const srgb = bucata('sRGB', Buffer.from([0])); // intenția „perceptual"
+  // după semnătură (8) și IHDR (8 + 13 + 4)
+  return Buffer.concat([png.subarray(0, 33), srgb, png.subarray(33)]);
+}
+
 /** Același PNG, ca URI de date, pentru încorporat într-o pagină. */
 export const pngDataUri = (w, h, rgb) => `data:image/png;base64,${scriePng(w, h, rgb).toString('base64')}`;

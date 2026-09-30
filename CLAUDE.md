@@ -38,6 +38,7 @@ se poartă în română.
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
 | `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși |
 | `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
+| `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic → `public/data/<hartă>-orto_v1.ktx2` + `.json`; cere KTX-Software 4.4 |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -577,6 +578,45 @@ de sub el: ΔE 0,50 / 0 / 0,53 opus soarelui / spre el / lateral; o ceață de c
 constantă ar da 2,85 / 4,54 / 0,59. Restul scenei stă sub 5 km și primește ceața
 obișnuită, liniară, cu media orizontului ca culoare — aceeași lege ca înainte, deci
 terenul de aproape iese neschimbat. Cadre desenate în 2 s de repaus: 0.
+
+## Vederea Satelit
+
+Fotografia aeriană DGT, pregătită ca textură pentru relief: vederea care o va
+drapa pe hartă vine în commit-ul următor.
+
+### Texturile: `npm run textura-ortofoto`
+
+Scrie `public/data/<hartă>-orto_v1.ktx2` + `.json`, pentru bază și petic. Textura are
+versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 4.4
+(`ktx`); scriptul îl caută și în `C:/Program Files/KTX-Software/bin` sau în
+`KTX_BIN`, fiindcă un shell pornit înainte de instalare nu vede PATH-ul nou.
+
+- **Geometria.** „Muchii de pixel”, cu marginile în TM06 în sidecar. Baza:
+  2368 × 3008 la 1 m, colțul NV (−95792; −136402); peticul: 2176 × 2880 la 0,25 m,
+  (−94823; −137295). Dimensiuni multipli de 64, deci toate cele 5 niveluri sunt
+  multipli de 4, cât blocurile KTX2. Colțurile cad pe metri întregi unul față de
+  altul, deci al treilea nivel al peticului (1 m) cade texel pe texel peste bază.
+- **Culoarea.** Ortofotoul la 0,25 m, mutat cu deplasarea măsurată pe sol (+0,25 m
+  spre est, `zbor.json`); toate mediile — baza, mipurile — în lumină LINIARĂ.
+  Probă: nivelul de 1 m al peticului iese identic cu baza pe cei 266 162 de texeli
+  de uscat comuni, **0 diferiți**; mutat cu 1 m, 264 797 diferă.
+- **Pixelii fără date.** Pe marginea datelor, în colțul NV, media se face numai pe
+  pixelii cu alfa ≥ 128. Înăuntru, banda alfa are pixeli izolați sub 128 —
+  artefacte JPEG —, deci cu cel puțin jumătate de pixeli valizi media e pe toți.
+  Uscatul bazei are date pe toți cei 3 092 832 de texeli.
+- **Marea.** Apa adâncă, măsurată în OKLab pe benzi de 25 m de la mal: sRGB
+  25, 54, 84. Fotografia se topește în ea între 25 și 50 m de la mal — de acolo
+  încolo nicio bandă nu mai stă la ΔE 2 de apa adâncă —, iar pixelii fără date o
+  primesc direct. Amestecul e copt în RGB, fără canal alfa: mipurile ar media
+  altfel culoarea și ponderea separat. Planul mării din afara texturii va primi
+  exact culoarea aceasta, ca marginea să nu se vadă.
+- **Codarea.** UASTC, calitate 2, cu RDO și zstd 18 — aleasă de autor: 3,88 MB baza
+  și 6,03 MB peticul (9,9 MB), ΔE_OK×100 după decodare 0,25 / 0,52 (p99 1,42 /
+  1,94). ETC1S ar fi dat 0,77 + 1,20 MB, cu ΔE 1,32 / 1,34 (p99 5,8 / 6,6).
+  `--threads 1` și `--uastc-rdo-m`: aceleași date dau același fișier, la octet;
+  numai cu al doilea, peticul ieșea diferit de la o rulare la alta. Pe GPU, UASTC
+  devine ASTC 4×4 pe telefon și BC7 pe desktop, un octet pe pixel: ~18 MB cu tot
+  cu mipurile, nu ~71 MB cât ar ocupa necomprimat.
 
 ## Sanctuarul
 
