@@ -32,6 +32,10 @@ se poartă în română.
 | `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/` |
 | `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele de sosire ale dalelor, straturile PNG, candidații din afara OSM |
+| `npm run masoara-sanctuar` | acoperișuri, turnuri, cupole, ziduri, apeduct și coșuri măsurate pe MDS → `date-sursa/derivate/` |
+| `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
+| `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
+| `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -535,6 +539,10 @@ comună, deci mutarea unui obiect întreg: Ermida da Memória, cu adro-ul și te
   (87 → 76, 250 → 366, 3 521 → 3 666 m²). Pentru acelea judecă proba amprentelor,
   mai jos.
 
+`scripts/sanctuar/inventar.json` leagă fiecare construcție din poza de referință
+de un element OSM, de o trasare pe straturile DGT sau de o excludere cu motiv.
+Poza, din Google Maps 3D, e numai o listă a ce există: nu se trasează nimic pe ea.
+
 ### Înălțimile: MDS − MDT, la 50 cm
 
 Nicio sursă nu dă înălțimile construcțiilor, iar OSM nu are nici acoperișuri.
@@ -570,6 +578,97 @@ clădirilor OSM și a parcării: 67. Din ei ies:
 
 Parcarea e scoasă din căutare: LiDAR-ul a prins mașinile și autobuzele ca blocuri
 de 1,5–2,5 m.
+
+### Formele: plane pe MDS, nu contururi ridicate
+
+`npm run masoara-sanctuar` descompune fiecare clădire în părți convexe, scrise de
+mână în `scripts/sanctuar/parti.json`, pe cadre cu originea și azimutul măsurate
+pe LiDAR. Pe fiecare parte:
+- **acoperișul** e MINIMUL unor plane găsite prin RANSAC pe pixelii MDS. Așa ies
+  fără cazuri speciale acoperișurile în una, două, trei și patru ape, cu teșituri;
+  pereții primesc marginea de sus din același minim, frântă unde se schimbă planul;
+- marginile libere se remăsoară pe profile MDS, cu pragul la jumătatea dintre
+  acoperișul dinăuntru și MDS-ul de afară;
+- **zidurile** ruinelor și ale incintei: schelet Zhang–Suen, lanțuri, Douglas–Peucker,
+  filtre de lungime, grosime și înălțime (0,4–4,5 m; 9 m la ruine);
+- **coșurile**: reziduul MDS − model peste 0,5 m, cel mult 2,5 m și 8 px, nu pe biserică.
+
+Ce a măsurat: nava în două ape cu p90 0,06 m; modulele 2–5 ale aripii N cu p90
+≤ 0,11 m (modul_1: 0,37); platforma turnurilor 147,27, vârfurile 148,64 și 149,28;
+frontonul până la 148,3; Ermida 5,5 × 5,7 m; 42 de coșuri; apeductul înălțat
+0,5–3,0 m, numai pe tronsoane (3,0 la joncțiunea cu Casa da Água). Rămân potrivite
+slab, cu p90 de ~1 m: `aripa_s.est_sud`, `est_mic`, `est_lean`, `est_jos` și
+`aripa_n.spate_v`; proba le tipărește pe cele de peste 0,8 m, cu tot cu
+`biserica.intre_s` (8 px).
+
+### Culorile: albedo, ca paleta terenului
+
+`npm run culori-sanctuar` folosește convenția din `paleta.mjs`: luminozitatea din
+cuantila 0,8, nuanța din pixelii de peste mediană.
+- **Acoperișurile** din ortofoto, „reluminate la plat": o potrivire Lambert pe
+  normalele RANSAC dă soarele zborului (azimut 96°, elevație 22,5°) și
+  Y = 0,627·cos i + 0,345; culoarea se împarte la factorul fiecărei ape.
+- **Ortofotoul e ars** pe tot ce e alb: cupola Casei da Água are 98,8% din pixeli la
+  254–255, parcarea 95,6%. Peste 2% arși, materialul NU se ia de acolo: varul,
+  cantaria și pietrișul vin din fotografiile autorului, pe petice curate
+  (`scripts/sanctuar/petice-culoare.json`).
+- **Țigla** se ia din fotografie; a bisericii și a aripii S, din diferența OKLab
+  față de aripa N în ortofoto — altfel s-ar coace în ea iluminarea zborului.
+- Deplasarea ortofotoului față de LiDAR se măsoară O DATĂ, pe pixelii de țiglă ai
+  tuturor acoperișurilor: (−0,25; +0,25) m, corelația 0,369 față de 0,341 la
+  (0, 0). Se aplică la fel peste tot.
+
+### Suprafețele de pe teren
+
+`npm run suprafete-sanctuar` scrie terreiro-ul, parcarea, esplanada și drumurile
+ca poligoane: ariile OSM triangulate, drumurile ca benzi, decupate după „zona
+pozei" din `decizii.json`. Din cele 37 de drumuri de acolo, 29 au bucăți în zonă.
+Lățimea e măsurată pe ortofoto la 19; celelalte 18, cu mai puțin de trei stații
+măsurabile, iau lățimea implicită a tipului lor.
+
+### Fațadele: o fotografie calibrată pe model
+
+Arcadele, ferestrele, portalurile și golurile clopotnițelor sunt citite pe
+`PXL_20260802_104852949` (terreiro-ul spre vest), în `scripts/sanctuar/fatade.json`.
+
+**Camera** se calibrează pe liniile modelului văzute contra cerului: coama aripii S
+(124 de puncte după tăierea coșurilor, rms 0,55 px) și muchiile de est ale
+turnurilor (rms 0,54 și 0,73 px). Focala e fixată din EXIF (24 mm echivalent pe
+diagonala 4:3 → 2830 px), altfel distanța și focala se schimbă una pe alta și
+potrivirea fuge la infinit. Coama văzută stă cu 0,12 m peste intersecția planelor:
+țigla de coamă. GPS-ul fotografiei cădea cu ~15 m mai la est. Control, nefolosit la
+potrivire: streașina și solul ambelor aripi și profilul frontonului cad peste
+fotografie la câțiva pixeli.
+
+**Planul zidului** contează mai mult decât camera: aripile se văd razant, deci o
+eroare de 0,4 m în adâncime mută un stâlp îndepărtat cu ~1,5 m. Zidul trece prin
+joncțiunea cu fața de est a corpului de legătură — raza intersectată cu fața aceea,
+văzută aproape frontal — și are direcția muchiei acoperișului lung. Stă cu 0,72 m
+(S) și ~0,4 m (N) în spatele muchiei LiDAR: streașina. Corpurile aripilor se retrag
+pe fundul galeriei; peste galerie stă un etaj cu acoperișul acelorași plane, iar
+între zid și muchia LiDAR, o streașină.
+
+Capcana, prinsă de probă: al doilea punct al liniei aripii N fusese calculat greșit,
+cu 0,29° rotație. La capătul de est linia zidului ieșea în afara streașinii, iar
+pozițiile citite se mutau cu până la 0,37 m. Le-a mutat înapoi o intersecție de
+raze cu planul corect, nu o nouă citire.
+
+**Ce e măsurat și ce nu:**
+- stâlpii: pe aripa S 16 măsurați, pas mediu 2,41 m; pe N 15, pas 2,57 m. Pasul
+  variază 2,1–2,7 m, cum spune SIPA („sensivelmente diferente”);
+- fotografia vede fațadele numai până la u ≈ 37 m din 119 și 154. Mai departe
+  arcada continuă cu pasul mediu măsurat — **NEVERIFICAT**, cu regula scrisă în
+  fișier; că arcada merge pe toată lungimea o spun SIPA și fotografiile Commons ale
+  lui Alvesgaspar din 2015 (CC BY-SA 4.0), folosite numai ca să se vadă, nu copiate;
+- ferestrele etajului: perechi, „num módulo de duas a duas”, câte una pe încăpere
+  — 21 la N, 18 la S, după SIPA; faza e potrivită pe perechile vizibile, restul la
+  pas egal, NEVERIFICAT;
+- fațada bisericii e rectificată frontal, la 4 cm/px: soclu, cornișa dintre
+  registre (142,0–142,6), cunhais, trei ferestre, trei portaluri, nișa, ceasul
+  solar al turnului N (SIPA: „relógio de sol circular, em cantaria”). Cornișa de
+  sus a turnurilor iese la 146,6, nu la 146,5 cât dădea REVIVE;
+- golurile clopotnițelor: „em duas faces”, SIPA; fața de est măsurată, a doua
+  presupusă cea exterioară, NEVERIFICAT.
 
 ## Principii de design (nenegociabile)
 

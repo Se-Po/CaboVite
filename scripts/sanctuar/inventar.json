@@ -1,0 +1,286 @@
+{
+  "licenta": "ODbL 1.0",
+  "atributie": "© contribuitorii OpenStreetMap",
+  "nota": "Reconcilierea cu poza Google 3D a complexului, dată de autor: fiecare construcție vizibilă primește un element OSM, o trasare pe straturile DGT sau o excludere cu motiv. Poza e folosită numai ca listă a ce există; nu se trasează nimic pe ea. Referințele OSM sunt la instantaneul din scripts/sanctuar/osm-manifest.json.",
+  "confirmat_de_autor": "2026-09-29",
+  "elemente": [
+    {
+      "cheie": "biserica",
+      "nume": "Igreja de Nossa Senhora do Cabo",
+      "osm": [
+        "way/96521128"
+      ],
+      "stare": "osm",
+      "nota": "nava, capela-mor, casa tribunei, sacristiile, turnurile; părțile se despart pe nMDS în scripts/sanctuar/parti.json"
+    },
+    {
+      "cheie": "corpuri_legatura",
+      "nume": "casa das pratas (S) și locuința capelanului (N)",
+      "osm": [],
+      "stare": "masurat",
+      "nota": "între turnuri și aripi. Acoperișurile pe MDS; pasajul boltit, fereastra cu balcon și cornișa pe fotografia rectificată (fatade.json).",
+      "parti": [
+        "aripa_n.corp_legatura",
+        "aripa_s.corp_legatura"
+      ]
+    },
+    {
+      "cheie": "aripa_n",
+      "nume": "Casa dos Círios, aripa de nord",
+      "osm": [
+        "way/96521136"
+      ],
+      "stare": "osm"
+    },
+    {
+      "cheie": "aripa_s",
+      "nume": "Casa dos Círios, aripa de sud",
+      "osm": [
+        "way/96521114"
+      ],
+      "stare": "osm"
+    },
+    {
+      "cheie": "cafenea",
+      "nume": "capătul de est al aripii de sud (cafeneaua)",
+      "osm": [
+        "way/473617324"
+      ],
+      "stare": "osm",
+      "nota": "ultimii ~4 m din est n-au acoperiș în LiDAR; terasă? se decide pe nMDS și fotografii"
+    },
+    {
+      "cheie": "casa_opera",
+      "nume": "Casa da Ópera (ruină)",
+      "osm": [
+        "way/225800580"
+      ],
+      "stare": "osm"
+    },
+    {
+      "cheie": "ruina_nv",
+      "nume": "ruină la NV, lipită de capătul de vest al aripii de nord",
+      "osm": [
+        "way/225802980"
+      ],
+      "stare": "osm",
+      "nota": "mutată în 2022 și readusă în 2026; versiunea se alege pe nMDS"
+    },
+    {
+      "cheie": "ruine_spate_n",
+      "nume": "încăperile fără acoperiș din spatele aripii de nord",
+      "osm": [],
+      "stare": "masurat",
+      "nota": "în vederea de sus apar ca un șir întunecat de-a lungul aripii; pot fi în amprenta ei sau în afara ei — nMDS — Cele acoperite sunt părțile spate_* și terasa_*; ce rămânea construit în afara lor, la capătul de vest al incintei, intră ca ziduri extrase din schelet (ruine_spate_n).",
+      "parti": [
+        "ruine_spate_n",
+        "aripa_n.spate_v",
+        "aripa_n.spate_m1",
+        "aripa_n.spate_e",
+        "aripa_n.terasa_a",
+        "aripa_n.terasa_b"
+      ]
+    },
+    {
+      "cheie": "anexe_s",
+      "nume": "anexele în ruină de la S și SV de biserică (incinte zidite)",
+      "osm": [],
+      "stare": "masurat",
+      "nota": "SIPA: „outros anexos, alguns em ruínas”; nu sunt în OSM. Pe nMDS se văd ziduri la colțul de SV al bisericii; s-au măsurat în 0.0.10.04 — Verificat pe nMDS: la S și SV de biserică nu mai rămâne nimic construit în afara părților măsurate, în afara marginilor de un pixel.",
+      "parti": [
+        "aripa_s.bloc_v",
+        "aripa_s.modul_v",
+        "aripa_s.sud_v",
+        "biserica.anexa_s",
+        "biserica.intre_s",
+        "biserica.sacristia_s"
+      ]
+    },
+    {
+      "cheie": "ruina_se",
+      "nume": "ruină la SE de capătul aripii de sud, lângă parcare",
+      "osm": [
+        "way/225800582",
+        "way/1056442947"
+      ],
+      "stare": "osm",
+      "nota": "cu gardul ei; două variante în instantaneu, se alege pe nMDS"
+    },
+    {
+      "cheie": "toalete",
+      "nume": "toaletele",
+      "osm": [
+        "node/2345722720"
+      ],
+      "stare": "masurat",
+      "nota": "OSM are numai un punct. Pe nMDS: bloc plat de ~2,3 × 2,5 m, 2,2 m peste sol, la 2–4 m de el; acoperiș alb în ortofoto.",
+      "parti": [
+        "toalete"
+      ]
+    },
+    {
+      "cheie": "terreiro",
+      "nume": "Terreiro (arraial)",
+      "osm": [
+        "way/225800568"
+      ],
+      "stare": "osm",
+      "nota": "suprafață de pietriș pe teren"
+    },
+    {
+      "cheie": "cruzeiro",
+      "nume": "Cruzeiro",
+      "osm": [
+        "node/1783517833"
+      ],
+      "stare": "osm"
+    },
+    {
+      "cheie": "stalpisori",
+      "nume": "stâlpișorii de pe conturul terreiro-ului (SIPA, 2008)",
+      "osm": [],
+      "stare": "exclus",
+      "motiv": "sub ~0,3 m, adică un pixel sau doi de la 80 m; pozițiile nu sunt în nicio sursă"
+    },
+    {
+      "cheie": "casa_agua",
+      "nume": "Casa da Água",
+      "osm": [
+        "way/422856086",
+        "way/225800569"
+      ],
+      "stare": "osm",
+      "nota": "cu scara de pe latura de vest"
+    },
+    {
+      "cheie": "cercado",
+      "nume": "incinta Casei da Água (cercado, horta murada)",
+      "osm": [
+        "way/225800573",
+        "way/1191363557",
+        "node/2345785571"
+      ],
+      "stare": "osm",
+      "nota": "zidul, zidul de lângă el și poarta"
+    },
+    {
+      "cheie": "cercado_interior",
+      "nume": "terasele, zidurile interioare și încăperile fără acoperiș din cercado; căsuța din colțul de SE",
+      "osm": [],
+      "stare": "masurat",
+      "nota": "nMDS arată zidurile interioare: unul E–V care taie fâșia de nord (terasele cu copaci), unul N–S și unul E–V spre sud, cu încăperile fără acoperiș din compartimentul de sud; căsuța din afara colțului de SE, ~13 m², 2,7 m, la TM06 (−94232, −138020); o cisternă rotundă lângă zidul de sud. — Măsurat: 23 de ziduri extrase din schelet în conturul cercado-ului (129,7 m, cu cele interioare) și căsuța (casuta_cercado). Blocul de ~10 m și până la 13 m din colțul de NE e un pin, nu o construcție: profil conic, NDVI-ul umbrit al coroanei îl scăpa. Cisterna rotundă nu se modelează: nu se desparte de ziduri pe nMDS — NEVERIFICAT.",
+      "parti": [
+        "cercado",
+        "casuta_cercado"
+      ]
+    },
+    {
+      "cheie": "apeduct",
+      "nume": "Aqueduto (apeductul Casei da Água)",
+      "osm": [
+        "way/225802677"
+      ],
+      "stare": "osm",
+      "nota": "nMDS arată zid înălțat de la Casa da Água spre est, pe ~100 m, apoi iar de la x ≈ −93990 până la ieșirea din contur; între ele nu se ridică deasupra solului (subteran sau la nivelul lui). Se modelează numai unde e zid"
+    },
+    {
+      "cheie": "parcare",
+      "nume": "parcarea",
+      "osm": [
+        "way/708329399",
+        "way/1056442945",
+        "way/1056442946",
+        "way/1369803448"
+      ],
+      "stare": "osm",
+      "nota": "suprafață de pietriș, cu aleile"
+    },
+    {
+      "cheie": "drumuri",
+      "nume": "Avenida 25 de Abril, drumurile de serviciu",
+      "osm": [
+        "way/430551916",
+        "way/1004511789",
+        "way/708329991",
+        "way/495719032"
+      ],
+      "stare": "osm",
+      "nota": "decupate după zona pozei (decizii.json)"
+    },
+    {
+      "cheie": "drumuri_pamant",
+      "nume": "Estrada do Farol și pistele",
+      "osm": [
+        "way/19643621",
+        "way/96521130",
+        "way/225799364",
+        "way/225802678",
+        "way/225802683",
+        "way/229830839"
+      ],
+      "stare": "osm",
+      "nota": "decupate după zona pozei"
+    },
+    {
+      "cheie": "poteci",
+      "nume": "potecile din jurul complexului",
+      "osm": [
+        "toate highway=path/footway din instantaneu"
+      ],
+      "stare": "osm",
+      "nota": "decupate după zona pozei; pasajele prin clădiri (tunnel=building_passage) devin treceri, nu suprafețe"
+    },
+    {
+      "cheie": "esplanada",
+      "nume": "esplanada pietonală de la vest de biserică",
+      "osm": [
+        "way/225800571",
+        "way/473742396"
+      ],
+      "stare": "osm",
+      "nota": "cu gardul spre faleză; varianta (v12 sau v13) se alege pe ortofoto"
+    },
+    {
+      "cheie": "ermida",
+      "nume": "Ermida da Memória, cu adro-ul și terasa",
+      "osm": [
+        "way/999972306",
+        "way/999972305",
+        "way/999972304",
+        "node/9058218920"
+      ],
+      "stare": "osm",
+      "nota": "varianta de dinainte de changesetul 120423250; nu apare în poza ta, dar ai cerut-o"
+    },
+    {
+      "cheie": "vehicule",
+      "nume": "mașinile, autobuzele, rulota",
+      "osm": [],
+      "stare": "exclus",
+      "motiv": "nu sunt construcții; se mută — LiDAR-ul le vede ca blocuri de 1,5–2,5 m în parcare"
+    },
+    {
+      "cheie": "fortificatie",
+      "nume": "Fortificação de Nossa Senhora do Cabo",
+      "osm": [
+        "node/9230584042"
+      ],
+      "stare": "exclus",
+      "motiv": "numai un panou; nicio sursă nu-i dă forma sau locul"
+    },
+    {
+      "cheie": "copaci",
+      "nume": "pinii și tufele din cercado și din jur",
+      "osm": [],
+      "stare": "exclus",
+      "motiv": "vegetație, nu construcții; terenul îi pictează din NDVI"
+    },
+    {
+      "cheie": "bloc_est",
+      "nume": "pătratul închis la culoare de ~12 × 12 m, ~2 m, la TM06 (−93718, −137988)",
+      "osm": [],
+      "stare": "exclus",
+      "motiv": "în afara pozei, la ~900 m est de biserică și ~70 m de linia apeductului; nicio sursă nu-l leagă de sanctuar"
+    }
+  ]
+}

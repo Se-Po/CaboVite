@@ -1,0 +1,90 @@
+{
+ "nota": "Petice de pe fotografiile autorului, în pixelii originalului (x0, y0, x1, y1). Alese pe decupaje cu grilă de 100 px, pe suprafețe însorite și curate — fără ferestre, banner sau tencuială căzută. Fotografia 104849276 e făcută la 11:48 din mijlocul terreiro-ului spre vest: fațada bisericii (normala la ~77°) primea soare, cu cos i ≈ 0,38. Pietrișul e prim-planul însorit al terreiro-ului din aceeași fotografie (rândurile 2300–3000), fără umbra aripii S, care cade pe marginea din stânga.",
+ "poza": "date-sursa/poze/PXL_20260802_104849276.MP.jpg",
+ "petice": {
+  "var": [
+   [
+    1630,
+    1150,
+    1780,
+    1350
+   ],
+   [
+    2020,
+    1150,
+    2140,
+    1350
+   ],
+   [
+    2380,
+    1180,
+    2500,
+    1400
+   ],
+   [
+    2650,
+    1450,
+    2740,
+    1780
+   ]
+  ],
+  "cantaria": [
+   [
+    790,
+    560,
+    940,
+    930
+   ],
+   [
+    2560,
+    590,
+    2700,
+    870
+   ],
+   [
+    1135,
+    1060,
+    1255,
+    1880
+   ]
+  ],
+  "lemn": [
+   [
+    2200,
+    1830,
+    2320,
+    2040
+   ]
+  ],
+  "pietris": [
+   [
+    1200,
+    2300,
+    2900,
+    3000
+   ]
+  ]
+ },
+ "alte": [
+  {
+   "poza": "date-sursa/poze/PXL_20260802_104852949.jpg",
+   "nota": "Același loc, 24 mm. Panta de sud a acoperișului aripii N, în soare la 11:48 (normala spre ~167°, cos i ≈ 0,38), privită razant: umbrele dintre țigle intră în petic, iar cuantila 0,8 le lasă deoparte, ca la paletă. Peticele au sub 1,5% pixeli de cer (b OKLab < −0,04); o primă alegere, cu marginea diagonală a acoperișului prinsă într-un dreptunghi, avea 42% și a fost aruncată.",
+   "petice": {
+    "tigla": [
+     [
+      3900,
+      870,
+      4060,
+      940
+     ],
+     [
+      3360,
+      1075,
+      3500,
+      1115
+     ]
+    ]
+   }
+  }
+ ]
+}

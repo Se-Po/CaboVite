@@ -1,0 +1,810 @@
+{
+ "licenta": "CC BY 4.0 pentru valorile măsurate pe LiDAR-ul DGT; numele părților după SIPA IPA.00006165",
+ "nota": "Descompunerea clădirilor în părți convexe, scrisă de mână pe hărțile de cote ale MDS. Fiecare cadru are originea și azimutul măsurate pe LiDAR; u e de-a lungul azimutului, v la 90° spre stânga. Marginile din „libere” se remăsoară pe MDS de masoara-sanctuar.mjs; celelalte sunt comune cu o parte vecină.",
+ "cadre": {
+  "biserica": {
+   "origine": [
+    -94515.14,
+    -138005.56
+   ],
+   "azimut": 77.1,
+   "sursa": "azimutul coamei navei, dreapta prin 19 secțiuni ale MDS; u = 0 pe fața fațadei (MDS cade la sol între u −1 și −0,5 în vechiul cadru), v = 0 pe coamă"
+  },
+  "aripa_n": {
+   "origine": [
+    -94518.11,
+    -137988.91
+   ],
+   "azimut": 77.36,
+   "sursa": "coama acoperișului lung, dreapta prin 111 secțiuni ale MDS (u 36–146); v = 0 pe coamă"
+  },
+  "aripa_s": {
+   "origine": [
+    -94510.84,
+    -138021.25
+   ],
+   "azimut": 77.95,
+   "sursa": "coama acoperișului lung, dreapta prin 105 secțiuni ale MDS (u 2–108); v = 0 pe coamă"
+  },
+  "vechi": {
+   "origine": [
+    -94514,
+    -138007.2
+   ],
+   "azimut": 77.34,
+   "sursa": "normala fațadei bisericii din amprenta OSM (cercetarea); blocurile de la capătul de est al aripii S sunt aliniate pe el, nu pe aripă"
+  },
+  "ermida": {
+   "origine": [
+    -94610.82,
+    -137926.15
+   ],
+   "azimut": 89.7,
+   "sursa": "centrul blocului din MDS; azimutul laturilor din amprenta OSM v1 (2021)"
+  }
+ },
+ "parti": [
+  {
+   "cheie": "biserica.nava",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -24.25,
+    -1.75
+   ],
+   "v": [
+    -7.6,
+    6.9
+   ],
+   "libere": [
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "biserica.fatada",
+   "cadru": "biserica",
+   "tip": "profil",
+   "u": [
+    -1.75,
+    0
+   ],
+   "v": [
+    -5.1,
+    5.4
+   ],
+   "libere": [
+    "u1"
+   ]
+  },
+  {
+   "cheie": "biserica.turn_n",
+   "cadru": "biserica",
+   "tip": "turn",
+   "u": [
+    -5.5,
+    -0.25
+   ],
+   "v": [
+    5.4,
+    9.9
+   ],
+   "libere": [
+    "u0",
+    "u1",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "biserica.turn_s",
+   "cadru": "biserica",
+   "tip": "turn",
+   "u": [
+    -5.5,
+    -0.25
+   ],
+   "v": [
+    -10.1,
+    -5.1
+   ],
+   "libere": [
+    "u0",
+    "u1",
+    "v0"
+   ]
+  },
+  {
+   "cheie": "biserica.anexa_s",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    -18.75,
+    -5.5
+   ],
+   "v": [
+    -10.35,
+    -7.6
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "biserica.intre_s",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -23.25,
+    -18.75
+   ],
+   "v": [
+    -10.75,
+    -7.6
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "biserica.capela_mor",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 3,
+   "u": [
+    -32.25,
+    -24.25
+   ],
+   "v": [
+    -5.05,
+    3.35
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "biserica.sacristia_n",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    -32.25,
+    -24
+   ],
+   "v": [
+    3.35,
+    10.05
+   ],
+   "libere": [
+    "u0",
+    "u1",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "biserica.sacristia_s",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    -31.65,
+    -23.25
+   ],
+   "v": [
+    -10.75,
+    -5.05
+   ],
+   "libere": [
+    "u0",
+    "v0"
+   ]
+  },
+  {
+   "cheie": "biserica.tribuna",
+   "cadru": "biserica",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -35.5,
+    -32.25
+   ],
+   "v": [
+    -5.25,
+    4.95
+   ],
+   "libere": [
+    "u0",
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.capat_v",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    -9.25,
+    1
+   ],
+   "v": [
+    -3.4,
+    3.75
+   ],
+   "libere": [
+    "u0",
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.corp_legatura",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -6.5,
+    -2
+   ],
+   "v": [
+    -6.8,
+    -3.4
+   ],
+   "libere": [
+    "u0",
+    "u1"
+   ],
+   "minim": 6
+  },
+  {
+   "cheie": "aripa_n.spate_v",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    -9.25,
+    1
+   ],
+   "v": [
+    3.75,
+    7.25
+   ],
+   "libere": [
+    "u0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.spate_m1",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    1,
+    4.75
+   ],
+   "v": [
+    4.75,
+    8.75
+   ],
+   "libere": [
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.modul_1",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    1,
+    4.75
+   ],
+   "v": [
+    -3.9,
+    4.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.modul_2",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    4.75,
+    10
+   ],
+   "v": [
+    -3.9,
+    6.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.modul_3",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    10,
+    15.75
+   ],
+   "v": [
+    -3.9,
+    6.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.modul_4",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    15.75,
+    22
+   ],
+   "v": [
+    -3.9,
+    6.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.modul_5",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    22,
+    28
+   ],
+   "v": [
+    -3.9,
+    6.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_n.terasa_a",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    4.75,
+    23.06
+   ],
+   "v": [
+    6.75,
+    12.66
+   ],
+   "libere": [
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.terasa_b",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    23.06,
+    30.8
+   ],
+   "v": [
+    6.75,
+    14
+   ],
+   "libere": [
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.lunga_capat_v",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 3,
+   "u": [
+    28,
+    33
+   ],
+   "v": [
+    -3.9,
+    3.8
+   ],
+   "libere": [
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.lunga",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    33,
+    153.25
+   ],
+   "v": [
+    -3.9,
+    3.8
+   ],
+   "libere": [
+    "v0",
+    "v1",
+    "u1"
+   ]
+  },
+  {
+   "cheie": "aripa_n.spate_e",
+   "cadru": "aripa_n",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    119.1,
+    153.25
+   ],
+   "v": [
+    3.8,
+    7.1
+   ],
+   "libere": [
+    "v1",
+    "u1"
+   ]
+  },
+  {
+   "cheie": "aripa_s.bloc_v",
+   "cadru": "aripa_s",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -27,
+    -16.75
+   ],
+   "v": [
+    -4.25,
+    3.5
+   ],
+   "libere": [
+    "u0",
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_s.modul_v",
+   "cadru": "aripa_s",
+   "tip": "acoperis",
+   "ape": 4,
+   "u": [
+    -16.75,
+    -11
+   ],
+   "v": [
+    -7.25,
+    3
+   ],
+   "libere": [
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "aripa_s.sud_v",
+   "cadru": "aripa_s",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -11,
+    -4.5
+   ],
+   "v": [
+    -7.5,
+    -3.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_s.corp_legatura",
+   "cadru": "aripa_s",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -6.75,
+    -2.25
+   ],
+   "v": [
+    2.6,
+    5.9
+   ],
+   "libere": [
+    "u0",
+    "u1"
+   ],
+   "minim": 6
+  },
+  {
+   "cheie": "aripa_s.lunga",
+   "cadru": "aripa_s",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    -11,
+    118
+   ],
+   "v": [
+    -3.75,
+    2.6
+   ],
+   "libere": [
+    "v0",
+    "v1",
+    "u1"
+   ]
+  },
+  {
+   "cheie": "aripa_s.est_lean",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    79.5,
+    92
+   ],
+   "v": [
+    -24.5,
+    -18.75
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_s.est_mic",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    77.5,
+    83
+   ],
+   "v": [
+    -28.5,
+    -21.5
+   ],
+   "libere": [
+    "u0",
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_s.est_jos",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 1,
+   "u": [
+    83,
+    91.5
+   ],
+   "v": [
+    -30,
+    -24.5
+   ],
+   "libere": [
+    "v0"
+   ]
+  },
+  {
+   "cheie": "aripa_s.est_sud",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 2,
+   "poligon": [
+    [
+     92,
+     -20.5
+    ],
+    [
+     102.5,
+     -20.5
+    ],
+    [
+     99.75,
+     -37.83
+    ],
+    [
+     91,
+     -34.8
+    ]
+   ]
+  },
+  {
+   "cheie": "aripa_s.est_cafenea",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 2,
+   "u": [
+    103.5,
+    116.5
+   ],
+   "v": [
+    -25.5,
+    -18.75
+   ],
+   "libere": [
+    "v0",
+    "u1"
+   ]
+  },
+  {
+   "cheie": "casa_agua",
+   "tip": "cupola",
+   "osm": 422856086
+  },
+  {
+   "cheie": "ermida",
+   "cadru": "ermida",
+   "tip": "cupola",
+   "u": [
+    -3.1,
+    3.1
+   ],
+   "v": [
+    -3.1,
+    3.1
+   ],
+   "libere": [
+    "u0",
+    "u1",
+    "v0",
+    "v1"
+   ]
+  },
+  {
+   "cheie": "ermida_adro_ziduri",
+   "cadru": "ermida",
+   "tip": "ziduri",
+   "u": [
+    2.5,
+    11
+   ],
+   "v": [
+    -4.5,
+    4.5
+   ],
+   "prag": 0.4
+  },
+  {
+   "cheie": "cruzeiro",
+   "tip": "cupola",
+   "poligon": [
+    [
+     140.3,
+     -0.06
+    ],
+    [
+     143.3,
+     -0.06
+    ],
+    [
+     143.3,
+     2.94
+    ],
+    [
+     140.3,
+     2.94
+    ]
+   ],
+   "cadru": "vechi"
+  },
+  {
+   "cheie": "casa_opera",
+   "tip": "ziduri",
+   "osm": 225800580,
+   "extinde": 1,
+   "inaltime_max": 9
+  },
+  {
+   "cheie": "ruina_nv",
+   "tip": "ziduri",
+   "osm": 225802980,
+   "extinde": 1.5,
+   "inaltime_max": 9
+  },
+  {
+   "cheie": "ruina_se",
+   "tip": "ziduri",
+   "osm": 225800582,
+   "extinde": 2,
+   "inaltime_max": 9
+  },
+  {
+   "cheie": "cercado",
+   "tip": "ziduri",
+   "osm": 225800573,
+   "extinde": 2,
+   "lungime_min": 3,
+   "ndvi": 0.15
+  },
+  {
+   "cheie": "zid_1191363557",
+   "tip": "zid_linie",
+   "osm": 1191363557
+  },
+  {
+   "cheie": "apeduct",
+   "tip": "zid_linie",
+   "osm": 225802677
+  },
+  {
+   "cheie": "toalete",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 1,
+   "minim": 6,
+   "u": [
+    127,
+    129.3
+   ],
+   "v": [
+    -59.8,
+    -57.3
+   ],
+   "sursa": "nMDS: bloc construit plat, ~2,3 × 2,5 m, 2,1 m peste sol, la 2–4 m de nodul OSM 2345722720; acoperiș alb în ortofoto. Marginile, fixate pe harta nMDS: la est stă zidul ruinei de SE, mai înalt, care nu e al lui."
+  },
+  {
+   "cheie": "casuta_cercado",
+   "cadru": "vechi",
+   "tip": "acoperis",
+   "ape": 2,
+   "minim": 6,
+   "u": [
+    269.7,
+    275.1
+   ],
+   "v": [
+    -75.8,
+    -72.3
+   ],
+   "libere": [
+    "u0",
+    "u1",
+    "v0",
+    "v1"
+   ],
+   "sursa": "nMDS: bloc construit de ~4,5 × 2,5 m, 2–3 m, lângă colțul de SE al cercado-ului; acoperiș deschis la culoare, plat, în ortofoto"
+  },
+  {
+   "cheie": "ruine_spate_n",
+   "cadru": "vechi",
+   "tip": "ziduri",
+   "u": [
+    22.3,
+    47.4
+   ],
+   "v": [
+    17.2,
+    42.3
+   ],
+   "inaltime_max": 9,
+   "sursa": "nMDS: ziduri fără acoperiș la capătul de vest al incintei din spatele aripii de nord, în afara oricărei părți; se extrag ca ruinele, din schelet"
+  }
+ ]
+}
