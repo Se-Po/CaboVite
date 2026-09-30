@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { anuleazaPredictor, decodeazaLzw } from './lzw.mjs';
 
 // Mersul prin structura de directoare a unui TIFF (IFD).
 //
@@ -125,11 +126,29 @@ export function citesteIfd(buf, off, le = true, baza = 0, big = false) {
 // ----------------------------------------------------------- dalele DGT (MDT)
 
 /**
- * Antetul unei dale MDT de la DGT: TIFF little-endian, necomprimat, cu benzi.
+ * Cheile din GeoKeyDirectory (tagul 34735) care au valoarea chiar în director.
+ * Celelalte trimit la tagurile 34736/34737 și nu ne trebuie.
+ */
+function cheiGeo(d) {
+  const v = d.valori(34735);
+  const chei = new Map();
+  if (!v) return chei;
+  for (let i = 4; i + 3 < v.length && chei.size < v[3]; i += 4)
+    if (v[i + 1] === 0) chei.set(v[i], v[i + 3]);
+  return chei;
+}
+
+/**
+ * Antetul unei dale MDT sau MDS de la DGT: TIFF little-endian, float32, cu benzi,
+ * necomprimat sau LZW.
  *
- * Versiunea unificată a copiilor din build-zona și build-petic. Întorcea și
- * `stripOcteti` (tagul 279), cerut de un al treilea script, șters între timp;
- * nimeni nu-l mai citea, deci a plecat odată cu el.
+ * Versiunea unificată a copiilor din build-zona și build-petic.
+ *
+ * Colecțiile DGT sunt inegal comprimate: MDT-50cm-105162 e LZW, vecina 105163 e
+ * brută, iar catalogul nu spune care e care. Compresia 5 se decodează acum (vezi
+ * lzw.mjs); orice altceva oprește cu un mesaj limpede, fără ghicit. Tot aici se
+ * citesc sistemul de coordonate, felul pixelului și NoData, pe care probele de
+ * sosire ale unei dale noi le cer înainte să se atingă de valori.
  */
 export function citesteTiffDGT(cale) {
   const buf = readFileSync(cale);
@@ -137,26 +156,58 @@ export function citesteTiffDGT(cale) {
   const d = citesteIfd(buf, buf.readUInt32LE(4));
 
   const compresie = d.scalar(259) ?? 1;
-  // Colecțiile DGT sunt inegal comprimate: unele dale sunt brute, altele nu, iar
-  // codecul nu e documentat nicăieri. Nu ghicim — oprim cu un mesaj limpede.
-  if (compresie !== 1)
-    throw new Error(`${cale}: compresie ${compresie}, aștept necomprimat. Cere din catalog o dală necomprimată (dimensiunea ei = lățime·înălțime·4 + rânduri·6 + 379).`);
+  if (compresie !== 1 && compresie !== 5)
+    throw new Error(`${cale}: compresie ${compresie}; se citesc numai necomprimat (1) și LZW (5).`);
+  const biti = d.scalar(258) ?? 1, format = d.scalar(339) ?? 1, esantioane = d.scalar(277) ?? 1;
+  if (biti !== 32 || format !== 3 || esantioane !== 1)
+    throw new Error(`${cale}: ${esantioane} eșantion(e) de ${biti} biți, format ${format}; aștept un float32.`);
 
+  const latime = d.scalar(256), inaltime = d.scalar(257);
+  const randuriPeStrip = Math.min(d.scalar(278) ?? inaltime, inaltime);
+  const stripOffsets = d.valori(273), stripOcteti = d.valori(279);
+  const predictor = d.scalar(317) ?? 1;
+  const geo = cheiGeo(d);
   const ps = d.valori(33550), tp = d.valori(33922);
+
+  // O singură bandă decodată ține minte: rândurile se cer în ordine, iar la LZW
+  // decodarea e partea scumpă. La necomprimat nu e nimic de ținut.
+  let bandaCache = -1, randuriCache = null;
+  const banda = (s) => {
+    if (s === bandaCache) return randuriCache;
+    const n = Math.min(randuriPeStrip, inaltime - s * randuriPeStrip);
+    const src = new Uint8Array(buf.buffer, buf.byteOffset + stripOffsets[s], stripOcteti[s]);
+    const octeti = anuleazaPredictor(decodeazaLzw(src, latime * n * 4), latime, 4, predictor);
+    bandaCache = s;
+    randuriCache = new DataView(octeti.buffer, octeti.byteOffset, octeti.byteLength);
+    return randuriCache;
+  };
+
   return {
     buf,
-    latime: d.scalar(256), inaltime: d.scalar(257), rezolutie: ps[0],
+    latime, inaltime, rezolutie: ps[0], rezolutieY: ps[1],
     x0: tp[3], y0: tp[4], // TiePoint dă colțul stânga-sus; în TM06 Y crește spre nord
-    randuriPeStrip: d.scalar(278),
-    stripOffsets: d.valori(273),
+    randuriPeStrip,
+    stripOffsets,
+    compresie, predictor,
+    epsg: geo.get(3072) ?? null,
+    // GTRasterTypeGeoKey: 1 = PixelIsArea (colțul e muchia pixelului), 2 = PixelIsPoint.
+    tipRaster: geo.get(1025) ?? null,
+    nodata: d.text(42113),
+    /** Un rând de float32. */
+    rand(r) {
+      const out = new Float32Array(latime);
+      const s = Math.floor(r / randuriPeStrip);
+      if (compresie === 1) {
+        const start = stripOffsets[s] + (r - s * randuriPeStrip) * latime * 4;
+        for (let i = 0; i < latime; i++) out[i] = buf.readFloatLE(start + i * 4);
+        return out;
+      }
+      const dv = banda(s), b = (r - s * randuriPeStrip) * latime * 4;
+      for (let i = 0; i < latime; i++) out[i] = dv.getFloat32(b + i * 4, true);
+      return out;
+    },
   };
 }
 
-/** Un rând de float32 dintr-un TIFF necomprimat cu benzi. */
-export function randTiff(t, r) {
-  const strip = Math.floor(r / t.randuriPeStrip);
-  const start = t.stripOffsets[strip] + (r - strip * t.randuriPeStrip) * t.latime * 4;
-  const out = new Float32Array(t.latime);
-  for (let i = 0; i < t.latime; i++) out[i] = t.buf.readFloatLE(start + i * 4);
-  return out;
-}
+/** Un rând de float32 dintr-o dală citită cu `citesteTiffDGT`. */
+export const randTiff = (t, r) => t.rand(r);

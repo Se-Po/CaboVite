@@ -104,7 +104,9 @@ const REGULA_BLOC = 'apă numai dacă toate cele 16 sub-celule de 50 cm sunt ap�
 function refaDin50cm(d, g) {
   const indice = d.nume.match(/-(\d{6})-/)?.[1];
   const nume50 = indice && existsSync(DIR_50)
-    && readdirSync(DIR_50).find((f) => f.includes(`-${indice}-`) && /\.tif$/i.test(f));
+    // Numai MDT: în același director stau și MDS-urile sanctuarului, cu aceiași
+    // indici, iar „MDS" vine alfabetic înaintea lui „MDT" — ar fi găsit primul.
+    && readdirSync(DIR_50).find((f) => f.startsWith('MDT-50cm-') && f.includes(`-${indice}-`) && /\.tif$/i.test(f));
   if (!nume50)
     throw new Error(`${d.nume}: colțul (x0 ${d.x0}, y0 ${d.y0}) nu cade pe muchiile de celulă ale hărții, `
       + 'deci pixelii ei stau la o jumătate de celulă de noduri, iar dala are uscat — nu se poate sări. '

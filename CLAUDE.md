@@ -29,11 +29,12 @@ se poartă în română.
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 | `npm run verifica-teren` | construiește plasa cu codul paginii, în Node, și verifică ce primește și ce pictează regula de culoare |
+| `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
 dala de ortofoto. Codul lor comun — proiecția TM06, mersul prin IFD-urile unui
-TIFF, citirea unei hărți gata făcute, citirea și alinierea ortofotoului, OKLab,
+TIFF și decompresia LZW, citirea unei hărți gata făcute, citirea și alinierea ortofotoului, OKLab,
 EXIF-ul — stă în `scripts/comun/`.
 
 ## Arhitectură
@@ -195,8 +196,9 @@ Ce a dovedit-o, nu doar a sugerat-o:
   1 m ⇒ −0,5. Controalele, între ele cusătura standard 105163/105162, citesc
   0,40–0,55.
 - `MDT-50cm-105162` e **LZW** (`Compression = 5`, predictor 1, un rând pe bandă).
-  `tiff.mjs` nu-l citește; proba l-a decodat cu un decodor scris pe loc, verificat
-  prin înregistrarea față de dala de 2 m 105162: minim la (0, 0).
+  Proba de atunci l-a decodat cu un decodor scris pe loc, verificat prin
+  înregistrarea față de dala de 2 m 105162: minim la (0, 0). Acum îl citește
+  `tiff.mjs` — vezi „Dalele comprimate", mai jos.
 
 Reparația, în `build-zona.mjs`:
 - O dală de 2 m al cărei colț nu cade pe muchiile de celulă ale hărții nu se mai
@@ -242,7 +244,30 @@ stau sub petic, banda ar rămâne fără date: 34 240 de noduri fără nicio pro
 date, dar peticul tot s-ar schimba, deci ar fi altă hartă. O gardă numără probele
 fiecărui nod, cu tot cu apa: un nod acoperit întreg are exact (pas / 0,5)², oricâte
 dale i-ar împărți pătratul. `date-sursa/lidar-50cm/` are acum și 104163 (numai apă și NODATA)
-și 105162 (LZW), pe care nu le citește niciun script.
+și 105162 (LZW), pe care nu le citește niciun script de hartă.
+
+### Dalele comprimate
+
+Catalogul DGT nu spune care dală e comprimată: 105162 e LZW, vecina 105163 e
+brută. `citesteTiffDGT()` citește acum compresia 1 și 5, cu predictorii 1, 2 și 3
+(`scripts/comun/lzw.mjs`); orice altceva aruncă, cu codul compresiei. Întoarce și
+`epsg`, `tipRaster` (1 = PixelIsArea) și `nodata`, pe care le cer probele de
+sosire ale unei dale noi. Rândurile se cer prin `t.rand(r)`, cu o bandă decodată
+ținută minte; `randTiff(t, r)` a rămas, ca alias.
+
+LZW-ul din TIFF nu e cel din GIF: lățimea codului crește cu un cod mai devreme
+(la 511, nu la 512). Cu regula GIF fluxul se rupe — sau, mai rău, trece pe
+bucăți. `npm run verifica-tiff` are un codor scris numai pentru probă și cere
+ca decodorul să refuze fluxul cu regula GIF. Pe date reale:
+- 105162 se decodează întreagă în ~180 ms;
+- media blocurilor 4 × 4 față de dala de 2 m are minimul la (0, 0): 0,176 m,
+  față de 0,659 m la 1 m;
+- cusătura 105163 (brută) | 105162 (LZW) arată 0,109 m între rândurile vecine,
+  cât între două rânduri din aceeași dală, 0,111 m.
+
+**`build-zona` caută în `lidar-50cm/` numai `MDT-50cm-*`.** În același director
+stau și MDS-urile sanctuarului, cu aceiași indici; „MDS" vine alfabetic înaintea
+lui „MDT", deci înainte ar fi fost găsit primul.
 
 ## Busola și nordul adevărat
 
