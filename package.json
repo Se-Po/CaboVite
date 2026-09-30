@@ -23,7 +23,8 @@
     "build-sanctuar": "node scripts/build-sanctuar.mjs",
     "verifica-teren": "node scripts/verifica-teren.mjs",
     "verifica-tiff": "node scripts/verifica-tiff.mjs",
-    "verifica-sanctuar": "node scripts/verifica-sanctuar.mjs"
+    "verifica-sanctuar": "node scripts/verifica-sanctuar.mjs",
+    "masoara-zbor": "node scripts/masoara-zbor.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

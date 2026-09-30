@@ -37,6 +37,7 @@ se poartă în română.
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
 | `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși |
+| `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -621,8 +622,12 @@ slab, cu p90 de ~1 m: `aripa_s.est_sud`, `est_mic`, `est_lean`, `est_jos` și
 `npm run culori-sanctuar` folosește convenția din `paleta.mjs`: luminozitatea din
 cuantila 0,8, nuanța din pixelii de peste mediană.
 - **Acoperișurile** din ortofoto, „reluminate la plat": o potrivire Lambert pe
-  normalele RANSAC dă soarele zborului (azimut 96°, elevație 22,5°) și
-  Y = 0,627·cos i + 0,345; culoarea se împarte la factorul fiecărei ape.
+  normalele RANSAC dă Y = 0,627·cos i + 0,345, iar culoarea se împarte la factorul
+  fiecărei ape. Potrivirea dădea și un soare, azimut 96°, elevație 22,5°, care e
+  **greșit**: măsurat din umbre, soarele zborului stă la 94,0° / 39,5° (vezi
+  „Zborul ortofotoului”), iar 96° / 22,5° nu e o poziție a soarelui în fereastra de
+  zbor. Albedoul acoperișurilor din `sanctuar_v2` e deci reluminat cu un soare
+  greșit; refacerea lui e un `sanctuar_v3`, încă nefăcut.
 - **Ortofotoul e ars** pe tot ce e alb: cupola Casei da Água are 98,8% din pixeli la
   254–255, parcarea 95,6%. Peste 2% arși, materialul NU se ia de acolo: varul,
   cantaria și pietrișul vin din fotografiile autorului, pe petice curate
@@ -631,7 +636,9 @@ cuantila 0,8, nuanța din pixelii de peste mediană.
   față de aripa N în ortofoto — altfel s-ar coace în ea iluminarea zborului.
 - Deplasarea ortofotoului față de LiDAR se măsoară O DATĂ, pe pixelii de țiglă ai
   tuturor acoperișurilor: (−0,25; +0,25) m, corelația 0,369 față de 0,341 la
-  (0, 0). Se aplică la fel peste tot.
+  (0, 0). Se aplică la fel peste tot. E o deplasare a ACOPERIȘURILOR, nu a
+  imaginii: pe sol fotografia stă cu ~0,35 m spre est, iar acoperișurile se înclină
+  spre VNV cu ~0,09 m pe metru de înălțime (vezi „Zborul ortofotoului”).
 
 ### Suprafețele de pe teren
 
@@ -915,3 +922,47 @@ Tabelul `SURSA` din `scripts/paleta.mjs` ține regula, iar fiecare material din
 
 `npm run paleta` merge și fără ortofoto — dala nu intră în depozit, deci cine
 clonează trebuie să poată reface paleta numai din fotografii.
+
+### Zborul ortofotoului: soarele, deplasarea, înclinarea
+
+`npm run masoara-zbor` le măsoară pe ortofoto însuși și scrie
+`date-sursa/derivate/zbor.json`, plus imaginile de control `zbor-<zonă>.png`.
+Azimuturile sunt de GRILĂ, ca scena; efemeridele dau azimut adevărat, iar
+A_grilă = A_adevărat + 0,674°.
+
+**Soarele, din umbre.** Pentru fiecare (azimut, elevație), MDS-ul de 50 cm spune ce
+pixeli de sol stau în umbră — o rază spre soare lovește ceva mai înalt —, iar scorul
+e cât de bine desparte masca asta pixelii întunecați de cei luminați. Luminanța se
+ia RELATIV la solul din ±15 m: fără asta scorul compara materiale, nu umbre, iar pe
+jumătățile zonei câștigau sori absurzi (147° la 9°), fiindcă terreiro-ul e mult mai
+deschis decât pământul de alături. Solul: nMDS < 0,3 m, fără vegetație, deasupra
+mării, la cel mult 40 m de ceva mai înalt de 3 m.
+- sanctuarul: **azimut 94,0°, elevație 39,5°**; jumătățile de nord și de sud,
+  căutate separat, diferă cu 1,1°;
+- farul, independent: 92,25° / 39,5°, la 1,75° de sanctuar; jumătățile, 2,1°;
+- controale: soarele opus dă scorul ~0 (0,004 față de 0,446), iar elevația ± 5° îl
+  scade.
+
+Vederea Satelit, care vine, va folosi soarele sanctuarului.
+
+**Proba independentă e cerul.** Perechea (azimut, elevație) trebuie să fie o
+poziție prin care soarele chiar a trecut în fereastra de zbor a lotului 4
+(24.05–25.07.2025). Soarele sanctuarului cade la 0,08° de poziția din 17 iulie,
+09:00 UTC, sau din 25 mai, 08:51 UTC; cel al farului, la 0,01° de 2 iunie, 08:49 UTC.
+Cifra veche, 96° / 22,5°, cade la 9,76° de orice poziție posibilă — deci era greșită.
+Mozaicul poate avea linii de zbor din zile diferite; ora exactă nu contează, direcția
+da. Vârful umbrei farului a fost încercat ca a doua metodă și lăsat: umbra turnului
+traversează acoperișurile și o curte deja umbrită, iar capătul ei nu se citește
+fără ambiguitate.
+
+**Deplasarea pe sol.** Umbrirea MDT-ului, cu soarele măsurat, corelată cu luminanța,
+pe ~200 000 de pixeli de sol gol de pe versanții de lângă far: maximul la
+(+0,25; 0) m, între pixeli (+0,35; +0,01) m — fotografia stă cu o treime de metru
+spre est. Controale: fotografia mutată sintetic cu 0,5 m mută maximul exact cu 2
+pixeli fini; cu soarele opus corelația devine negativă.
+
+**Înclinarea.** Aceeași corelație pe acoperișuri (umbrirea MDS-ului), minus
+deplasarea solului: 0,095 m/m spre 297° la clădirile de 2–9 m, 0,085 m/m spre 284°
+la cele peste 9 m. Ortofotoul nu e true-ortho: un acoperiș de 6 m apare mutat cu
+~0,5 m, vârful farului (31,5 m) cu ~2,7 m, spre VNV. Afirmația mai veche „~3 m
+spre vest” pentru toate acoperișurile nu era măsurată și nu se confirmă.
