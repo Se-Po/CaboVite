@@ -6,7 +6,7 @@ import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { creeazaCer } from './cer.js';
 import { creeazaSatelit } from './satelit.js';
-import { incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
+import { incarcaCladiri, incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
 import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
@@ -80,6 +80,8 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // Sanctuarul pleacă odată cu relieful: n-au nimic de împărțit. Nu respinge
   // niciodată — întoarce null și spune de ce —, deci nici n-are nevoie de catch.
   const sanctuarGata = incarcaSanctuar();
+  // La fel clădirile din afara lui: farul, casele lui, Casa da Ronca.
+  const cladiriGata = incarcaCladiri();
 
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
@@ -218,20 +220,51 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     surse = unesteSurse(surse, sanctuar.surse.map((s) => ({ ...s, prelucrare: PRELUCRARE[s.cheie] ?? 'geometria sanctuarului' })));
   }
 
-  // Umbrele sanctuarului: o hartă strânsă pe complex, desenată la pornire și apoi
-  // numai când se mută soarele (Relief ↔ Satelit).
+  // Farul și celelalte clădiri: același cod, alte date, fără suprafețe pe teren.
+  const cladiri = creeazaSanctuar({
+    date: await cladiriGata, inaltimeLa, eticheta: 'clădiri',
+    ancora: b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null,
+  });
+  if (cladiri) {
+    scena.add(cladiri.obiect);
+    deEliberat.push(() => cladiri.dispose());
+    const PRELUCRARE = {
+      osm: 'conturul farului și al clădirilor din afara sanctuarului, înregistrat pe LiDAR',
+      mds: 'înălțimile și acoperișurile farului și ale clădirilor din afara sanctuarului',
+      ortofoto: 'materialul acoperișurilor din afara sanctuarului, după culoarea lor',
+    };
+    surse = unesteSurse(surse, cladiri.surse.map((s) => ({ ...s, prelucrare: PRELUCRARE[s.cheie] ?? 'geometria clădirilor' })));
+  }
+
+  // Umbrele clădirilor: o hartă strânsă pe complex, desenată la pornire și apoi
+  // numai când se mută soarele (Relief ↔ Satelit) sau grupul privit.
   // Separabile — dacă nu se pot face, clădirile rămân, doar fără umbră.
-  let umbre = null;
-  if (sanctuar) {
+  //
+  // Grupurile — sanctuarul, farul, Casa da Ronca — stau la sute de metri unul de
+  // altul. Dacă o cutie peste toate ține texelul sub TEXEL_MAXIM, rămâne ea; altfel
+  // harta trece între cutia unită (de departe) și grupul cel mai apropiat de ținta
+  // camerei (de aproape), cu o redesenare la fiecare schimbare (`umbreGrup`, în buclă).
+  // Măsurat, cu soarele Relief: cutia unită 0,60 m pe texel, farul singur 0,12 m.
+  const TEXEL_MAXIM = 0.3;
+  let umbre = null, umbreGrup = null;
+  const grupuriUmbra = [
+    ...(sanctuar ? [{ nume: 'sanctuar', cutie: sanctuar.cutieCladiri }] : []),
+    ...(cladiri ? [...cladiri.cutiiGrupuri].map(([nume, cutie]) => ({ nume, cutie })) : []),
+  ].filter((g) => !g.cutie.isEmpty());
+  if (grupuriUmbra.length) {
     try {
+      const unita = grupuriUmbra.reduce((a, g) => a.union(g.cutie), new THREE.Box3());
       umbre = creeazaUmbre({
         renderer, soare: lumini.soare,
-        cutie: sanctuar.cutieCladiri,
-        arunca: [sanctuar.obiect],
-        primesc: [sanctuar.obiect, ...sanctuar.obiecte.slice(1), teren.obiect, ...(petic ? [petic.obiect] : [])],
+        cutie: unita,
+        arunca: [sanctuar?.obiect, cladiri?.obiect].filter(Boolean),
+        primesc: [...(sanctuar ? sanctuar.obiecte : []), ...(cladiri ? [cladiri.obiect] : []), teren.obiect, ...(petic ? [petic.obiect] : [])],
       });
       const u = umbre;
       deEliberat.push(() => u.dispose());
+      // Pragul se judecă în buclă, nu aici: soarele se mută între Relief și Satelit.
+      if (grupuriUmbra.length > 1)
+        umbreGrup = urmaresteGrupul({ umbre: u, grupuri: grupuriUmbra, unita, texelMaxim: TEXEL_MAXIM, camera, controale, canvas: renderer.domElement });
       // Harta nu se redesenează singură (autoUpdate = false). După pierderea
       // contextului WebGL, three face un WebGLShadowMap nou, dar lumina ar fi sărită
       // de-acum încolo: umbrele s-ar compara cu o textură nedesenată. Ascultătorul
@@ -331,8 +364,12 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     inaltimeLa,
     limitaDatelor,
     zMin: relief.meta?.zMin_m,
-    loveste: sanctuar?.loveste,
-    numeElement: (cheie) => continut?.sanctuar?.nume_elemente?.find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
+    // Clădirea cea mai apropiată de-a lungul razei, din oricare set.
+    loveste: sanctuar || cladiri ? (raza) => {
+      const a = sanctuar?.loveste(raza) ?? null, c = cladiri?.loveste(raza) ?? null;
+      return !a ? c : !c ? a : a.t <= c.t ? a : c;
+    } : undefined,
+    numeElement: (cheie) => [...(continut?.sanctuar?.nume_elemente ?? []), ...(continut?.cladiri?.nume_elemente ?? [])].find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
   });
   if (punct) deEliberat.push(() => punct.dispose());
 
@@ -413,6 +450,9 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     // cadru pinul stătea la 44 px de biserică.
     camera.updateMatrixWorld();
     eticheta?.pas();
+    // Camera s-a apropiat de alt grup de clădiri, sau s-a depărtat: harta de umbre se
+    // strânge pe cutia potrivită, în cadrul acesta.
+    umbreGrup?.pas();
     renderer.render(scena, camera);
   });
 
@@ -437,10 +477,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, sanctuar, busola, punct, geo,
+    renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo,
     // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
     get surse() { return surse; },
-    zbor: zborSanctuar, eticheta, umbre, satelit,
+    zbor: zborSanctuar, eticheta, umbre, umbreGrup, satelit,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
@@ -485,4 +525,63 @@ function unesteSurse(a, b) {
       vechi.prelucrare = vechi.prelucrare ? `${vechi.prelucrare}; ${s.prelucrare}` : s.prelucrare;
   }
   return [...m.values()];
+}
+
+/**
+ * Pe ce cutie se strânge harta de umbre, la fiecare cadru desenat.
+ *
+ * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
+ * Altfel, de departe tot ea: cât texelul ei nu trece de mărimea unui pixel de ecran
+ * la țintă, o hartă mai strânsă n-ar desena nimic în plus. La pornire camera stă la
+ * 1,6–5,2 km, după forma ecranului, unde pixelul are cel puțin ~0,85 m, iar texelul cutiei
+ * unite 0,50–0,60 m. De aproape,
+ * grupul cel mai apropiat de țintă. Două praguri cu histerezis — ±10% pe pixel,
+ * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu
+ * redeseneze harta la fiecare cadru; o schimbare costă o singură redesenare.
+ *
+ * Texelul cutiei unite depinde de soare (0,60 m cu soarele Relief, 0,50 m cu al
+ * zborului), deci se recitește când `umbre.versiuneSoare` s-a schimbat.
+ *
+ * @param {{incadreazaPe: (c: THREE.Box3) => void, texelPentru: (c: THREE.Box3) => number,
+ *          texelMetri: number, versiuneSoare: number}} o.umbre
+ * @param {{nume: string, cutie: THREE.Box3}[]} o.grupuri
+ */
+function urmaresteGrupul({ umbre, grupuri, unita, texelMaxim, camera, controale, canvas }) {
+  const HISTEREZIS = 20;
+  const p = new THREE.Vector3();
+  const tinta = controale.target;
+  const distanta = (g) => g.cutie.distanceToPoint(p.set(tinta.x, (g.cutie.min.y + g.cutie.max.y) / 2, tinta.z));
+  const toate = { nume: 'toate', cutie: unita };
+  const texel = new Map();
+  let curent = toate, texelUnit = 0, versiune = -1;
+  const pas = () => {
+    if (versiune !== umbre.versiuneSoare) {
+      versiune = umbre.versiuneSoare;
+      texelUnit = umbre.texelPentru(unita);
+      texel.clear();
+      texel.set('toate', texelUnit);
+      if (curent !== toate) texel.set(curent.nume, umbre.texelMetri);
+    }
+    let ales = toate;
+    if (texelUnit > texelMaxim) {
+      // mărimea unui pixel de ecran la distanța țintei, în metri
+      const pixel = (camera.position.distanceTo(tinta) * 2 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, canvas.height);
+      if (texelUnit > pixel * (curent === toate ? 1.1 : 0.9)) {
+        let cel = grupuri[0], dCel = distanta(cel);
+        for (let k = 1; k < grupuri.length; k++) { const d = distanta(grupuri[k]); if (d < dCel) { cel = grupuri[k]; dCel = d; } }
+        ales = curent !== toate && cel !== curent && distanta(curent) - dCel < HISTEREZIS ? curent : cel;
+      }
+    }
+    if (ales === curent) return;
+    curent = ales;
+    umbre.incadreazaPe(curent.cutie);
+    texel.set(curent.nume, umbre.texelMetri);
+  };
+  pas();
+  return {
+    pas,
+    get grup() { return curent.nume; },
+    /** Texelul fiecărei cutii deja încadrate cu soarele de acum, în metri. */
+    get texel() { return Object.fromEntries(texel); },
+  };
 }

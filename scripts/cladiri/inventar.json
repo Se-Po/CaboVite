@@ -1,5 +1,5 @@
 {
-  "nota": "Clădirile din afara sanctuarului, în cutia lui harta_v4: câte o decizie pentru fiecare element al instantaneului OSM (osm-cladiri), cu motivul. build-cladiri refuză să scrie datele dacă un element nou n-are decizie aici. Numele de afișat vor sta în src/content, după prefixul cheii. ODbL 1.0, © contribuitorii OpenStreetMap.",
+  "nota": "Clădirile din afara sanctuarului, în cutia lui harta_v4: câte o decizie pentru fiecare element al instantaneului OSM (osm-cladiri), cu motivul. build-cladiri refuză să scrie datele dacă un element nou n-are decizie aici. Numele de afișat stau în src/content, după prefixul cheii. ODbL 1.0, © contribuitorii OpenStreetMap.",
   "osm": "cladiri-osm-2026-09-30.json",
   "elemente": [
     { "osm": 156262927, "inclus": true, "cheie": "far.turn", "ce": "Farol do Cabo Espichel (man_made=lighthouse, name)", "motiv": "turnul hexagonal, vârful MDS 168,28 m; hexagonul OSM e mai mare decât turnul, deci se înregistrează cu scară (×0,84)" },

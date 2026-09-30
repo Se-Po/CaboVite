@@ -345,22 +345,23 @@ export function zid(s, linie, talpa, sus, grosime, rgb) {
 /**
  * O cupolă din profilul ei măsurat, rotit în jurul axei: `profil` e [r, y] de la
  * margine spre vârf, `laturi` numărul de fațete pe cerc (6 la Casa da Água, care e
- * hexagonală).
+ * hexagonală). `peSegment`, dacă e dat, are câte o culoare pe segment de profil
+ * (lanterna farului: camera ei și cupola de deasupra) și înlocuiește `rgb`.
  */
-export function cupola(s, centru, profil, laturi, rotatie, rgb) {
+export function cupola(s, centru, profil, laturi, rotatie, rgb, peSegment = null) {
   const inel = (r, y) => Array.from({ length: laturi }, (_, k) => {
     const a = rotatie + (2 * Math.PI * k) / laturi;
     return [centru[0] + r * Math.cos(a), y, centru[1] + r * Math.sin(a)];
   });
   for (let m = 0; m + 1 < profil.length; m++) {
     const [r0, y0] = profil[m], [r1, y1] = profil[m + 1];
-    const A = inel(r0, y0), B = inel(r1, y1);
+    const A = inel(r0, y0), B = inel(r1, y1), c = peSegment ? peSegment[m] : rgb;
     for (let k = 0; k < laturi; k++) {
       const k2 = (k + 1) % laturi;
       const mid = [(A[k][0] + A[k2][0]) / 2 - centru[0], 0, (A[k][2] + A[k2][2]) / 2 - centru[1]];
       const spre = [mid[0], Math.max(0.2, (r0 - r1) / Math.max(1e-6, y1 - y0)), mid[2]];
-      if (r1 < 1e-6) s.tri(A[k], A[k2], B[0], rgb, spre);
-      else s.quad(A[k], A[k2], B[k2], B[k], rgb, spre);
+      if (r1 < 1e-6) s.tri(A[k], A[k2], B[0], c, spre);
+      else s.quad(A[k], A[k2], B[k2], B[k], c, spre);
     }
   }
 }

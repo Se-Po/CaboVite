@@ -42,6 +42,7 @@ se poartă în română.
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul și cu ce lumină s-ar colora stânca → `date-sursa/derivate/faleza.json`; măsurătoare, nefolosită de pagină |
 | `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, înregistrate și măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
+| `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -640,6 +641,15 @@ versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 
 - **Marea**, în cutia texturii, e fotografia; în afara ei, apa adâncă măsurată;
   ceața pe pixel rămâne (cu AgX inclus de mână: materialul nu e tone-mapped).
 - Suprafețele sanctuarului de pe teren (drapajul) se ascund: fotografia le are.
+- **Acoperișurile fantomă nu se retușează.** Ortofotoul nu e true-ortho: acoperișul
+  unei clădiri de h metri apare mutat cu h × înclinarea din `zbor.json` (0,095 m/m
+  sub 9 m, 0,085 peste). Imaginea iese din amprentele modelate cu ~0,6 m în lungul
+  pereților de 6–9 m — pe bază sub un texel, pe petic ~2 texeli — și cu până la
+  ~1,3 m (15 m × 0,085) la colțul de NV al turnului de nord, peste poteca de la
+  nord de biserică: pe petic, ~5 texeli. Turnul farului se mută cu ~2,7 m, dar
+  cade peste acoperișul casei lui, care e modelată. Retușul prin difuzie
+  (`orto_v2`), prevăzut ca opțional, nu s-a făcut; dacă se vede, turnul de nord e
+  primul loc de retușat.
 - **Falezele rămân fotografia.** `npm run masoara-faleza` a măsurat, pe plasa
   paginii, cât detaliu are fotografia pe metrul de SUPRAFAȚĂ, pe clase de pantă:
   sub 50% din cel de pe terenul plat de la 46,6° încolo, 17% la 70–75°, 2% la
@@ -944,16 +954,20 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
 ### Umbrele
 
 `src/scene/umbre.js`: o singură hartă de 2048², strânsă pe clădiri plus lungimea
-umbrei (60 m; la 18° o clădire de 15 m aruncă 46 m), deci 0,211 m pe texel. Cutia
+umbrei (60 m; la 18° o clădire de 15 m aruncă 46 m): 0,211 m pe texel pe sanctuar;
+de departe, cutia unită a grupurilor, 0,50–0,60 m — vezi „Umbrele pe grupuri”. Cutia
 lasă apeductul afară: merge ~550 m spre est și dubla fereastra luminii (0,336 m pe
 texel) pentru umbre de 2–8 m. Harta ține ~32 MiB pe placă — adâncime plus culoare,
 pe care r186 o alocă oricum.
 `autoUpdate = false`: se desenează la pornire și apoi numai când soarele se mută
-între vederi. Aruncă umbră numai sanctuarul; primesc
-sanctuarul, suprafețele și terenul. Tocmai de aceea trebuie refăcută la
+între vederi sau camera trece la alt grup de clădiri. Tocmai de aceea trebuie refăcută la
 `webglcontextrestored`: three face atunci un WebGLShadowMap nou, iar o lumină cu
 `autoUpdate = false` și fără `needsUpdate` e sărită. Proba: contextul pierdut și
 refăcut dă 0 pixeli diferiți; fără umbre, pe aceeași vedere, diferă 8 393.
+
+Aruncă umbră sanctuarul și, din v0.1.0, clădirile din afara lui; primesc
+clădirile, suprafețele și terenul. Cutia trece între grupuri — vezi „Umbrele pe
+grupuri”, la far.
 
 Soarele nu se mută ca să încadreze umbra — numai între vederi, Relief ↔ Satelit,
 unde `potriveste()` reîncadrează cutia și redesenează harta o dată. Camera de umbră
@@ -999,9 +1013,8 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
 ## Farul și celelalte clădiri
 
 Farol do Cabo Espichel, cele șase clădiri de lângă el și cele trei de la Casa da
-Ronca, la ~400 m spre sud-vest, sunt măsurate ca geometrie, în schema sanctuarului:
-`public/data/cladiri_v1.json`, pe care pagina îl va construi cu același
-`creeazaSanctuar()`.
+Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctuarului:
+`public/data/cladiri_v1.json`, construit în pagină de același `creeazaSanctuar()`.
 
 ### Contururile: OSM, înregistrate pe LiDAR
 
@@ -1081,6 +1094,61 @@ Ronca, la ~400 m spre sud-vest, sunt măsurate ca geometrie, în schema sanctuar
   întreg (96% din amprentă pe două ape de 30°), iar ortofotoul, țiglă. Se construiesc
   cu acoperiș, cu pereții din zidărie. Numele „Casa da Ronca” vine numai din OSM —
   **NEVERIFICAT** într-o sursă primară.
+
+### În pagină
+
+- `incarcaCladiri()` și `incarcaSanctuar()` stau pe aceeași funcție din
+  `loaders.js`. Fiecare refuză datele celeilalte, după prefixul lui `nume`.
+- `creeazaSanctuar({ ..., eticheta: 'clădiri' })` are `fatada`, `cruzeiro` și `poi`
+  opționale. `materiale_profil` dă câte o culoare pe segment de profil. Fiecare
+  element poartă un `grup`, iar obiectul întors are `cutiiGrupuri`.
+- Proba refactorizării: `sanctuar_v2` dă același sha256 pe position, color și
+  ocluzie, înainte și după.
+- Clădirile sunt al doilea Mesh, pe același program (`sanctuar-ocluzie`): un apel
+  de desenare în plus și 232 de triunghiuri.
+- Panoul punctului ia clădirea cea mai apropiată din oricare set. Numele vin din
+  `src/content/cladiri.js`, după prefixul cheii.
+
+### Umbrele pe grupuri
+
+- **Trei grupuri:** sanctuarul, farul, Casa da Ronca. Texelul, în metri:
+
+  | soarele | cutia unită | sanctuarul | farul | Casa da Ronca |
+  |---|---|---|---|---|
+  | Relief (18° / 244°) | 0,604 | 0,211 | 0,124 | 0,102 |
+  | al zborului (39,5° / 94°) | 0,497 | 0,216 | 0,118 | 0,097 |
+
+- **`urmaresteGrupul()`** din `scena.js` alege cutia la fiecare cadru desenat:
+  - cutia unită, dacă texelul ei stă sub TEXEL_MAXIM (0,3 m) sau nu trece de
+    pixelul ecranului la țintă. La pornire camera stă la 1,6–5,2 km, după
+    forma ecranului, iar pixelul are acolo cel puțin ~0,85 m;
+  - altfel, grupul cel mai apropiat de țintă.
+- **Texelul cutiei unite depinde de soare**, deci pragul se judecă în buclă, nu la
+  creare. `umbre.potriveste()` crește `versiuneSoare`, iar `pas()` recitește atunci
+  texelul cu `texelPentru(cutie)`, o proiecție care nu atinge camera. Înainte de
+  recenzia three.js, pragul rămânea cel al soarelui Relief și sub Satelit: pe un
+  ecran de 1 000 px, grupurile nealese pierdeau umbra de la 663 m de țintă în loc
+  de 546 m.
+- **Histerezis:** ±10% pe pixel și 20 m între grupuri. O schimbare costă o
+  redesenare a hărții, în același cadru: `needsUpdate` se pune înainte de `render`.
+- **Consecința:** de departe umbrele se văd pe toate grupurile, la 0,50–0,60 m pe texel;
+  de aproape, numai pe grupul privit.
+
+### Probele: `npm run verifica-cladiri`
+
+- **încărcătorul:** șapte căi de eșec dau `null` și un avertisment, fără aruncare.
+  Una dintre ele sunt datele sanctuarului;
+- **construcția:** 0 elemente sărite, 232 de triunghiuri (buget 6 000), 6,5 KB
+  (buget 20), două grupuri. O cheie inexistentă în `materiale_profil` sare farul,
+  cu avertisment; înainte, culoarea nedefinită se scria tăcut ca negru;
+- **vârful:** cel mai înalt vârf e la 168,28 m, iar raza verticală pe ax lovește
+  `far.turn` la 168,280 m;
+- **față de LiDAR** (cere dalele):
+  - acoperișurile, pe 3 774 de pixeli: mediana −0,001 m, p90 0,085 m. Ridicate cu
+    1 m, pică;
+  - amprentele stau pe clădire în 97,3% din aria lor; mutate 2 m, cel mult 85,2%.
+    **Proba amprentelor nu e independentă:** înregistrarea a maximizat chiar mărimea
+    asta, deci prinde numai o greșeală de transport până în pagină.
 
 ## Principii de design (nenegociabile)
 

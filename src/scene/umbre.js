@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// Umbrele sanctuarului.
+// Umbrele clădirilor: sanctuarul și, din v0.1.0, cele din afara lui.
 //
 // Soarele vederii Relief stă la 18° deasupra orizontului, din vest-sud-vest, ca
 // straturile falezei să se citească în lumină razantă; vederea Satelit îl pune pe
@@ -12,10 +12,10 @@ import * as THREE from 'three';
 //   - o singură hartă de umbre, de 2048², strânsă pe complex — nu pe cei 4 km²
 //     ai hărții, unde un texel ar avea 2 m;
 //   - `autoUpdate = false`: se desenează la pornire și apoi numai când se mută
-//     soarele, nu la fiecare cadru;
-//   - aruncă umbră numai sanctuarul; primesc sanctuarul, suprafețele de pe teren
-//     și terenul. În afara cutiei umbrei, shaderul găsește „luminat", deci restul
-//     hărții rămâne neschimbat.
+//     soarele sau grupul privit, nu la fiecare cadru;
+//   - aruncă umbră clădirile; primesc ele, suprafețele de pe teren și terenul. În
+//     afara cutiei umbrei, shaderul găsește „luminat", deci restul hărții rămâne
+//     neschimbat.
 //
 // Camera de umbră stă unde stă lumina, la 4 km, și privește spre ținta ei; numai
 // marginile ei se strâng pe complex, oriunde ar fi el în cadru. Așa terenul din
@@ -23,6 +23,11 @@ import * as THREE from 'three';
 // pe aceeași direcție, ar fi rotunjit altfel vectorul luminii și ar fi schimbat
 // pixeli pe toată harta. Soarele se mută numai între vederi (Relief ↔ Satelit), iar
 // atunci `potriveste()` reîncadrează cutia și redesenează harta o dată.
+//
+// Clădirile stau în trei grupuri — sanctuarul, farul, Casa da Ronca —, la sute de
+// metri unul de altul. O cutie peste toate ar lărgi texelul peste pragul ales în
+// scena.js; atunci harta se strânge pe grupul privit (`incadreazaPe`), tot cu o
+// singură redesenare, iar celelalte grupuri rămân fără umbră cât nu sunt privite.
 
 /**
  * @param {{renderer: THREE.WebGLRenderer, soare: THREE.DirectionalLight, cutie: THREE.Box3,
@@ -30,27 +35,36 @@ import * as THREE from 'three';
  */
 export function creeazaUmbre({ renderer, soare, cutie, arunca, primesc, lungimeUmbra = 60 }) {
   const cam = soare.shadow.camera;
+  let curenta = cutie;
   let texel = 0;
+  // Crește la fiecare mutare a soarelui: cine ține minte un texel știe când s-a învechit.
+  let versiuneSoare = 0;
   // Cutia camerei de umbră: colțurile complexului, lărgite cu lungimea umbrei, în
   // spațiul luminii — aceeași rotație pe care și-o face LightShadow.updateMatrices.
-  // Se reface ori de câte ori soarele se mută (vederea Satelit îl pune pe soarele
-  // zborului): altfel cutia veche, rotită altfel, ar tăia umbrele.
-  const incadreaza = () => {
+  // Funcție pură: nu atinge camera, deci servește și la întrebarea „cât ar avea
+  // texelul pe cutia asta?”.
+  const limite = (c) => {
     soare.updateMatrixWorld();
     soare.target.updateMatrixWorld();
     const ochi = new THREE.Vector3().setFromMatrixPosition(soare.matrixWorld);
     const tinta = new THREE.Vector3().setFromMatrixPosition(soare.target.matrixWorld);
     const invers = new THREE.Matrix4().lookAt(ochi, tinta, cam.up).invert();
-    const b = cutie.clone().expandByScalar(lungimeUmbra);
+    const b = c.clone().expandByScalar(lungimeUmbra);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
       const p = new THREE.Vector3(x, y, z).sub(ochi).applyMatrix4(invers);
       x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z);
     }
-    cam.left = x0; cam.right = x1; cam.bottom = y0; cam.top = y1;
-    cam.near = Math.max(1, -z1 - 10); cam.far = -z0 + 10;
+    return { x0, x1, y0, y1, z0, z1, texel: Math.max(x1 - x0, y1 - y0) / 2048 };
+  };
+  // Se reface ori de câte ori soarele se mută (vederea Satelit îl pune pe soarele
+  // zborului): altfel cutia veche, rotită altfel, ar tăia umbrele.
+  const incadreaza = () => {
+    const l = limite(curenta);
+    cam.left = l.x0; cam.right = l.x1; cam.bottom = l.y0; cam.top = l.y1;
+    cam.near = Math.max(1, -l.z1 - 10); cam.far = -l.z0 + 10;
     cam.updateProjectionMatrix();
-    texel = Math.max(x1 - x0, y1 - y0) / 2048;
+    texel = l.texel;
   };
   incadreaza();
   soare.shadow.mapSize.set(2048, 2048);
@@ -71,8 +85,14 @@ export function creeazaUmbre({ renderer, soare, cutie, arunca, primesc, lungimeU
     /** Cere refacerea hărții de umbre — de pildă după pierderea contextului. */
     refa() { soare.shadow.needsUpdate = true; },
     /** Soarele s-a mutat: cutia se reîncadrează, iar harta se redesenează o dată. */
-    potriveste() { incadreaza(); soare.shadow.needsUpdate = true; },
+    potriveste() { versiuneSoare++; incadreaza(); soare.shadow.needsUpdate = true; },
+    /** Harta se strânge pe altă cutie — alt grup de clădiri — și se redesenează o dată. */
+    incadreazaPe(c) { curenta = c; incadreaza(); soare.shadow.needsUpdate = true; },
+    get cutie() { return curenta; },
     get texelMetri() { return texel; },
+    /** Texelul pe care l-ar avea harta strânsă pe cutia `c`, cu soarele de acum. */
+    texelPentru: (c) => limite(c).texel,
+    get versiuneSoare() { return versiuneSoare; },
     dispose() {
       if (!viu) return;
       viu = false;

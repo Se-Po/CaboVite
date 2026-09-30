@@ -8,8 +8,7 @@
 // (scripts/cladiri/inventar.json: ce intră și de ce), dalele MDS/MDT de 50 cm
 // (înălțimile) și ortofotoul (materialul acoperișurilor). Iese
 // public/data/cladiri_vN.json, în schema sanctuarului — corpuri cu plane de
-// acoperiș, o cupolă —, pe care pagina îl va construi cu același cod
-// (creeazaSanctuar), și
+// acoperiș, o cupolă —, construit în pagină de același cod (creeazaSanctuar), și
 // date-sursa/derivate/masuratori-cladiri.json.
 //
 // Pe fiecare clădire:
@@ -354,7 +353,7 @@ function alegeMaterial(ape) {
 
 // ------------------------------------------------------------ grupurile
 // Clădirile la mai puțin de 60 m una de alta: farul cu casele lui, iar la ~400 m spre
-// sud-vest Casa da Ronca cu vecinele ei. Umbrele paginii se vor strânge pe câte un grup.
+// sud-vest Casa da Ronca cu vecinele ei. Umbrele paginii se strâng pe câte un grup.
 const elemente = inst.elemente.map((el) => ({ el, P: tm(el) }));
 const farEl = elemente.find(({ el }) => el.tags?.man_made === 'lighthouse');
 const grupuri = [];

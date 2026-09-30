@@ -1,4 +1,4 @@
-// Încărcarea resurselor: relieful și stratul lui NDVI, sanctuarul și texturile
+// Încărcarea resurselor: relieful și stratul lui NDVI, sanctuarul, clădirile din afara lui și texturile
 // Satelit (KTX2). Loaderele grele stau aici, câte o singură instanță.
 
 /**
@@ -160,9 +160,23 @@ export function straturiNdvi(relief, reliefPetic) {
  *
  * @returns {Promise<object|null>}
  */
-export async function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
+export function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
+  return incarcaCladiriDate(url, 'sanctuar', (motiv) => `sanctuarul lipsește (${motiv}) — scena pornește fără el`);
+}
+
+/**
+ * Clădirile din afara sanctuarului — farul și casele lui, Casa da Ronca —, produse de
+ * `npm run build-cladiri`, în aceeași schemă. Aceleași reguli: nu aruncă.
+ *
+ * @returns {Promise<object|null>}
+ */
+export function incarcaCladiri(url = '/data/cladiri_v1.json') {
+  return incarcaCladiriDate(url, 'cladiri', (motiv) => `clădirile din afara sanctuarului lipsesc (${motiv}) — scena pornește fără ele`);
+}
+
+async function incarcaCladiriDate(url, prefix, mesaj) {
   const lipsa = (motiv) => {
-    console.warn(`sanctuarul lipsește (${motiv}) — scena pornește fără el`);
+    console.warn(mesaj(motiv));
     return null;
   };
   try {
@@ -170,7 +184,7 @@ export async function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
     if (!r.ok) return lipsa(`HTTP ${r.status}`);
     let d;
     try { d = await r.json(); } catch { return lipsa('nu e JSON'); }
-    if (!/^sanctuar_v\d+$/.test(d?.nume ?? '')) return lipsa(`nume necunoscut: ${d?.nume}`);
+    if (!new RegExp(`^${prefix}_v\\d+$`).test(d?.nume ?? '')) return lipsa(`nume necunoscut: ${d?.nume}`);
     if (d.versiune_schema !== 1) return lipsa(`schema ${d.versiune_schema}, aștept 1`);
     for (const k of ['corpuri', 'turnuri', 'cupole', 'ziduri', 'apeduct', 'surse'])
       if (!Array.isArray(d[k])) return lipsa(`lipsește ${k}`);

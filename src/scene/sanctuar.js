@@ -20,19 +20,25 @@ import { creeazaDrapaj } from './drapaj.js';
 // Nu aruncă. O greșeală aici ar dărâma, prin `construieste()`, toată scena, cu
 // teren cu tot; așa că fiecare element se construiește în try-ul lui, iar un
 // element stricat se sare cu un avertisment.
+//
+// Același cod construiește și clădirile din afara sanctuarului (cladiri_vN.json:
+// farul, casele lui, Casa da Ronca). Acelea n-au fațadă, cruzeiro sau etichetă, iar
+// fiecare element poartă un `grup`: umbrele se strâng pe câte unul.
 
 /**
  * @param {{ date: object|null, inaltimeLa: (x: number, z: number) => number, ancora: {x: number, y: number},
- *           retea?: {relief: object, reliefPetic: object|null, pastreaza?: Function, subPetic?: Function} }} optiuni
- *   `retea` sunt plasele terenului, ca suprafețele să se așeze pe triunghiurile lor.
+ *           retea?: {relief: object, reliefPetic: object|null, pastreaza?: Function, subPetic?: Function},
+ *           eticheta?: string }} optiuni
+ *   `retea` sunt plasele terenului, ca suprafețele să se așeze pe triunghiurile lor;
+ *   `eticheta` începe avertismentele și numește obiectul.
  * @returns {null | { obiect: THREE.Mesh, obiecte: THREE.Mesh[], nrTriunghiuri: {cladiri: number, drapaj: number}, poi: object, surse: object[], dispose(): void }}
  */
-export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
+export function creeazaSanctuar({ date, inaltimeLa, ancora, retea, eticheta = 'sanctuar' }) {
   if (!date) return null;
   try {
     // Datele sunt în coordonatele unei hărți anume. Pe alta ar ateriza la sute de metri.
     if (!ancora || date.ancora_tm06?.x !== ancora.x || date.ancora_tm06?.y !== ancora.y) {
-      console.warn(`sanctuar: ${date.nume} e ancorat în (${date.ancora_tm06?.x}, ${date.ancora_tm06?.y}), harta în (${ancora?.x}, ${ancora?.y}) — nu-l așez`);
+      console.warn(`${eticheta}: ${date.nume} e ancorat în (${date.ancora_tm06?.x}, ${date.ancora_tm06?.y}), harta în (${ancora?.x}, ${ancora?.y}) — nu-l așez`);
       return null;
     }
     const cul = Object.fromEntries(Object.entries(date.materiale).map(([k, m]) => [k, m.rgb]));
@@ -57,8 +63,8 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
         f();
         // O coordonată lipsă din date nu aruncă: dă NaN. Elementul se derulează înapoi.
         if (!s.finite(n0)) throw new Error('coordonate nefinite');
-      } catch (e) { s.inapoi(n0); sarite++; console.warn(`sanctuar: ${cheie} sărit — ${e.message}`); }
-      if (s.nrTriunghiuri > n0) intervale.push({ cheie: parte, t0: n0, t1: s.nrTriunghiuri });
+      } catch (e) { s.inapoi(n0); sarite++; console.warn(`${eticheta}: ${cheie} sărit — ${e.message}`); }
+      if (s.nrTriunghiuri > n0) intervale.push({ cheie: parte, grup: element?.grup ?? null, t0: n0, t1: s.nrTriunghiuri });
     };
     /** Cota cea mai joasă a reliefului în colțurile unui contur și la mijlocul laturilor, minus 0,5 m. */
     const talpa = (puncte, inchis = true) => {
@@ -91,18 +97,22 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
       else if (q.tip === 'rama') rama(s, q, cul[q.material]);
       else s.cuOcluzie(q.ocluzie ?? 1, () => placa(s, q, cul[q.material]));
     }, q.parte ?? q.cheie, q);
-    incearca('fatada', () => {
+    if (date.fatada) incearca('fatada', () => {
       const f = date.fatada;
       placaVerticala(s, f.a, f.b, f.spre_interior, f.profil, talpa([f.a, f.b], false), cul.var, cul.cantaria);
     }, 'fatada', date.fatada);
     for (const c of date.cupole) incearca(c.cheie, () => {
       prisma(s, c.contur, talpa(c.contur), c.cornisa, cul.var, cul.cupola);
       const [x0, z0] = c.contur[0];
-      cupola(s, c.centru, c.profil, c.laturi, Math.atan2(z0 - c.centru[1], x0 - c.centru[0]), cul[c.material]);
+      // O cheie de material greșită ar da o culoare nedefinită, scrisă tăcut ca negru.
+      if (c.materiale_profil && (c.materiale_profil.length !== c.profil.length - 1 || !c.materiale_profil.every((k) => cul[k])))
+        throw new Error('materiale_profil nu se potrivește cu profilul');
+      cupola(s, c.centru, c.profil, c.laturi, Math.atan2(z0 - c.centru[1], x0 - c.centru[0]),
+        cul[c.material], c.materiale_profil ? c.materiale_profil.map((k) => cul[k]) : null);
     }, c.cheie, c);
     for (const z of [...date.ziduri, ...date.apeduct]) incearca(z.cheie, () => zid(s, z.linie, talpa(z.linie, false), z.sus, z.grosime, cul[z.material]), z.cheie, z);
     for (const c of date.cosuri ?? []) incearca(c.cheie, () => prisma(s, c.contur, c.baza, c.sus, cul[c.material]), c.parte ?? c.cheie, c);
-    incearca('cruzeiro', () => {
+    if (date.cruzeiro) incearca('cruzeiro', () => {
       // Platforma cu trei trepte și crucea. Dimensiunile sunt ale fotografiilor, NEVERIFICATE pe LiDAR:
       // crucea e mai subțire decât pixelul MDS-ului.
       const [x, z] = date.cruzeiro.centru, y = inaltimeLa(x, z);
@@ -144,14 +154,14 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
     };
     material.customProgramCacheKey = () => 'sanctuar-ocluzie';
     const obiect = new THREE.Mesh(geometrie, material);
-    obiect.name = 'sanctuar';
+    obiect.name = eticheta;
     obiect.matrixAutoUpdate = false;
     obiect.updateMatrix();
 
     // Suprafețele de pe teren, într-un try al lor: fără ele clădirile rămân.
     let drapaj = null;
     if (retea && date.suprafete?.length) {
-      try { drapaj = creeazaDrapaj({ suprafete: date.suprafete, culori: cul, ...retea }); } catch (e) { console.warn(`sanctuar: suprafețele sărite — ${e.message}`); }
+      try { drapaj = creeazaDrapaj({ suprafete: date.suprafete, culori: cul, ...retea }); } catch (e) { console.warn(`${eticheta}: suprafețele sărite — ${e.message}`); }
     }
 
     const nrTriunghiuri = { cladiri: pozitii.length / 9, drapaj: drapaj?.nrTriunghiuri ?? 0 };
@@ -166,6 +176,9 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
     // spre est și ar lărgi fereastra luminii de două ori, pentru umbre de 2–8 m.
     const cutieCladiri = new THREE.Box3();
     for (const iv of intervale) if (!iv.cheie.startsWith('apeduct')) cutieCladiri.union(iv.cutie);
+    // Cutia fiecărui grup, pentru datele care își numesc grupurile.
+    const cutiiGrupuri = new Map();
+    for (const iv of intervale) if (iv.grup) (cutiiGrupuri.get(iv.grup) ?? cutiiGrupuri.set(iv.grup, new THREE.Box3()).get(iv.grup)).union(iv.cutie);
     /**
      * Prima clădire pe care o lovește raza: cutiile în ordinea intrării, apoi
      * Möller–Trumbore numai pe triunghiurile elementului. Întoarce distanța de-a
@@ -206,15 +219,16 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
       const p = raza.at(best.t, new THREE.Vector3());
       return { t: best.t, cheie: best.cheie, x: p.x, y: p.y, z: p.z };
     };
-    if (sarite) console.warn(`sanctuar: ${sarite} elemente sărite`);
+    if (sarite) console.warn(`${eticheta}: ${sarite} elemente sărite`);
     let viu = true;
     return {
       obiect,
       obiecte: [obiect, ...(drapaj?.obiecte ?? [])],
       nrTriunghiuri,
       cutieCladiri,
+      cutiiGrupuri,
       loveste,
-      poi: date.poi,
+      poi: date.poi ?? null,
       surse: date.surse,
       dispose() {
         if (!viu) return;
@@ -233,7 +247,7 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea }) {
       },
     };
   } catch (e) {
-    console.warn(`sanctuar: nu s-a putut construi — ${e.message}`);
+    console.warn(`${eticheta}: nu s-a putut construi — ${e.message}`);
     return null;
   }
 }

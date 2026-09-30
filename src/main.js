@@ -4,6 +4,7 @@
 // dispare și pagina rămâne o pagină, nu un ecran de eroare.
 import { porneste } from './scene/scena.js';
 import { SANCTUAR } from './content/sanctuar.js';
+import { CLADIRI } from './content/cladiri.js';
 
 const canvas = document.querySelector('#scena');
 const continut = document.querySelector('#continut');
@@ -113,7 +114,7 @@ if (continut && !continut.textContent.trim()) {
 try {
   // `laSurse`: vederea Satelit își adaugă sursa când îi sosește textura, după ce
   // subsolul a fost deja scris; atunci se scrie din nou.
-  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR }, laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); } });
+  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR, cladiri: CLADIRI }, laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); } });
   if (!scena) {
     faraScena('WebGL indisponibil');
   } else {
