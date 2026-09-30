@@ -1,13 +1,13 @@
 // Datele sanctuarului pentru pagină: public/data/sanctuar_vN.json.
 //
-//   npm run build-sanctuar -- sanctuar_v1
+//   npm run build-sanctuar -- sanctuar_vN
 //
 // Adună măsurătorile (masoara-sanctuar), instantaneul OSM (osm-sanctuar), culorile
 // (culori-sanctuar) și intrările scrise de mână din scripts/sanctuar/, și le scrie
 // în coordonatele scenei — x = X_TM06 + 94624, z = −137899 − Y_TM06, ancorate pe
 // centrul cutiei lui harta_v2 —, ca pagina să nu mai proiecteze nimic.
 //
-// Un nume se scrie o singură dată, ca hărțile: o reparație de date e sanctuar_v2.
+// Un nume se scrie o singură dată, ca hărțile: o reparație de date primește numele următor.
 //
 // Licența fișierului e ODbL 1.0, fiindcă numele, drumurile și suprafețele vin din
 // OpenStreetMap; valorile măsurate pe LiDAR și pe ortofotoul DGT rămân CC BY 4.0,
@@ -233,10 +233,13 @@ for (const A of FAT.arcade) {
     }
   }
   corpuri.push(...noi);
-  // stâlpii: cei măsurați, apoi pasul mediu întins egal până la capăt (NEVERIFICAT)
+  // stâlpii: cei măsurați, apoi arcele rămase până la `arce_total` împărțite egal până
+  // la capăt (NEVERIFICAT). Primul stâlp măsurat e semistâlpul de la vest, deci n stâlpi
+  // închid n − 1 arce.
   const w = A.latime_stalp, masurati = A.stalpi_masurati;
   const capat = uCapat - w / 2, ultim = masurati[masurati.length - 1];
-  const nr = Math.max(0, Math.round((capat - ultim) / A.pas_extrapolat));
+  const nr = A.arce_total - (masurati.length - 1);
+  if (!(nr >= 0)) throw new Error(`${A.cheie}: arce_total ${A.arce_total} < arcele măsurate (${masurati.length - 1})`);
   const pas = nr ? (capat - ultim) / nr : 0;
   const stalpi = [...masurati, ...Array.from({ length: nr }, (_, i) => ultim + pas * (i + 1))].map((u) => [r3(u), w]);
   arcade.push({ cheie: A.cheie, a: lin.a.map(r3), d: lin.d.map(r3), m: lin.m.map(r3), stalpi,
@@ -244,16 +247,31 @@ for (const A of FAT.arcade) {
     masurati: masurati.length, pas_extrapolat: r3(pas) });
   console.log(`${A.cheie}: ${masurati.length} stâlpi măsurați, ${nr} extrapolați la pasul ${pas.toFixed(3)} m, capăt la u = ${capat.toFixed(2)}`);
 
-  // ferestrele etajului: perechi la pas egal, cu faza potrivită pe cele măsurate
+  // ferestrele etajului: perechile măsurate rămân unde sunt; celelalte umplu zidul înainte
+  // și după ele, la pas egal pe fiecare parte, cu o jumătate de pas la capăt — cum stă
+  // prima pereche măsurată a aripii de sud. Câte vin înainte se alege cât toți pașii,
+  // măsurați și puși, să fie cât mai egali (NEVERIFICAT).
   const F = FAT.ferestre_etaj.find((q) => q.arcada === A.cheie);
   if (F) {
-    const P = uCapat / F.perechi;
-    const faza = F.centre_masurate.reduce((s, c) => s + (c - Math.round((c - P / 2) / P) * P), 0) / F.centre_masurate.length;
-    for (let i = 0; i < F.perechi; i++) {
-      const c = faza + i * P;
+    const m = F.centre_masurate, rest = F.perechi - m.length, c0 = m[0], c1 = m[m.length - 1];
+    if (!(rest >= 0)) throw new Error(`${F.cheie}: perechi ${F.perechi} < perechile măsurate (${m.length})`);
+    let ales = null;
+    for (let nb = 0; nb <= rest; nb++) {
+      const na = rest - nb, sb = c0 / (nb + 0.5), sa = (uCapat - c1) / (na + 0.5);
+      const pasi = [...Array(nb).fill(sb), ...m.slice(1).map((c, i) => c - m[i]), ...Array(na).fill(sa)];
+      const med = pasi.reduce((s, p) => s + p, 0) / pasi.length;
+      const abatere = pasi.reduce((s, p) => s + (p - med) ** 2, 0);
+      if (!ales || abatere < ales.abatere) ales = { nb, na, sb, sa, abatere };
+    }
+    const centre = [...Array.from({ length: ales.nb }, (_, i) => c0 - ales.sb * (ales.nb - i)), ...m,
+      ...Array.from({ length: ales.na }, (_, i) => c1 + ales.sa * (i + 1))];
+    console.log(`${F.cheie}: ${ales.nb} perechi înainte de cele ${m.length} măsurate (pas ${ales.sb.toFixed(2)} m), ${ales.na} după (pas ${ales.sa.toFixed(2)} m)`);
+    for (let i = 0; i < centre.length; i++) {
+      const c = centre[i];
       for (const semn of [-1, 1]) {
         const uc = c + (semn * F.distanta_in_pereche) / 2;
-        if (uc - F.latime / 2 < 0.3 || uc + F.latime / 2 > uCapat - 0.3) continue;
+        // numărul vine dintr-o sursă, deci o fereastră care iese din zid oprește, nu dispare
+        if (uc - F.latime / 2 < 0.3 || uc + F.latime / 2 > uCapat - 0.3) throw new Error(`${F.cheie}: fereastra ${i} iese din zid (u ${uc.toFixed(2)} din ${uCapat.toFixed(2)})`);
         detalii.push({ ...rama(lin, 0, [uc - F.latime / 2, uc + F.latime / 2], F.cote, 0.14, 0.07, 'cantaria', `${A.aripa}.fereastra.${i}.${semn < 0 ? 'a' : 'b'}`), parte: `${A.aripa}.etaj` });
       }
     }

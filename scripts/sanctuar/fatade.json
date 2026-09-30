@@ -24,8 +24,9 @@
       "stalpi_masurati": [0.25, 2.8, 5.15, 7.3, 9.65, 12.0, 14.4, 16.9, 19.25, 21.5, 23.9, 26.3, 28.8, 31.4, 34.1, 36.55],
       "stalpi_sursa": "centrele stâlpilor pe fațada rectificată, ±0,15 m; primul e semistâlpul lipit de corpul de legătură",
       "latime_stalp": 0.45,
-      "pas_extrapolat": 2.41,
-      "extrapolare": "NEVERIFICAT: după u = 36,55 fotografia nu mai vede fațada. Arcada continuă până la capătul de est — SIPA („o primeiro piso ritmado por arcaria”) și fotografia Commons „Cabo Espichel March 2015-4a” (Alvesgaspar, CC BY-SA 4.0) o arată pe toată lungimea —, dar pozițiile de acolo sunt pasul mediu măsurat, 2,41 m, întins egal până la capăt.",
+      "arce_total": 47,
+      "arce_sursa": "Pinho Leal, „Portugal Antigo e Moderno”, vol. IX (Lisboa, 1880), intrarea „Senhora do Cabo (do Espichel)”, p. 137: „Do lado do S. ha 47 arcos, 9 escadas, 18 sobrados, com 36 janellas, e 18 lojas” — https://archive.org/stream/portugalantigoe06ferrgoog#page/n141/mode/1up (scanul n141). Cele 18 lojas și 18 sobrados coincid cu încăperile din SIPA. Arcada e „uma arcada geral”, pe sub care se ajunge la biserică (aceeași pagină), „arcaria contínua” (Paulo Pereira, 2014).",
+      "extrapolare": "NEVERIFICAT: după u = 36,55 fotografia nu mai vede fațada. Cele 32 de arce rămase până la cele 47 din 1880 se împart egal până la capătul de est. Două rezerve: numărătoarea e dinaintea restaurării din 1964–1975, iar pentru treimea de est a aripii planurile nu se împacă — planul Câmarei din 2015 are arcada (236 m²) pe toată lungimea, un plan scanat mai vechi, fără dată, arată acolo ~30 m fără stâlpi.",
       "cote": { "pardoseala": 132.15, "nastere": 133.85, "cheie": 134.5, "tavan": 134.9 },
       "cote_sursa": "nașterea și cheia arcelor pe fațada rectificată (media arcelor, ±0,1 m). Tavanul galeriei: cheia + 0,4 m, NEVERIFICAT.",
       "adancime_galerie": 1.8,
@@ -39,8 +40,9 @@
       "stalpi_masurati": [0.29, 2.78, 5.32, 7.82, 10.32, 12.83, 15.4, 18.02, 20.6, 23.28, 25.87, 28.37, 30.87, 33.53, 36.2],
       "stalpi_sursa": "mijlocul dintre cheile a două arce vecine pe fațada rectificată (fațada e în soare, stâlpii își aruncă umbra în galerie, iar cheile sunt mai sigure decât muchiile stâlpilor), ±0,2 m",
       "latime_stalp": 0.55,
-      "pas_extrapolat": 2.57,
-      "extrapolare": "NEVERIFICAT: după u = 36,2 pozițiile sunt pasul mediu măsurat, 2,57 m, întins egal până la capătul de est. Continuitatea arcadei: SIPA și fotografia Commons „Cabo Espichel March 2015-9a” (Alvesgaspar, CC BY-SA 4.0).",
+      "arce_total": 63,
+      "arce_sursa": "Pinho Leal, „Portugal Antigo e Moderno”, vol. IX (Lisboa, 1880), p. 137: „Do lado do N. ha 63 arcos e 11 escadas de pedra, 21 sobrados, com 46 janellas de frente, e 22 lojas” — https://archive.org/stream/portugalantigoe06ferrgoog#page/n141/mode/1up. Cele 22 de lojas și 21 de sobrados coincid cu încăperile din SIPA; aceleași 63 și 47 de arce le dă și fișa Associação Portuguesa dos Jardins Históricos, fără să-și numească sursa.",
+      "extrapolare": "NEVERIFICAT: după u = 36,2 cele 49 de arce rămase până la cele 63 din 1880 se împart egal până la capătul de est. Planurile (planul de parter scanat, alçado sul, cortele REVIVE) arată arcada pe toată aripa; numărătoarea e dinaintea restaurării din 1964–1975.",
       "cote": { "pardoseala": 132.4, "nastere": 134.2, "cheie": 134.75, "tavan": 135.15 },
       "cote_sursa": "fațada rectificată: galeria de nord stă pe un soclu ~0,25 m peste terreiro. Tavanul: cheia + 0,4 m, NEVERIFICAT.",
       "adancime_galerie": 1.8,
@@ -52,23 +54,23 @@
       "cheie": "aripa_s.ferestre",
       "arcada": "aripa_s.arcada",
       "perechi": 18,
-      "perechi_sursa": "SIPA: ferestre „num módulo de duas a duas”, iar aripa de sud are 18 încăperi la etaj. O pereche pe încăpere e presupunerea de aici — NEVERIFICAT.",
+      "perechi_sursa": "Pinho Leal (1880, p. 137): la sud „18 sobrados, com 36 janellas”, adică 18 perechi; SIPA: ferestre „num módulo de duas a duas”. Pozițiile, în afara celor văzute, NEVERIFICAT.",
       "centre_masurate": [2.8, 9.2, 14.6, 21.7, 26.9, 34.1],
       "distanta_in_pereche": 2.4,
       "latime": 1.5,
       "cote": [135.8, 137.4],
-      "sursa": "centrele perechilor vizibile pe fațada rectificată (umbră, contrast slab, ±0,4 m); restul, la pas egal cu faza potrivită pe ele — NEVERIFICAT"
+      "sursa": "centrele perechilor vizibile pe fațada rectificată (umbră, contrast slab, ±0,4 m) rămân unde sunt. Celelalte 12 umplu restul zidului la pas egal, cu o jumătate de pas la capătul de est, cum stă prima pereche la vest — NEVERIFICAT"
     },
     {
       "cheie": "aripa_n.ferestre",
       "arcada": "aripa_n.arcada",
-      "perechi": 21,
-      "perechi_sursa": "SIPA: 21 de încăperi la etajul aripii de nord; o pereche pe încăpere — NEVERIFICAT.",
+      "perechi": 23,
+      "perechi_sursa": "Pinho Leal (1880, p. 137): la nord „21 sobrados, com 46 janellas de frente”, adică 23 de perechi — mai multe decât câte o pereche pe încăpere (21). Pozițiile, în afara celor văzute, NEVERIFICAT.",
       "centre_masurate": [27.87, 34.79],
       "distanta_in_pereche": 2.6,
       "latime": 1.35,
       "cote": [135.9, 137.4],
-      "sursa": "două perechi clare pe fațada rectificată (în soare, ±0,15 m); restul, la pas egal cu faza potrivită pe ele — NEVERIFICAT"
+      "sursa": "două perechi clare pe fațada rectificată (în soare, ±0,15 m) rămân unde sunt. Celelalte 21 umplu zidul înainte și după ele, la pas egal pe fiecare parte, cu o jumătate de pas la capete; câte vin înainte (4) e numărul la care toți pașii ies cât mai egali — NEVERIFICAT. Fotografia arată ferestre și înainte de u = 27, dar prea neclar ca să fie măsurate"
     }
   ],
   "biserica": {

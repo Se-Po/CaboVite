@@ -160,7 +160,7 @@ export function straturiNdvi(relief, reliefPetic) {
  *
  * @returns {Promise<object|null>}
  */
-export async function incarcaSanctuar(url = '/data/sanctuar_v1.json') {
+export async function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
   const lipsa = (motiv) => {
     console.warn(`sanctuarul lipsește (${motiv}) — scena pornește fără el`);
     return null;

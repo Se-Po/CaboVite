@@ -36,7 +36,7 @@ se poartă în română.
 | `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
-| `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu REVIVE și cu el însuși |
+| `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -501,7 +501,8 @@ Regula costă +23 ms la construcția bazei, în Node.
 
 Santuário de Nossa Senhora do Cabo Espichel intră pe hartă ca geometrie: toate
 construcțiile din poza de referință a autorului, plus Ermida da Memória. A intrat
-în v0.0.10, în cinci commit-uri, 0.0.10.01–05.
+în v0.0.10, în cinci commit-uri, 0.0.10.01–05. În v0.0.11 arcele și ferestrele
+aripilor au trecut pe numărătoarea din 1880, iar datele au devenit `sanctuar_v2`.
 
 ### Contururile: OpenStreetMap, cu versiuni fixate
 
@@ -675,17 +676,33 @@ raze cu planul corect, nu o nouă citire.
 **Ce e măsurat și ce nu:**
 - stâlpii: pe aripa S 16 măsurați, pas mediu 2,41 m; pe N 15, pas 2,57 m. Pasul
   variază 2,1–2,7 m, cum spune SIPA („sensivelmente diferente”);
-- fotografia vede fațadele numai până la u ≈ 37 m din 119 și 154. Mai departe
-  arcada continuă cu pasul mediu măsurat — **NEVERIFICAT**, cu regula scrisă în
-  fișier; că arcada merge pe toată lungimea o spun SIPA și fotografiile Commons ale
-  lui Alvesgaspar din 2015 (CC BY-SA 4.0), folosite numai ca să se vadă, nu copiate;
-- ferestrele etajului: perechi, „num módulo de duas a duas”, câte una pe încăpere
-  — 21 la N, 18 la S, după SIPA; faza e potrivită pe perechile vizibile, restul la
-  pas egal, NEVERIFICAT;
+- **câte arce și câte ferestre** are fiecare aripă nu se măsoară: le numără Pinho
+  Leal, *Portugal Antigo e Moderno*, vol. IX (1880), p. 137 — **63 de arce la N, 47
+  la S**; 46 de ferestre pe fața aripii N, 36 la S. Aceeași pagină dă încăperile
+  (22 / 21 la N, 18 / 18 la S) exact ca SIPA, de aceea i se dă crezare. Rezerva:
+  numărătoarea e dinaintea restaurării din 1964–1975;
+- fotografia vede fațadele numai până la u ≈ 37 m din 119 și 154. Mai departe,
+  arcele rămase până la numărul din 1880 se împart egal până la capăt: pas 2,57 m
+  la S, 2,41 la N — invers decât pașii măsurați, dar în plaja lor. Pozițiile sunt
+  **NEVERIFICAT**. Că arcada merge pe toată lungimea o sprijină Pinho Leal (casele,
+  „tudo com uma arcada geral”, o arcadă comună), Paulo Pereira („arcaria contínua”),
+  SIPA și fotografiile Commons ale lui Alvesgaspar din 2015 (CC BY-SA 4.0),
+  folosite numai ca să se vadă, nu copiate. La treimea de est a aripii S planurile
+  nu se împacă: al Câmarei din 2015 are arcada pe toată lungimea, unul scanat, fără
+  dată, ~30 m fără stâlpi;
+- ferestrele etajului: perechi, „num módulo de duas a duas” (SIPA), deci 23 la N și
+  18 la S. La N sunt mai multe perechi decât încăperi (21). Perechile măsurate
+  rămân unde sunt; celelalte umplu zidul la pas egal pe fiecare parte, cu o
+  jumătate de pas la capete, iar câte vin înaintea celor măsurate se alege cât toți
+  pașii să iasă cât mai egali (4 la N, 0 la S) — NEVERIFICAT. Înainte, un pas egal pe
+  toată aripa, cu faza potrivită, muta perechile măsurate ale aripii S cu până la
+  1,24 m și scotea tăcut câte o fereastră care ieșea din zid: la S prima, peste
+  corpul de legătură, la N ultima. Acum `build-sanctuar` se oprește dacă o fereastră
+  iese din zid: numărul vine dintr-o sursă, deci nu are voie să scadă tăcut;
 - fațada bisericii e rectificată frontal, la 4 cm/px: soclu, cornișa dintre
   registre (142,0–142,6), cunhais, trei ferestre, trei portaluri, nișa, ceasul
   solar al turnului N (SIPA: „relógio de sol circular, em cantaria”). Cornișa de
-  sus a turnurilor iese la 146,6, nu la 146,5 cât dădea REVIVE;
+  sus a turnurilor iese la 146,6, nu la 146,5 din cotele „REVIVE” (vezi probele);
 - golurile clopotnițelor: „em duas faces”, SIPA; fața de est măsurată, a doua
   presupusă cea exterioară, NEVERIFICAT.
 
@@ -754,10 +771,12 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
 - **încărcătorul:** index.html cu 200, 404, JSON trunchiat, nume străin, schemă
   necunoscută, material fără rgb, listă lipsă — `null` și un avertisment, fără
   aruncare; ancoră greșită; o coordonată `null` sare numai elementul ei;
-- **bugetul:** clădiri ≤ 70 000 de triunghiuri (azi 17 449), suprafețe ≤ 80 000
-  (60 855), JSON ≤ 150 KB (93,5);
+- **bugetul:** clădiri ≤ 70 000 de triunghiuri (azi 17 745), suprafețe ≤ 80 000
+  (60 855), JSON ≤ 150 KB (94,7);
 - **geometria:** vârfuri finite, ocluzie pe fiecare, stâlpi în ordine cu goluri
   ≥ 0,2 m, corpuri convexe — proba care a prins linia rotită a aripii N;
+- **numărătoarea din 1880** ajunge întreagă în pagină: 47 / 63 de arce, 36 / 46 de
+  ferestre. Pe `sanctuar_v1` ar fi picat: 49 / 60 de arce, 35 / 41 de ferestre;
 - **suprafețele** stau pe triunghiurile randate: 0 vârfuri în afară, maximum 1 mm;
   control: față de relieful interpolat biliniar, abaterea ar fi 175 mm;
 - **față de LiDAR** (cere rastrul): acoperișurile pe pixelii interiori, la cel puțin
@@ -766,10 +785,12 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
   perpendicular pe aripi, 84,7%. Vârfurile turnurilor sunt numai o probă de
   consistență: `varf` e chiar maximul MDS al părții, deci ea prinde doar o
   greșeală de transport până în pagină;
-- **REVIVE 2019**, ca probă independentă: streașinile și coamele aripilor și vârful
-  turnului trec. Coama navei (LiDAR 146,85, REVIVE 145,90) și cupola Casei da Água
-  (145,48 față de 143,27) nu — tipărite DE VERIFICAT, fără să oprească rularea:
-  planele navei au p90 0,06 m, deci cifra de pe planșă numește probabil alt punct;
+- **cotele „REVIVE 2019”** se tipăresc numai informativ, fără prag. Au fost
+  atribuite unei planșe REVIVE la cercetarea de la început, dar nu apar pe niciuna
+  dintre cele șapte planșe publicate, citite cu tot cu textul din desene: acelea au
+  numai cote de teren. O cifră cu sursă necunoscută nu dovedește nimic, nici când se
+  potrivește. Pe LiDAR, nimic de pe biserică nu stă la 145,90: coama navei e
+  orizontală la 146,85, capela-mor ajunge la 144,0;
 - **zborul** aterizează la 1e-13 m din repaus, după o aruncare și sub
   `prefers-reduced-motion` (acolo în 0 cadre), iar busola citește 205°; control:
   pe nordul grilei ar citi 204,33°;

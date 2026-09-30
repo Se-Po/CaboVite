@@ -29,9 +29,9 @@ import { creeazaZbor } from '../src/scene/zbor.js';
 import { convergentaDinColturi } from '../src/scene/busola.js';
 
 const BUGET = { cladiri: 70000, drapaj: 80000, json_kb: 150 };
-const FISIER = 'public/data/sanctuar_v1.json';
+const FISIER = 'public/data/sanctuar_v2.json';
 
-let picate = 0, deVerificat = 0;
+let picate = 0;
 const proba = (bun, text) => {
   console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`);
   if (!bun) picate++;
@@ -135,6 +135,15 @@ proba(ocl?.count === poz.length / 3 && ocl.normalized, `ocluzia: un octet normal
     if (ub - wb / 2 - (ua + wa / 2) < 0.2) rele.push(`${a.cheie}#${k}`);
   }
   proba(rele.length === 0, `stâlpii arcadelor sunt în ordine, cu goluri ≥ 0,2 m${rele.length ? `: ${rele.slice(0, 5).join(', ')}` : ''}`);
+  // numărătoarea din sursă (Pinho Leal, 1880) trebuie să ajungă întreagă în pagină
+  const FAT = JSON.parse(readFileSync('scripts/sanctuar/fatade.json', 'utf8'));
+  for (const A of FAT.arcade) {
+    const a = date.arcade.find((q) => q.cheie === A.cheie), F = FAT.ferestre_etaj.find((q) => q.arcada === A.cheie);
+    const arce = a ? a.stalpi.length - 1 : null;
+    const ferestre = date.detalii.filter((d) => d.cheie.startsWith(`${A.aripa}.fereastra.`)).length;
+    proba(arce === A.arce_total && ferestre === 2 * F.perechi,
+      `${A.aripa}: ${arce} arce și ${ferestre} ferestre la etaj, cât în sursă (${A.arce_total} și ${2 * F.perechi})`);
+  }
   // corpurile rămân convexe după retragerea laturilor dinspre terreiro
   const convex = (c) => { let semn = 0; for (let k = 0; k < c.length; k++) { const p = c[k], q = c[(k + 1) % c.length], r = c[(k + 2) % c.length]; const x = (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]); if (Math.abs(x) < 1e-9) continue; if (semn && Math.sign(x) !== semn) return false; semn = Math.sign(x); } return true; };
   const neconvexe = date.corpuri.filter((c) => !convex(c.contur)).map((c) => c.cheie);
@@ -285,9 +294,14 @@ else {
   console.log(`       IoU față de toți pixelii de clădire din fereastră: ${bun.iou.toFixed(3)} (mutate: ${mutat.iou.toFixed(3)}); restul sunt ziduri, ruine, apeduct, coșuri — nu corpuri`);
 }
 
-// ------------------------------------------------------------ 6. REVIVE
+// ------------------------------------------------------------ 6. cotele „REVIVE”, informativ
 
-console.log('\nFață de planșa REVIVE 2019 (probă independentă, nu sursă)');
+// Nu e o probă. Cotele au fost atribuite, la cercetarea de la început, unei planșe
+// REVIVE 2019, dar nu apar pe niciuna dintre cele șapte planșe publicate, citite cu tot
+// cu textul din desene: acelea au numai cote de teren. O cifră cu sursă necunoscută nu
+// dovedește nimic, nici când se potrivește. Modelul stă direct pe LiDAR; diferențele se
+// tipăresc numai ca să se vadă, fără prag.
+console.log('\nCotele atribuite planșei REVIVE 2019 — informativ, proveniență neconfirmată, fără prag');
 {
   const corp = (k) => date.corpuri.find((c) => c.cheie === k);
   const maxAcoperis = (c) => Math.max(...c.contur.map(([x, z]) => yMinim(c.plane, x, z)), ...(() => {
@@ -302,21 +316,17 @@ console.log('\nFață de planșa REVIVE 2019 (probă independentă, nu sursă)')
     return yMinim(c.plane, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2);
   };
   const cazuri = [
-    ['streașina aripii N', aripa('aripa_n'), 137.75, 0.4],
-    ['streașina aripii S', aripa('aripa_s'), 137.75, 0.4],
-    ['coama aripii N', maxAcoperis(corp('aripa_n.lunga')), 139.4, 0.4],
-    ['coama aripii S', maxAcoperis(corp('aripa_s.lunga')), 139.4, 0.4],
-    ['coama navei', maxAcoperis(corp('biserica.nava')), 145.9, 0.5],
-    ['vârful turnului cel mai înalt', Math.max(...date.turnuri.map((t) => t.varf)), 149.75, 0.8],
-    ['Casa da Água, vârful cupolei', Math.max(...date.cupole.filter((c) => c.cheie.includes('agua')).flatMap((c) => c.profil.map((p) => p[1]))), 143.27, 0.5],
+    ['streașina aripii N', aripa('aripa_n'), 137.75],
+    ['streașina aripii S', aripa('aripa_s'), 137.75],
+    ['coama aripii N', maxAcoperis(corp('aripa_n.lunga')), 139.4],
+    ['coama aripii S', maxAcoperis(corp('aripa_s.lunga')), 139.4],
+    ['coama navei', maxAcoperis(corp('biserica.nava')), 145.9],
+    ['vârful turnului cel mai înalt', Math.max(...date.turnuri.map((t) => t.varf)), 149.75],
+    ['Casa da Água, vârful cupolei', Math.max(...date.cupole.filter((c) => c.cheie.includes('agua')).flatMap((c) => c.profil.map((p) => p[1]))), 143.27],
   ];
-  // O nepotrivire aici nu oprește rularea: cifrele REVIVE sunt citite de pe o planșă,
-  // fără să se știe sigur ce punct al clădirii poartă fiecare, iar modelul le are din
-  // LiDAR, direct. Se tipăresc ca DE VERIFICAT, iar cineva se uită pe planșă.
-  for (const [nume, model, revive, tol] of cazuri) {
-    const bun = Math.abs(model - revive) <= tol;
-    if (!bun) deVerificat++;
-    console.log(`${bun ? '  ok ' : '  DE VERIFICAT'}  ${nume}: model ${model.toFixed(2)}, REVIVE ${revive.toFixed(2)} (±${tol})`);
+  for (const [nume, model, cota] of cazuri) {
+    const d = model - cota;
+    console.log(`  info  ${nume}: model ${model.toFixed(2)}, cota ${cota.toFixed(2)}, diferența ${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)} m`);
   }
 }
 
@@ -396,5 +406,4 @@ console.log('\nPanoul punctului: ce lovește o rază');
 
 sanctuar.dispose();
 console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
-if (deVerificat) console.log(`${deVerificat} cote REVIVE de verificat pe planșă`);
 process.exit(picate ? 1 : 0);
