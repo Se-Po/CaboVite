@@ -31,6 +31,7 @@ se poartă în română.
 | `npm run verifica-teren` | construiește plasa cu codul paginii, în Node, și verifică ce primește și ce pictează regula de culoare |
 | `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/` |
 | `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
+| `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele de sosire ale dalelor, straturile PNG, candidații din afara OSM |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -533,6 +534,42 @@ comună, deci mutarea unui obiect întreg: Ermida da Memória, cu adro-ul și te
   ele Casa da Água, ruina de SE și cercado-ul, pe care changesetul le-a atins
   (87 → 76, 250 → 366, 3 521 → 3 666 m²). Pentru acelea judecă proba amprentelor,
   mai jos.
+
+### Înălțimile: MDS − MDT, la 50 cm
+
+Nicio sursă nu dă înălțimile construcțiilor, iar OSM nu are nici acoperișuri.
+DGT publică însă, din același zbor, și **MDS-ul**: suprafața de sus, cu clădiri,
+ziduri și vegetație, pe aceeași grilă de 50 cm ca MDT-ul. Diferența lor, nMDS, e
+înălțimea a tot ce stă pe sol.
+
+Dalele necesare sunt MDS 105162, 105163, 106162 și 106163, plus MDT 106162 și
+106163. Au fost descărcate de autor în `date-sursa/lidar-50cm/`. Catalogul are
+MDS 104162 și 104163, dar nu le folosește nimic.
+
+`npm run nmds-sanctuar` le verifică la sosire: mărimea, acolo unde catalogul o dă,
+colțul `((CCC−200)·1000, (RRR−300)·1000)`, EPSG 3763, PixelIsArea, NoData −999 și
+aceeași grilă pentru MDS și MDT. Pe 2026-09-29 a măsurat:
+- **același datum:** pe 28 149 de pixeli de sol gol (terreiro-ul și parcarea,
+  erodate, fără goluri TIN și fără vegetație), mediana |MDS − MDT| e **0,000 m**;
+- **fără deplasare:** mediana minimă e la (0, 0);
+- MDS − MDT ≥ −0,15 m pe 99,99% din uscat;
+- cusăturile MDS: 0,121 m peste y −138000 față de 0,105 între rânduri vecine;
+  0,046 m peste x −94000 față de 0,051.
+
+Scriptul scrie în `date-sursa/derivate/` rastrul (MDS, MDT, NDVI) pentru pașii
+următori și straturile de privit: umbrirea, nMDS, ortofotoul la 0,25 m, golurile
+TIN și suprapunerea cu OSM.
+
+**Candidații** sunt ce stă peste 1 m deasupra solului, fără vegetație, în afara
+clădirilor OSM și a parcării: 67. Din ei ies:
+- zidurile cercado-ului și ale ruinelor;
+- apeductul, înălțat de la Casa da Água spre est pe ~100 m și din nou de la
+  x ≈ −93990; între ele nu se ridică deasupra solului;
+- corpul de legătură de nord al bisericii;
+- căsuța din afara colțului de SE al cercado-ului.
+
+Parcarea e scoasă din căutare: LiDAR-ul a prins mașinile și autobuzele ca blocuri
+de 1,5–2,5 m.
 
 ## Principii de design (nenegociabile)
 

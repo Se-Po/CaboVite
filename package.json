@@ -16,6 +16,7 @@
     "ortofoto": "node scripts/ortofoto.mjs",
     "strat-ndvi": "node scripts/strat-ndvi.mjs",
     "osm-sanctuar": "node scripts/osm-sanctuar.mjs",
+    "nmds-sanctuar": "node scripts/nmds-sanctuar.mjs",
     "verifica-teren": "node scripts/verifica-teren.mjs",
     "verifica-tiff": "node scripts/verifica-tiff.mjs"
   },
