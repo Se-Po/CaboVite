@@ -1,0 +1,20 @@
+{
+  "nota": "Clădirile din afara sanctuarului, în cutia lui harta_v4: câte o decizie pentru fiecare element al instantaneului OSM (osm-cladiri), cu motivul. build-cladiri refuză să scrie datele dacă un element nou n-are decizie aici. Numele de afișat vor sta în src/content, după prefixul cheii. ODbL 1.0, © contribuitorii OpenStreetMap.",
+  "osm": "cladiri-osm-2026-09-30.json",
+  "elemente": [
+    { "osm": 156262927, "inclus": true, "cheie": "far.turn", "ce": "Farol do Cabo Espichel (man_made=lighthouse, name)", "motiv": "turnul hexagonal, vârful MDS 168,28 m; hexagonul OSM e mai mare decât turnul, deci se înregistrează cu scară (×0,84)" },
+    { "osm": 156262936, "inclus": true, "cheie": "cladire.156262936", "ce": "clădirea lungă lipită de far", "motiv": "acoperiș în două ape de 29°, țiglă; amprenta OSM trece pe sub far, deci acoperișul se caută fără pixelii turnului" },
+    { "osm": 156262880, "inclus": true, "cheie": "cladire.156262880", "ce": "clădirea lungă din mijlocul incintei farului", "motiv": "acoperiș în două ape de 48° pe LiDAR; țiglă (apa de vest brun-roșcată, cea de est arsă în ortofoto)" },
+    { "osm": 156262894, "inclus": true, "cheie": "cladire.156262894", "ce": "clădire la sud-vest de far", "motiv": "acoperiș în două ape de 27–28°, țiglă" },
+    { "osm": 156262911, "inclus": true, "cheie": "cladire.156262911", "ce": "clădire mică la nord-vest de far", "motiv": "acoperiș într-o apă de 11°, alb (ars pe 94% din pixeli)" },
+    { "osm": 156262916, "inclus": true, "cheie": "cladire.156262916", "ce": "clădire mică la sud-vest de far", "motiv": "acoperiș într-o apă de 11°, țiglă" },
+    { "osm": 156262922, "inclus": true, "cheie": "cladire.156262922", "ce": "clădirea în L de la vest de far", "motiv": "acoperișuri albe, plate (7–8°), în trepte: amprenta concavă se taie în părți convexe, iar una dintre ele încă o dată, pe treaptă" },
+    { "osm": 96521141, "inclus": true, "cheie": "ruina.96521141", "ce": "Casa da Ronca (name; OSM: ruins=yes)", "motiv": "OSM o dă ruină, dar LiDAR-ul din 2024–2025 vede 96% din amprentă pe două ape de 30°, iar ortofotoul țiglă: se construiește cu acoperiș; pereții, zidărie, după eticheta OSM" },
+    { "osm": 96521147, "inclus": true, "cheie": "ruina.96521147", "ce": "clădire la nord de Casa da Ronca (OSM: ruins=yes)", "motiv": "ca Casa da Ronca: două ape de 19–21°, țiglă; amprenta OSM era mutată cu 1,5 m față de LiDAR" },
+    { "osm": 303868633, "inclus": true, "cheie": "ruina.303868633", "ce": "clădire mică la nord de Casa da Ronca (OSM: ruins=yes)", "motiv": "acoperiș gri, nears în ortofoto, la 2,3 m peste sol: terasă" }
+  ],
+  "neincluse_fara_osm": [
+    { "centru_tm06": [-94639.29, -138514.21], "arie_m2": 11.75, "motiv": "structură de ~1,9 m la capătul de sud al clădirii în L, fără amprentă OSM; seria v0.1.0 nu trasează contururi noi" },
+    { "centru_tm06": [-94640.8, -138546.15], "arie_m2": 5, "motiv": "structură de ~2,2 m la sud de incinta farului, fără amprentă OSM; seria v0.1.0 nu trasează contururi noi" }
+  ]
+}

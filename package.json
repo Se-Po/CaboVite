@@ -26,7 +26,9 @@
     "verifica-sanctuar": "node scripts/verifica-sanctuar.mjs",
     "masoara-zbor": "node scripts/masoara-zbor.mjs",
     "textura-ortofoto": "node scripts/textura-ortofoto.mjs",
-    "masoara-faleza": "node scripts/masoara-faleza.mjs"
+    "masoara-faleza": "node scripts/masoara-faleza.mjs",
+    "osm-cladiri": "node scripts/osm-cladiri.mjs",
+    "build-cladiri": "node scripts/build-cladiri.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

@@ -40,6 +40,8 @@ se poartă în română.
 | `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
 | `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic → `public/data/<hartă>-orto_v1.ktx2` + `.json`; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul și cu ce lumină s-ar colora stânca → `date-sursa/derivate/faleza.json`; măsurătoare, nefolosită de pagină |
+| `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
+| `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, înregistrate și măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -993,6 +995,92 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
   pe nordul grilei ar citi 204,33°;
 - **raza** verticală pe navă lovește acoperișul la 1 mm; una prin golul unui arc
   trece de fațadă și lovește fundul galeriei la 11,8 m; una în stâlp, la 10 m.
+
+## Farul și celelalte clădiri
+
+Farol do Cabo Espichel, cele șase clădiri de lângă el și cele trei de la Casa da
+Ronca, la ~400 m spre sud-vest, sunt măsurate ca geometrie, în schema sanctuarului:
+`public/data/cladiri_v1.json`, pe care pagina îl va construi cu același
+`creeazaSanctuar()`.
+
+### Contururile: OSM, înregistrate pe LiDAR
+
+- `npm run osm-cladiri` e un profil separat: `osm-sanctuar` își rescrie manifestul
+  la fiecare rulare. Ia căile cu `building` sau `man_made=lighthouse` din cutia lui
+  `harta_v4`, fără cele ale sanctuarului. Instantaneul e
+  `date-sursa/osm/cladiri-osm-2026-09-30.json`, manifestul
+  `scripts/cladiri/osm-manifest.json`. Sunt 10 căi, niciuna atinsă de changesetul
+  120423250.
+- `scripts/cladiri/inventar.json` ține câte o decizie pentru fiecare element, cu
+  motivul. `build-cladiri` refuză un element fără decizie și un inventar scris pe
+  alt instantaneu. Toate 10 intră.
+- **Candidații fără OSM** (nMDS > 1 m, NDVI < 0,15, ≥ 5 m², la peste 1 m de
+  amprente) sunt doi, de 12 și 5 m². Rămân pe dinafară, cu motivul scris.
+- **Aici amprentele OSM NU cad pe clădiri**, spre deosebire de sanctuar. Pe
+  nMDS > 1 m acoperă 72–95% din aria lor (farul, pe pixelii de peste 12 m, 68%) și
+  sunt mutate cu 0,4–2,2 m, fiecare altfel. `build-cladiri` caută translația, în pași de 0,25 m pe ±3,5 m, care
+  maximizează „pixeli de clădire − pixeli de sol” în amprentă. Forma rămâne a
+  OSM-ului, iar acoperirea urcă la 86–99%. Cea mai mare mutare e la Casa da Ronca,
+  (1,25; 1,75) m.
+- **Farul are hexagonul OSM mai mare decât turnul:** la ~5,5 m de ax, MDS-ul
+  coboară pe acoperișul casei lipite de el. Se înregistrează cu translație și cu
+  scară, pe pixelii de peste 12 m: ×0,84 și (−0,75; 0,25) m. Acoperirea urcă de la
+  68% la 95%. Lanterna cade la 0,18 m de axul hexagonului înregistrat — probă de
+  consistență, nu independentă: lanterna e în masca pe care s-a potrivit.
+- `build-cladiri` scrie și `date-sursa/derivate/cladiri-grup-N.png`: ortofotoul
+  mărit de 3 ori, cu amprenta OSM roșu, cea înregistrată galben și farul cyan.
+
+### Formele
+
+- **Amprenta concavă** se taie în părți convexe (urechi, apoi Hertel–Mehlhorn).
+  Nodurile de pe laturi se scot întâi: 156262936 are cinci, la 1–5 mm, iar unul la
+  −1 mm ar face concav un dreptunghi.
+- **Fiecare parte** ia minimul planelor RANSAC (`scripts/comun/plane.mjs`, mutat din
+  `masoara-sanctuar` cu rezultat identic), pe pixelii de la cel puțin 0,75 m de
+  marginea clădirii. O parte sub 40 de pixeli ia planele clădirii.
+- **Treptele.** Un acoperiș în trepte nu e un minim de plane: planul de jos,
+  prelungit, taie prin cel de sus. Pe 156262922, mediana abaterii ieșea 0,92 m.
+  Unde p90 trece de 0,5 m, partea se taie pe dreapta care desparte cele două plane
+  mai mari. Tăietura rămâne dacă p90 scade cu cel puțin 0,2 m; acolo a scăzut de la
+  1,11 la 0,05 m.
+- **Farul** e o prismă hexagonală până la platformă, apoi lanterna.
+  - Platforma: mediana MDS pe inelul 0,6–0,95 din apotemă, 158,59 m (solul e la
+    136,71 m).
+  - Lanterna: inelele de peste jumătatea dintre platformă și vârf, adică r ≤ 2,5 m.
+    Urcă vertical până la 166,40 m, iar cupola ajunge la vârful MDS, 168,28 m.
+  - Profilul pornește de la platformă, nu de la marginea prismei: un inel plat la
+    cota capacului ar pâlpâi cu el.
+  - Înălțimea: de la sol la vârf, 31,57 m. OSM are `height=32`, pe care nicio
+    măsurătoare de aici nu-l citește.
+- **Măsurat pe clădirile întregi:** mediana abaterii 0,025 m, p90 0,076 m.
+
+### Materialele: după apa cea mai puțin arsă
+
+- **Nu după pantă și nu după culoarea medie.** 156262880 are ape de 48° și e
+  țiglă, dar ortofotoul îl dă aproape neutru: apa din est e arsă, cea din vest în
+  umbră. La sanctuar, țigla aripii N are a = 0,015 în OKLab, terasa 0,000.
+- **Regula.** Pe fiecare apă se numără pixelii arși (un canal ≥ 254). Hotărăște
+  apa cea mai puțin arsă:
+  - arsă și ea peste 50% ⇒ alb, `var`: 156262911 și 156262922, cu 82–94% pe
+    fiecare apă. O țiglă are apa din umbră la 0–4%;
+  - roșcată ⇒ `tigla`, albedoul din fotografie. Pragul lui a stă la jumătatea
+    dintre terasa sanctuarului și cea mai puțin roșcată țiglă a lui, măsurate la
+    fel;
+  - altfel, referința neutră cea mai apropiată: terasa (303868633) sau acoperișul
+    întunecat.
+- **Cum se citește ortofotoul.** Cu deplasarea pe sol și cu înclinarea
+  acoperișului: h × înclinarea măsurată la sanctuar, iar la far cea a grupului de
+  peste 9 m. Pe casa lipită de far se scoate imaginea turnului, înclinată de la sol
+  până la vârf.
+- **Controlul a fost privirea**, pe straturile `cladiri-grup-N.png`: toate cele
+  zece acoperișuri ies cum se văd acolo, iar cupola lanternei iese roșcată.
+- **Presupuneri**, scrise și în date, la `presupuneri`: pereții — var la clădirile
+  întregi, zidărie la cele pe care OSM le dă ruine — și camera lanternei, var. Nu se
+  văd de sus: **NEVERIFICAT**.
+- **Casa da Ronca și 96521147 sunt `ruins=yes` în OSM**, dar LiDAR-ul vede acoperiș
+  întreg (96% din amprentă pe două ape de 30°), iar ortofotoul, țiglă. Se construiesc
+  cu acoperiș, cu pereții din zidărie. Numele „Casa da Ronca” vine numai din OSM —
+  **NEVERIFICAT** într-o sursă primară.
 
 ## Principii de design (nenegociabile)
 
