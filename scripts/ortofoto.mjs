@@ -37,7 +37,11 @@ const DIR = 'date-sursa/ortofoto';
 // rezultatul era un fișier livrat vizitatorului pe care nimic nu-l cerea.
 const PALETA_POZE = 'public/data';
 const IESIRE = DIR;
-const HARTA = process.argv[2] || 'harta_v2';
+const HARTA = process.argv[2] || 'harta_v4';
+// Un raport pe hartă: `paleta.mjs` scoate albedourile din raportul lui harta_v2, iar
+// `strat-ndvi` îl cere pe al bazei pe care lucrează. Un singur fișier, rescris de
+// fiecare rulare, ar fi mutat tăcut culorile paletei pe altă hartă.
+const RAPORT = `ortofoto-culori.${HARTA}.json`;
 
 // --------------------------------------------------------------------- main
 
@@ -210,7 +214,7 @@ const main = () => {
     }
   } catch { /* paleta din poze poate lipsi; ortofotoul stă singur în picioare */ }
 
-  writeFileSync(join(IESIRE, 'ortofoto-culori.json'), JSON.stringify({
+  writeFileSync(join(IESIRE, RAPORT), JSON.stringify({
     generat: new Date().toISOString(),
     sursa: {
       nume: 'Ortofotomapa digital de Portugal Continental 2025, 25 cm',
@@ -230,7 +234,7 @@ const main = () => {
     },
     clase: rezultat,
   }, null, 1));
-  console.log(`\nscris ${join(IESIRE, 'ortofoto-culori.json')}`);
+  console.log(`\nscris ${join(IESIRE, RAPORT)}`);
 };
 
 main();

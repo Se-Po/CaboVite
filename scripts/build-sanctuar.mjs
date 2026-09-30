@@ -31,7 +31,10 @@ if (existsSync(iesire)) {
 
 cereFisier('date-sursa/derivate/masuratori-sanctuar.json', 'măsurătorile', 'Rulează `npm run masoara-sanctuar`.');
 const M = JSON.parse(readFileSync('date-sursa/derivate/masuratori-sanctuar.json', 'utf8'));
-const baza = JSON.parse(readFileSync('public/data/harta_v2-dem.json', 'utf8'));
+// Baza hărții pe care o încarcă pagina. harta_v4 are aceeași cutie ca harta_v2,
+// deci aceeași ancoră: sanctuar_v2 se așază neschimbat.
+const HARTA_BAZA = 'harta_v4';
+const baza = JSON.parse(readFileSync(`public/data/${HARTA_BAZA}-dem.json`, 'utf8'));
 const b = baza.bbox_tm06;
 const ANCORA = { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 };
 if (ANCORA.x !== -94624 || ANCORA.y !== -137899) throw new Error(`ancora hărții s-a schimbat: (${ANCORA.x}, ${ANCORA.y})`);
@@ -378,7 +381,7 @@ poi.zbor = { tinta: poi.tinta, distanta: 320, azimut: 205, elevatie: 30 };
 
 const date = {
   nume, versiune_schema: 1, generat: new Date().toISOString(),
-  baza: 'harta_v2', ancora_tm06: ANCORA,
+  baza: HARTA_BAZA, ancora_tm06: ANCORA,
   licenta: 'ODbL 1.0', licenta_url: 'https://opendatacommons.org/licenses/odbl/1-0/',
   surse: [
     { cheie: 'osm', nume: 'OpenStreetMap', producator: 'contribuitorii OpenStreetMap', licenta: 'ODbL 1.0',

@@ -230,15 +230,15 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  *
  * Apa. Fațetele de la mal coboară până la umplutura de −8 m pe cel mult 2 m în plan,
  * deci au panta de cel puțin 0,757 (76°), peste pragul falezei: ies calcar exact, pe
- * toate cele care se văd: 4 023 pe bază, 2 714 pe petic. Cele 720 + 549 cu toate
+ * toate cele care se văd: 5 378 pe bază, 2 714 pe petic, pe harta_v4. Cele 1 001 + 549 cu toate
  * vârfurile la −8 m n-au NDVI și iau calea fără strat — stau întregi sub planul
  * opac al mării. Tot sub mare stau și 26 de fațete ale peticului, în inelul de
  * cusătură, unde relieful e interpolat între umplutură și uscat.
  *
- * ─── Cât de bine, măsurat pe cele 855 495 de fațete de uscat ale bazei
+ * ─── Cât de bine, măsurat pe cele 1 415 685 de fațete de uscat ale bazei harta_v4
  *
- * ΔE_OK×100 față de culoarea ortofotoului în vârfuri: 10,21 medie cu albedourile
- * paletei (8,48 mediană), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
+ * ΔE_OK×100 față de culoarea ortofotoului în vârfuri: 10,27 medie cu albedourile
+ * paletei (8,51 mediană; pe harta_v2 10,21 / 8,48), 5,46 cu ancorele ortofotoului — diferența e lumina, nu
  * regula. Fără strat: 15,56 / 9,56. Cuantizarea stratului pe 15 niveluri schimbă
  * culoarea cu 0,37 în medie, p99 1,95. Fațetele care ies în evidență față de
  * vecinii lor (ΔE > 5 față de media celor 3 × 3 celule din jur): 8,1% aici, 17% cu
@@ -247,7 +247,8 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  * Cifrele pe care nu le reface nicio unealtă — 5,46, 15,56 / 9,56, 0,37 / 1,95 și
  * procentele — sunt măsurate pe harta_v0. Pe harta_v2 diferă numai fâșia refăcută
  * a dalei 104162, 1,3% din uscat. Cele reproduse de `verifica-teren` s-au mișcat
- * puțin: 10,22 → 10,21, 8,49 → 8,48, iar fațetele 855 836 → 855 495.
+ * puțin: 10,22 → 10,21, 8,49 → 8,48, iar fațetele 855 836 → 855 495; pe harta_v4, cu
+ * uscatul din afara conturului, 10,27 / 8,51 pe 1 415 685.
  *
  * ─── Albedo, nu aparență
  *

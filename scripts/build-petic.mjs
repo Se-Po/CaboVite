@@ -9,14 +9,18 @@
 //          npm run build-petic -- 0.5   (rezoluția nativă)
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { laTM06 } from './comun/tm06.mjs';
 import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
 // harta_v3 = același petic ca harta_v1, pe baza reparată harta_v2. Peticul citește
 // baza numai în banda de cusătură (coloanele 484…752), departe de fâșia refăcută,
 // deci .bin-ul iese identic la octet; se schimbă doar baza numită în sidecar.
-const NUME = 'harta_v3';
-const BAZA = 'harta_v2';
+// harta_v5 = același petic, pe baza harta_v4 (aceeași cutie, alt contur, altă
+// zScara). Inelul de cusătură citește baza cuantizată, deci poate diferi de v3 cu o
+// cuantă, numai în banda de 4 m.
+const NUME = 'harta_v5';
+const BAZA = 'harta_v4';
 
 const DIR = 'date-sursa/lidar-50cm';
 const IESIRE = 'public/data';
@@ -102,6 +106,12 @@ function incarcaBaza() {
 // --------------------------------------------------------------------- main
 
 const main = () => {
+  // Un nume se scrie o singură dată, ca în build-zona.
+  const urmarit = spawnSync('git', ['ls-files', '--error-unmatch', `${IESIRE}/${NUME}-dem.bin`], { stdio: 'ignore' }).status === 0;
+  if (urmarit) throw new Error(`${IESIRE}/${NUME}-dem.bin e deja în depozit; un petic nou primește un nume nou`);
+  if (existsSync(join(IESIRE, `${NUME}-dem.bin`)) && !process.argv.includes('--suprascrie-lucru'))
+    throw new Error(`${IESIRE}/${NUME}-dem.bin există (neurmărit); rescrie-l cu --suprascrie-lucru`);
+
   const lipsa = DALE.filter((f) => !existsSync(join(DIR, f)));
   if (lipsa.length) throw new Error(`lipsesc din ${DIR}: ${lipsa.join(', ')} — vezi DALE`);
 

@@ -28,7 +28,8 @@ export function creeazaGeo(meta) {
   // chiar primul nod. Deci ancorat pe centru, conversia nu mai depinde de care e.
   // Verificat pe harta_v0 și harta_v1 — deci pe ambele convenții — plus pe o a
   // treia hartă de atunci, ștearsă între timp: diferență exact zero. harta_v2 și
-  // harta_v3 au aceeași geometrie, la octet, ca primele două.
+  // harta_v3, apoi harta_v4 și harta_v5, au aceeași cutie și aceleași noduri ca
+  // primele două.
   const centru = b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null;
 
   /** Metri de scenă → metri TM06. Exactă, nu aproximativă: e o translație. */

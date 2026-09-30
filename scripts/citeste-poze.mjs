@@ -32,8 +32,8 @@ const DIR = 'date-sursa/poze';
 // DGT e ortometric, deci deasupra geoidului. Fără scăderea asta, cele două par
 // să difere cu ~58 m și nu se poate spune cât din diferență e eroare de GPS.
 const GEOID_M = 52.92;
-const HARTA_BAZA = 'harta_v2';
-const HARTA_FINA = 'harta_v3';
+const HARTA_BAZA = 'harta_v4';
+const HARTA_FINA = 'harta_v5';
 
 const grade = (p) => `${(Math.acos(Math.max(-1, Math.min(1, 1 - p))) * 180 / Math.PI).toFixed(0)}°`;
 

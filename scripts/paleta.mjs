@@ -90,7 +90,9 @@ const main = () => {
   // fiindcă dala de 283 MB nu intră în depozit și cine clonează n-o are.
   let orto = {}, sursaOrto = null;
   try {
-    const raport = JSON.parse(readFileSync(join(DIR_ORTO, 'ortofoto-culori.json'), 'utf8'));
+    // Raportul lui harta_v2, fixat: pe el s-au măsurat albedourile paletei, iar
+    // culorile vederii Relief nu trebuie să se schimbe când se face o hartă nouă.
+    const raport = JSON.parse(readFileSync(join(DIR_ORTO, 'ortofoto-culori.harta_v2.json'), 'utf8'));
     orto = raport.clase;
     sursaOrto = raport.sursa;
     console.log('ortofoto găsit — îl folosesc pentru materialele pe care pozele le-au văzut de departe\n');

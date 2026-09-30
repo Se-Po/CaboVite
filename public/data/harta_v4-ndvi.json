@@ -1,10 +1,10 @@
 {
- "nume": "harta_v3-ndvi",
- "harta": "harta_v3",
+ "nume": "harta_v4-ndvi",
+ "harta": "harta_v4",
  "descriere": "Indicele de vegetație (NDVI) pe fiecare nod al hărții, din ortofotoul DGT. Intră în culoarea terenului: spune unde e vegetație și cât de verde e.",
- "generat": "2026-09-29T14:22:27.562Z",
- "latime": 535,
- "inaltime": 701,
+ "generat": "2026-09-30T09:37:02.967Z",
+ "latime": 1164,
+ "inaltime": 1493,
  "codare": {
   "biti": 4,
   "ordine": "nodul i în octetul i >> 1: jumătatea de jos dacă i e par, cea de sus dacă e impar; rândul 0 = nord, ca în -dem.bin",
@@ -30,61 +30,51 @@
   0.55,
   0.6
  ],
- "acoperire": "tot uscatul",
+ "acoperire": "nodurile de uscat ale celulelor cu centrul în poligon_scena",
  "ortofoto": {
-  "nivel_piramida": 1,
-  "pas_m": 0.5,
-  "bloc": 2,
+  "nivel_piramida": 3,
+  "pas_m": 2,
+  "bloc": 1,
   "decalaj_pixeli": {
-   "coloana": 2361,
-   "rand": 4597
+   "coloana": 106,
+   "rand": 703
   },
-  "niveluri_respinse_m": [
-   1
-  ],
+  "niveluri_respinse_m": [],
   "ndvi": "NDVI = (NIR − R) / (NIR + R), calculat DUPĂ media benzilor pe bloc — cum e construită și piramida"
  },
  "numarate": {
-  "noduri": 375035,
-  "cu_ndvi": 250781,
+  "noduri": 1737852,
+  "cu_ndvi": 773208,
   "pe_cod": [
-   124254,
-   36943,
-   56990,
-   32335,
-   16947,
-   11271,
-   11111,
-   13210,
-   15362,
-   16556,
-   15252,
-   13506,
-   9130,
-   2073,
-   95,
-   0
+   964644,
+   33730,
+   57176,
+   82691,
+   103984,
+   58003,
+   40048,
+   42439,
+   49917,
+   61801,
+   72730,
+   77705,
+   62049,
+   26702,
+   3993,
+   240
   ],
   "eroare_cuantizare": {
-   "medie": 0.0146,
-   "max": 0.1787
+   "medie": 0.013,
+   "max": 0.303
   }
  },
  "verificari": {
-  "aliniere_fata_de_baza": {
-   "noduri": 62902,
-   "corelatie_la_0": 0.984,
-   "maxim_la": [
-    0,
-    0
-   ]
-  },
-  "cusatura": {
-   "noduri": 797,
-   "mediana": 0.0156,
-   "p90": 0.0477,
-   "cod_diferit": 0.3538,
-   "cod_diferit_cu_2": 0.0301
+  "clase_ca_ortofoto": {
+   "tufaris": 208700,
+   "vegetatie_uscata": 208570,
+   "calcar": 88985,
+   "poteca": 266953,
+   "prag_verde": 0.3498233215547703
   }
  },
  "sursa": {

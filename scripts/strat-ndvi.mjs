@@ -1,6 +1,6 @@
 // Stratul NDVI al paginii: pe fiecare nod al hărții, cât de verde e în infraroșu.
 //
-//   npm run strat-ndvi [nume-hartă]        implicit harta_v3, plus baza ei
+//   npm run strat-ndvi [nume-hartă]        implicit harta_v5, plus baza ei
 //
 // De ce e nevoie de el. `culoareTeren()` primea numai panta și altitudinea, iar
 // din ele nu se poate afla unde e vegetația: tufărișul și vegetația uscată au
@@ -40,7 +40,9 @@ import { inPoligon } from '../src/scene/terrain.js';
 
 const DIR = 'date-sursa/ortofoto';
 const IESIRE = 'public/data';
-const RAPORT_ORTOFOTO = join(DIR, 'ortofoto-culori.json');
+// Raportul ortofotoului e pe hartă (`ortofoto-culori.<hartă>.json`): proba de clase
+// se face pe baza hărții cerute, deci se citește raportul bazei.
+const raportPentru = (nume) => join(DIR, `ortofoto-culori.${nume}.json`);
 
 /**
  * Tabelul de decodare: indicele e codul, valoarea e NDVI-ul.
@@ -309,15 +311,16 @@ function scrie(harta, m, fisier, verificari) {
 const main = () => {
   cereDirector(DIR, 'dala de ortofoto DGT (.tif)',
     'Colecția ORTOS-2025 de la cdd.dgterritorio.gov.pt; descărcarea cere cont.');
-  cereFisier(RAPORT_ORTOFOTO, 'raportul ortofotoului, pentru proba de control', 'Rulează întâi: npm run ortofoto');
   const fisier = readdirSync(DIR).filter((f) => /\.tif{1,2}$/i.test(f))[0];
   if (!fisier) throw new Error(`niciun .tif în ${DIR}`);
   const cale = join(DIR, fisier);
-  const raport = JSON.parse(readFileSync(RAPORT_ORTOFOTO, 'utf8'));
 
-  const harta = incarcaHarta(process.argv[2] || 'harta_v3');
+  const harta = incarcaHarta(process.argv[2] || 'harta_v5');
   const baza = harta.meta.baza ? incarcaHarta(harta.meta.baza) : null;
   const toate = baza ? [baza, harta] : [harta];
+  const RAPORT_ORTOFOTO = raportPentru((baza ?? harta).nume);
+  cereFisier(RAPORT_ORTOFOTO, 'raportul ortofotoului, pentru proba de control', `Rulează întâi: npm run ortofoto -- ${(baza ?? harta).nume}`);
+  const raport = JSON.parse(readFileSync(RAPORT_ORTOFOTO, 'utf8'));
 
   const mas = new Map();
   for (const hh of toate) {

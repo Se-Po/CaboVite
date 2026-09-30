@@ -1,10 +1,10 @@
 {
- "nume": "harta_v2-ndvi",
- "harta": "harta_v2",
+ "nume": "harta_v5-ndvi",
+ "harta": "harta_v5",
  "descriere": "Indicele de vegetație (NDVI) pe fiecare nod al hărții, din ortofotoul DGT. Intră în culoarea terenului: spune unde e vegetație și cât de verde e.",
- "generat": "2026-09-29T14:22:19.913Z",
- "latime": 1164,
- "inaltime": 1493,
+ "generat": "2026-09-30T09:37:12.505Z",
+ "latime": 535,
+ "inaltime": 701,
  "codare": {
   "biti": 4,
   "ordine": "nodul i în octetul i >> 1: jumătatea de jos dacă i e par, cea de sus dacă e impar; rândul 0 = nord, ca în -dem.bin",
@@ -30,51 +30,61 @@
   0.55,
   0.6
  ],
- "acoperire": "nodurile de uscat ale celulelor cu centrul în poligon_scena",
+ "acoperire": "tot uscatul",
  "ortofoto": {
-  "nivel_piramida": 3,
-  "pas_m": 2,
-  "bloc": 1,
+  "nivel_piramida": 1,
+  "pas_m": 0.5,
+  "bloc": 2,
   "decalaj_pixeli": {
-   "coloana": 106,
-   "rand": 703
+   "coloana": 2361,
+   "rand": 4597
   },
-  "niveluri_respinse_m": [],
+  "niveluri_respinse_m": [
+   1
+  ],
   "ndvi": "NDVI = (NIR − R) / (NIR + R), calculat DUPĂ media benzilor pe bloc — cum e construită și piramida"
  },
  "numarate": {
-  "noduri": 1737852,
-  "cu_ndvi": 492837,
+  "noduri": 375035,
+  "cu_ndvi": 250781,
   "pe_cod": [
-   1245015,
-   28984,
-   47426,
-   60520,
-   64153,
-   33491,
-   25992,
-   26814,
-   30697,
-   38122,
-   43963,
-   43678,
-   32462,
-   14013,
-   2384,
-   138
+   124254,
+   36943,
+   56990,
+   32335,
+   16947,
+   11271,
+   11111,
+   13210,
+   15362,
+   16556,
+   15252,
+   13506,
+   9130,
+   2073,
+   95,
+   0
   ],
   "eroare_cuantizare": {
-   "medie": 0.0133,
-   "max": 0.303
+   "medie": 0.0146,
+   "max": 0.1787
   }
  },
  "verificari": {
-  "clase_ca_ortofoto": {
-   "tufaris": 122388,
-   "vegetatie_uscata": 122256,
-   "calcar": 61813,
-   "poteca": 185438,
-   "prag_verde": 0.3412698412698413
+  "aliniere_fata_de_baza": {
+   "noduri": 62902,
+   "corelatie_la_0": 0.984,
+   "maxim_la": [
+    0,
+    0
+   ]
+  },
+  "cusatura": {
+   "noduri": 797,
+   "mediana": 0.0156,
+   "p90": 0.0477,
+   "cod_diferit": 0.3538,
+   "cod_diferit_cu_2": 0.0301
   }
  },
  "sursa": {

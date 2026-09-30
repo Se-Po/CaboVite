@@ -1,6 +1,6 @@
 {
-  "nume": "harta_v2",
-  "descriere": "Zona selectată la Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m, redus la 2 m; dalele nealiniate refăcute din MDT 50 cm (vezi corectii). Uint16 little-endian, rând 0 = nord.",
+  "nume": "harta_v4",
+  "descriere": "Cutia de la Cabo Espichel, cu tot uscatul ei. LiDAR DGT 2024-2025, MDT 2 m, redus la 2 m; dalele nealiniate refăcute din MDT 50 cm (vezi corectii). Uint16 little-endian, rând 0 = nord.",
   "latime": 1164,
   "inaltime": 1493,
   "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
@@ -31,47 +31,47 @@
     }
   },
   "zMin_m": -8,
-  "zMax_m": 143.64,
-  "zScara": 0.002313937443821765,
+  "zMax_m": 150,
+  "zScara": 0.002410972725019908,
   "poligon_scena": [
     {
-      "x": -293.14,
-      "z": -1491.28
+      "x": -1164,
+      "z": -1493
     },
     {
-      "x": 1162.29,
-      "z": -486.13
+      "x": 1164,
+      "z": -1493
     },
     {
-      "x": 379.3,
-      "z": 1492.08
+      "x": 1164,
+      "z": 1493
     },
     {
-      "x": -1162.4,
-      "z": 1107.51
+      "x": -1164,
+      "z": 1493
     }
   ],
   "poligon_geo": [
     {
-      "lon": -9.2202,
-      "lat": 38.4345
+      "lon": -9.230173,
+      "lat": 38.434423
     },
     {
-      "lon": -9.2034,
-      "lat": 38.4256
+      "lon": -9.203514,
+      "lat": 38.434669
     },
     {
-      "lon": -9.2121,
-      "lat": 38.4077
+      "lon": -9.203117,
+      "lat": 38.407774
     },
     {
-      "lon": -9.2298,
-      "lat": 38.411
+      "lon": -9.229766,
+      "lat": 38.407528
     }
   ],
   "acoperire": {
-    "celule_in_poligon": 1000887,
-    "uscat_masurat_in_poligon": 491895,
+    "celule_in_poligon": 1737852,
+    "uscat_masurat_in_poligon": 773208,
     "uscat_masurat_in_cutie": 773208,
     "regula_apa": "exact 0.0 m sau NODATA (-999); plaja, care are valori mici dar nenule, rămâne uscat",
     "nota_colt_fara_dala": "Colțul de nord-vest al cutiei iese din acoperirea LiDAR (dala MDT-2m-104164 nu există). Verificat pe Copernicus GLO-30: acolo e mare, nu uscat — deci nu lipsește relief."
@@ -81,7 +81,7 @@
     "ascutire": "niciuna",
     "reducere": "niciuna — rezoluția nativă de 2 m",
     "nota": "La 2 m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la -8 m — artificiu de randare, nu batimetrie.",
-    "limitare": "14190 noduri peste zMax (toate în afara conturului) limitate la 65535, nu înfășurate"
+    "limitare": "niciuna: zMax e maximul uscatului din toată cutia"
   },
   "corectii": [
     {

@@ -8,16 +8,16 @@
  * Fișierul e Uint16 little-endian, rând 0 = nord. Verificăm lungimea, pentru că
  * un fișier trunchiat ar produce un teren aberant în loc de o eroare limpede.
  *
- * Proiectul are o singură hartă, în două rezoluții. Implicit se cere `harta_v3`
- * — peticul de 1 m — care își aduce singur baza, `harta_v2` la 2 m, prin cheia
+ * Proiectul are o singură hartă, în două rezoluții. Implicit se cere `harta_v5`
+ * — peticul de 1 m — care își aduce singur baza, `harta_v4` la 2 m, prin cheia
  * `baza` din sidecar. Numele bazei nu e scris nicăieri în cod: vine din date.
  *
  * `adancime` oprește lanțul de baze. O hartă care s-ar referi la ea însăși — o
  * greșeală de tastare în sidecar — ar încărca la nesfârșit altfel.
  */
 export async function incarcaRelief(
-  urlBin = '/data/harta_v3-dem.bin',
-  urlMeta = '/data/harta_v3-dem.json',
+  urlBin = '/data/harta_v5-dem.bin',
+  urlMeta = '/data/harta_v5-dem.json',
   adancime = 0,
 ) {
   const [rMeta, rBin] = await Promise.all([fetch(urlMeta), fetch(urlBin)]);

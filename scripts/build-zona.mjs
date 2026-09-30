@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-// Extrage o zonă delimitată de un poligon din dalele LiDAR ale DGT.
-//
-// Poligonul se scrie mai jos, în longitudine/latitudine. Aici e
-// proiectat în ETRS89 / Portugal TM06, decupat din mozaicul dalelor și scris ca
-// heightmap, împreună cu poligonul în coordonate de scenă — ca plasa să se
-// genereze numai înăuntrul lui, nu pe toată cutia dreptunghiulară.
+// Extrage o zonă din dalele LiDAR ale DGT: o cutie TM06, decupată din mozaicul
+// dalelor și scrisă ca heightmap, împreună cu conturul ei în coordonate de scenă —
+// plasa se generează numai înăuntrul lui.
 //
 // Sursa: Levantamento LiDAR de Portugal Continental 2024-2025 (DGT), MDT 2 m,
 // 10 puncte/m², CC BY 4.0. Dalele sunt GeoTIFF float32 NECOMPRIMATE.
@@ -13,7 +10,8 @@
 //          npm run build-zona -- 4 harta_vN       (mediere 2 × 2: altă hartă, alt nume)
 import { writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { laTM06, dinTM06, inPoligon, arie } from './comun/tm06.mjs';
+import { spawnSync } from 'node:child_process';
+import { dinTM06, inPoligon, arie } from './comun/tm06.mjs';
 import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
 // Numele hărții produse. Hărțile proiectului sunt numerotate harta_vN: o
@@ -22,7 +20,10 @@ import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 //
 // harta_v2 = harta_v0 cu fâșia dalei 104162 refăcută din 50 cm: acolo harta_v0
 // avea fiecare pixel cu 1 m spre est. Vezi `refaDin50cm`.
-const NUME = 'harta_v2';
+// harta_v4 = aceeași cutie și aceleași date ca harta_v2, dar conturul e toată
+// cutia, nu poligonul ales în pagină: uscatul din afara lui (1,1 km²) se vedea ca
+// mare. Și zScara se ia pe toată cutia, ca niciun nod să nu mai fie tăiat.
+const NUME = 'harta_v4';
 
 const DIR = 'date-sursa/lidar';
 const DIR_50 = 'date-sursa/lidar-50cm';
@@ -31,14 +32,15 @@ const NODATA = -999;
 const REZ_SURSA = 2;
 const REZ_50 = 0.5;
 
-// Conturul zonei, longitudine latitudine. Singurul loc din care se schimbă
-// zona extrasă. Vârfurile se dau în ordine, conturul se închide singur.
-const POLIGON_GEO = [
-  [-9.2202, 38.4345],
-  [-9.2034, 38.4256],
-  [-9.2121, 38.4077],
-  [-9.2298, 38.4110],
-];
+// Cutia zonei, în TM06, cu muchiile pe metri întregi. Singurul loc din care se
+// schimbă zona extrasă.
+//
+// Se scrie în TM06, nu ca un poligon în longitudine/latitudine: colțurile lui
+// harta_v2 proiectate înapoi au o eroare de ±0,1 m, iar floor(−95788,05 / 2)·2 dă
+// −95790 — cutia ar crește cu o celulă, iar peticul n-ar mai cădea pe noduri.
+// Aceeași cutie ca harta_v2 păstrează și ancora sanctuarului (centrul ei), γ-ul
+// busolei și gaura de sub petic.
+const CUTIE_TM06 = { xMin: -95788, xMax: -93460, yMin: -139392, yMax: -136406 };
 
 // Marea, în aceste date, NU e NODATA: LiDAR-ul o dă ca 0.0 m exact. Lăsată așa,
 // ar fi coplanară cu planul mării al scenei și ar produce z-fighting pe sute de
@@ -56,6 +58,16 @@ const FACTOR = pas / REZ_SURSA;
 const nume = pas === REZ_SURSA ? NUME : process.argv[3];
 if (!nume || (pas !== REZ_SURSA && nume === NUME))
   throw new Error(`la pasul de ${pas} m iese altă hartă decât ${NUME}: dă-i un nume nou — npm run build-zona -- ${pas} harta_vN`);
+
+// Un nume se scrie o singură dată: o hartă pe care git o urmărește deja nu se
+// rescrie, oricât de mică ar fi schimbarea — pe ea stau peticul, NDVI-ul și pagina.
+// Cât încă nu e urmărită, se poate reface (`--suprascrie-lucru`), ca la sanctuar.
+{
+  const urmarit = spawnSync('git', ['ls-files', '--error-unmatch', `public/data/${nume}-dem.bin`], { stdio: 'ignore' }).status === 0;
+  if (urmarit) throw new Error(`public/data/${nume}-dem.bin e deja în depozit; o hartă nouă primește un nume nou`);
+  if (existsSync(`public/data/${nume}-dem.bin`) && !process.argv.includes('--suprascrie-lucru'))
+    throw new Error(`public/data/${nume}-dem.bin există (neurmărit); rescrie-l cu --suprascrie-lucru`);
+}
 
 
 // ------------------------------------------------ dalele nealiniate, din 50 cm
@@ -208,17 +220,14 @@ function refaDin50cm(d, g) {
 // --------------------------------------------------------------------- main
 
 const main = () => {
-  const poligon = POLIGON_GEO.map(([lon, lat]) => laTM06(lon, lat));
-  const xMin = Math.min(...poligon.map((p) => p.x)), xMax = Math.max(...poligon.map((p) => p.x));
-  const yMin = Math.min(...poligon.map((p) => p.y)), yMax = Math.max(...poligon.map((p) => p.y));
-
-  // Cutia se aliniază la pasul de ieșire, ca să nu iasă o jumătate de celulă la
-  // margine când se face medierea pe blocuri.
-  const X_MIN = Math.floor(xMin / pas) * pas, X_MAX = Math.ceil(xMax / pas) * pas;
-  const Y_MIN = Math.floor(yMin / pas) * pas, Y_MAX = Math.ceil(yMax / pas) * pas;
+  const { xMin: X_MIN, xMax: X_MAX, yMin: Y_MIN, yMax: Y_MAX } = CUTIE_TM06;
+  if ((X_MAX - X_MIN) % pas || (Y_MAX - Y_MIN) % pas || X_MIN % REZ_SURSA || Y_MAX % REZ_SURSA)
+    throw new Error(`cutia ${JSON.stringify(CUTIE_TM06)} nu se împarte la pasul de ${pas} m sau nu cade pe grila de ${REZ_SURSA} m`);
   const w = Math.round((X_MAX - X_MIN) / pas), h = Math.round((Y_MAX - Y_MIN) / pas);
+  // Conturul e chiar cutia, NV → NE → SE → SV.
+  const poligon = [{ x: X_MIN, y: Y_MAX }, { x: X_MAX, y: Y_MAX }, { x: X_MAX, y: Y_MIN }, { x: X_MIN, y: Y_MIN }];
 
-  console.log(`poligon: ${POLIGON_GEO.length} vârfuri, ${(arie(poligon) / 1e6).toFixed(2)} km²`);
+  console.log(`contur: cutia, ${(arie(poligon) / 1e6).toFixed(2)} km²`);
   console.log(`cutie TM06: X ${X_MIN} .. ${X_MAX}   Y ${Y_MIN} .. ${Y_MAX}`);
   console.log(`grilă: ${w} × ${h} la ${pas} m = ${(w * h / 1e6).toFixed(2)} M celule`);
 
@@ -328,10 +337,10 @@ const main = () => {
       if (inp) inPolig++;
       if (Number.isNaN(v)) continue;
       uscat++;
-      if (!inp) continue;
-      uscatInPolig++;
       if (v < zmin) zmin = v;
       if (v > zmax) zmax = v;
+      if (!inp) continue;
+      uscatInPolig++;
     }
   console.log(`în poligon: ${inPolig} celule (${(100 * inPolig / (w * h)).toFixed(0)}% din cutie)`);
   console.log(`  din care uscat măsurat: ${uscatInPolig} (${(100 * uscatInPolig / inPolig).toFixed(0)}%)`);
@@ -344,12 +353,12 @@ const main = () => {
   for (let i = 0; i < grila.length; i++)
     final[i] = Number.isNaN(grila[i]) ? ADANCIME_APA : grila[i];
 
+  // zMax e maximul uscatului din toată CUTIA. Până la harta_v2 era al conturului,
+  // iar relieful mai înalt din afara lui (până la 150 m) se tăia la 65535: 14 190
+  // de noduri, podișuri false la 143,64 m. Acum nu se taie nimic, iar un nod
+  // limitat oprește scriptul.
   const zMin = ADANCIME_APA, zMax = zmax;
   const scara = (zMax - zMin) / 65535;
-  // zMax e maximul din CONTUR, dar cutia are și relief mai înalt, în afara lui
-  // (până la 150 m). Un Uint16Array nu taie: 65 536 devine 0, deci acele noduri
-  // se înfășurau tăcut până la apă — în harta_v0, 14 190 de noduri. Toate stau în
-  // afara conturului, unde plasa nu ajunge; limitarea nu schimbă zScara.
   const u16 = new Uint16Array(grila.length);
   let limitate = 0;
   for (let i = 0; i < final.length; i++) {
@@ -357,13 +366,13 @@ const main = () => {
     if (q > 65535 || q < 0) limitate++;
     u16[i] = Math.min(65535, Math.max(0, q));
   }
-  if (limitate) console.log(`${limitate} noduri în afara conturului, peste zMax, limitate la 65535 (nu mai înfășurate)`);
+  if (limitate) throw new Error(`${limitate} noduri ies din Uint16 cu zScara ${scara}: zMax nu e maximul cutiei`);
 
   mkdirSync(IESIRE, { recursive: true });
   writeFileSync(join(IESIRE, `${nume}-dem.bin`), Buffer.from(u16.buffer));
   writeFileSync(join(IESIRE, `${nume}-dem.json`), JSON.stringify({
     nume,
-    descriere: `Zona selectată la Cabo Espichel. LiDAR DGT 2024-2025, MDT 2 m, redus la ${pas} m`
+    descriere: `Cutia de la Cabo Espichel, cu tot uscatul ei. LiDAR DGT 2024-2025, MDT 2 m, redus la ${pas} m`
       + (corectii.length ? `; dalele nealiniate refăcute din MDT 50 cm (vezi corectii)` : '')
       + '. Uint16 little-endian, rând 0 = nord.',
     latime: w, inaltime: h,
@@ -379,10 +388,9 @@ const main = () => {
       sv: dinTM06(X_MIN, Y_MIN), se: dinTM06(X_MAX, Y_MIN),
     },
     zMin_m: +zMin.toFixed(2), zMax_m: +zMax.toFixed(2), zScara: scara,
-    // Plasa se generează numai înăuntrul poligonului. Fără el, cutia
-    // dreptunghiulară ar avea de 1,7 ori mai multe celule, mai toate apă.
+    // Conturul e cutia; celulele de mare le taie oricum terrain.js, după regula_apa.
     poligon_scena: poligonScena,
-    poligon_geo: POLIGON_GEO.map(([lon, lat]) => ({ lon, lat })),
+    poligon_geo: poligon.map((p) => dinTM06(p.x, p.y)),
     acoperire: {
       celule_in_poligon: inPolig,
       uscat_masurat_in_poligon: uscatInPolig,
@@ -396,7 +404,7 @@ const main = () => {
       reducere: FACTOR === 1 ? 'niciuna — rezoluția nativă de 2 m'
         : `medie pe blocuri ${FACTOR} × ${FACTOR}, ignorând celulele de apă`,
       nota: `La ${pas} m faleza e măsurată direct. Ascuțirea folosită pe datele de 30 m ar falsifica măsurători reale, deci nu se aplică. Celulele fără date (apă) sunt coborâte la ${ADANCIME_APA} m — artificiu de randare, nu batimetrie.`,
-      limitare: `${limitate} noduri peste zMax (toate în afara conturului) limitate la 65535, nu înfășurate`,
+      limitare: 'niciuna: zMax e maximul uscatului din toată cutia',
     },
     // Dalele de 2 m al căror colț nu cade pe muchiile de celulă ale hărții.
     corectii,

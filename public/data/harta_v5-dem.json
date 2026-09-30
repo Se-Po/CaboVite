@@ -1,8 +1,8 @@
 {
-  "nume": "harta_v3",
+  "nume": "harta_v5",
   "rol": "petic",
-  "baza": "harta_v2",
-  "descriere": "Petic de 1 m peste harta_v2. LiDAR DGT 2024-2025, MDT 50 cm redus prin mediere. Uint16 little-endian, rând 0 = nord.",
+  "baza": "harta_v4",
+  "descriere": "Petic de 1 m peste harta_v4. LiDAR DGT 2024-2025, MDT 50 cm redus prin mediere. Uint16 little-endian, rând 0 = nord.",
   "latime": 535,
   "inaltime": 701,
   "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
@@ -72,7 +72,7 @@
     "reducere": "medie pe pătrate de 1 × 1 m din date de 0.5 m, ignorând celulele de apă",
     "cusatura": {
       "latime_m": 4,
-      "nota": "Inelul exterior ia exact relieful bazei (harta_v2), interpolat de-a lungul muchiei comune, iar spre interior se trece lin la datele peticului. Fără asta, cele două rezoluții ar lăsa o crăpătură pe margine. Artificiu de îmbinare, nu date."
+      "nota": "Inelul exterior ia exact relieful bazei (harta_v4), interpolat de-a lungul muchiei comune, iar spre interior se trece lin la datele peticului. Fără asta, cele două rezoluții ar lăsa o crăpătură pe margine. Artificiu de îmbinare, nu date."
     },
     "aliniere": "Nodurile peticului cad peste nodurile bazei din 2 în 2; colțurile sunt noduri ale bazei."
   },
