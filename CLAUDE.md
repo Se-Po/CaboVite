@@ -878,6 +878,12 @@ magic 43, numărul de intrări dintr-un IFD pe 8 octeți, intrări de 20 de octe
 valori inline până în 8 octeți. `citesteIfd(..., big)` din `scripts/comun/tiff.mjs`
 tratează ambele.
 
+**Atribuirea.** Datele DGT sunt CC BY 4.0, iar metadatele lor din SNIG cer, la orice
+publicare, și adaptată, textul „Informação geográfica cedida pela Direção-Geral do
+Território”. Îl scrie `scrieSurse()` din `src/main.js`, o singură dată, cu
+`lang="pt"`, ori de câte ori subsolul are o sursă DGT. Sidecarurile publicate nu
+s-au rescris pentru asta.
+
 Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v2` și
 `harta_v3`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până
 la `harta_v2` iese **106 × 703 pixeli, întregi**: pixelul ortofotoului cade peste

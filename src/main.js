@@ -60,6 +60,14 @@ function scrieSurse(surse) {
   });
   rezumat.append(` · ${unice('licenta').join(', ')} · prelucrate`);
   const lista = el('ul');
+  // Metadatele SNIG ale datelor DGT cer, la orice publicare, și adaptată, textul
+  // acesta, în portugheză. Se scrie o singură dată, oricâte surse DGT ar fi; `lang`
+  // e pentru cititoarele de ecran, care altfel l-ar pronunța românește.
+  if (surse.some((s) => /Direção-Geral do Território/.test(s.producator ?? ''))) {
+    const dgt = el('li', 'Informação geográfica cedida pela Direção-Geral do Território');
+    dgt.lang = 'pt';
+    lista.append(dgt);
+  }
   for (const s of surse) lista.append(el('li', s.atributie));
   const nota = el('p', `Prelucrate pentru această pagină: ${unice('prelucrare').join('; ')}. Licența: `);
   unice('licenta').forEach((l, i) => {
