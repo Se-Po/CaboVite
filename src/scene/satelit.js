@@ -84,6 +84,11 @@ export function creeazaSatelit(o) {
     };
     const tB = pregateste(b.textura, b.meta), tP = p ? pregateste(p.textura, p.meta) : null;
     texturi = [tB, ...(tP ? [tP] : [])];
+    // Falezele rămân fotografia. Pe un perete abrupt ea e întinsă — ortofotoul
+    // privește drept în jos —, dar pe calcar dungile acelea arată ca stratele, iar
+    // stânca pictată din regula de albedo ieșea uniformă și ternă. Măsurătoarea
+    // (npm run masoara-faleza) și comparația sunt în CLAUDE.md; autorul a ales fotografia.
+    //
     // Același program pentru bază și petic: diferă numai textura, iar r186 cheamă
     // onBeforeCompile pe fiecare material chiar când programul e refolosit.
     const terenM = (t) => {

@@ -25,7 +25,8 @@
     "verifica-tiff": "node scripts/verifica-tiff.mjs",
     "verifica-sanctuar": "node scripts/verifica-sanctuar.mjs",
     "masoara-zbor": "node scripts/masoara-zbor.mjs",
-    "textura-ortofoto": "node scripts/textura-ortofoto.mjs"
+    "textura-ortofoto": "node scripts/textura-ortofoto.mjs",
+    "masoara-faleza": "node scripts/masoara-faleza.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

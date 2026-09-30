@@ -39,6 +39,7 @@ se poartă în română.
 | `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși |
 | `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
 | `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic → `public/data/<hartă>-orto_v1.ktx2` + `.json`; cere KTX-Software 4.4 |
+| `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul și cu ce lumină s-ar colora stânca → `date-sursa/derivate/faleza.json`; măsurătoare, nefolosită de pagină |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -637,6 +638,15 @@ versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 
 - **Marea**, în cutia texturii, e fotografia; în afara ei, apa adâncă măsurată;
   ceața pe pixel rămâne (cu AgX inclus de mână: materialul nu e tone-mapped).
 - Suprafețele sanctuarului de pe teren (drapajul) se ascund: fotografia le are.
+- **Falezele rămân fotografia.** `npm run masoara-faleza` a măsurat, pe plasa
+  paginii, cât detaliu are fotografia pe metrul de SUPRAFAȚĂ, pe clase de pantă:
+  sub 50% din cel de pe terenul plat de la 46,6° încolo, 17% la 70–75°, 2% la
+  85–90°. Stânca pictată de acolo încolo din regula de albedo, luminată cu soarele
+  zborului (α 1,26, β 0,29, potriviți pe stânca de 30–70°; R² 0,33 la antrenare, 0,29
+  pe fațetele ținute deoparte; soarele zborului o potrivește mai bine decât cel Relief, ΔE 10,3
+  față de 11,8), ieșea însă uniformă și ternă, iar numai pe pereții de 70–85°, în
+  dungi. Fotografia întinsă arată, pe calcar, ca stratele: autorul a ales-o. Scriptul
+  rămâne, ca măsurătoare, nefolosit de pagină.
 - **Încărcarea.** `creeazaIncarcatorKtx2` importă KTX2Loader dinamic — `loaders.js`
   e importat și de uneltele Node. Transcodorul NU se copiază în `public/`:
   KTX2Loader din r186 îl găsește cu `new URL(…, import.meta.url)`, iar Vite îl emite
