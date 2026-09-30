@@ -30,6 +30,7 @@ se poartă în română.
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 | `npm run verifica-teren` | construiește plasa cu codul paginii, în Node, și verifică ce primește și ce pictează regula de culoare |
 | `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/` |
+| `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -489,6 +490,49 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
   în el. Cifra aceea nu se calculează în unealtă.
 
 Regula costă +23 ms la construcția bazei, în Node.
+
+## Sanctuarul
+
+Santuário de Nossa Senhora do Cabo Espichel intră pe hartă ca geometrie: toate
+construcțiile din poza de referință a autorului, plus Ermida da Memória. A intrat
+în v0.0.10, în cinci commit-uri, 0.0.10.01–05.
+
+### Contururile: OpenStreetMap, cu versiuni fixate
+
+`npm run osm-sanctuar` citește din API-ul OSM 0.6 tot ce e construit sau călcat
+în cutia complexului: clădiri, ziduri, garduri, apeductul, drumurile, potecile și
+parcarea. Se alege după etichete, nu după o listă scrisă de mână. Scrie două lucruri:
+- instantaneul `date-sursa/osm/sanctuar-osm-<data>.json`, care nu se suprascrie;
+- `scripts/sanctuar/osm-manifest.json`, cu versiunea fiecărei căi și a fiecărui nod.
+
+Versiunile OSM sunt imuabile, deci `-- --din-manifest` reface instantaneul numai
+din ele și cere să iasă identic. Pe 2026-09-29 a ieșit identic: 63 de elemente.
+
+**Licența.** OSM e ODbL 1.0. Manifestul, inventarul și tot ce se derivă din
+contururi sunt bază de date derivată, deci ODbL. Pagina îi datorează atribuirea
+„© contribuitorii OpenStreetMap”.
+
+**Fără Overpass.** La cercetare a căzut de două ori cu 504, pe două servere.
+API-ul principal e pentru editare, deci cererile stau sub una pe secundă, cu
+User-Agent propriu și cu așteptare la 429/5xx.
+
+**Changesetul 120423250** („Update Cabo Espichel”, 2022-05-01) a retrasat o bună
+parte din complex: 97 de noduri modificate. Numai într-un loc mutarea e o translație
+comună, deci mutarea unui obiect întreg: Ermida da Memória, cu adro-ul și terasa,
+9 noduri, toate cu (+12,84; −13,80) m.
+- Poziția de dinainte e cea bună: pe ea cade blocul alb din ortofotoul DGT, cu
+  umbra lui, iar pinul Google stă la 5,7 m de ea, față de 13 m pe cea de azi.
+- În rest mutările sunt individuale, de la centimetri la zeci de metri, deci nu se
+  răstoarnă mecanic. Exemple: esplanada are 10 790 → 6 917 m², Estrada do Farol s-a
+  mutat cu 47 m.
+- Pentru fiecare cale atinsă, instantaneul păstrează și varianta de dinainte. Ce
+  se folosește e scris în DOUĂ locuri, nu unul: `variante_osm` din
+  `scripts/sanctuar/decizii.json` (esplanada și grupul Ermidei, citit numai de
+  `suprafete-sanctuar`), iar grupul Ermidei încă o dată, în cod, în
+  `nmds-sanctuar` și `masoara-sanctuar`. Tot restul ia versiunea de azi — între
+  ele Casa da Água, ruina de SE și cercado-ul, pe care changesetul le-a atins
+  (87 → 76, 250 → 366, 3 521 → 3 666 m²). Pentru acelea judecă proba amprentelor,
+  mai jos.
 
 ## Principii de design (nenegociabile)
 

@@ -1,0 +1,314 @@
+{
+ "licenta": "ODbL 1.0 (referințele și geometria vin din OpenStreetMap)",
+ "nota": "Deciziile scrise de mână pentru sanctuar, fiecare cu motivul ei.",
+ "zona": {
+  "cadru": {
+   "origine": [
+    -94514,
+    -138007.2
+   ],
+   "azimut": 77.34
+  },
+  "u": [
+   -95,
+   300
+  ],
+  "v": [
+   -130,
+   110
+  ],
+  "de_ce": "cadrul pozei de referință: complexul, Casa da Água cu incinta, parcarea și drumurile din jur, plus esplanada de vest cu Ermida da Memória, pe care autorul a cerut-o separat. Drumurile se taie aici, ca să nu se întindă până la far."
+ },
+ "variante_osm": {
+  "225800571": "inainte",
+  "999972304": "inainte",
+  "999972305": "inainte",
+  "999972306": "inainte"
+ },
+ "de_ce_variante": "Changesetul 120423250 a mutat grupul Ermidei cu (+12,84; −13,80) m; poziția de dinainte e cea pe care o confirmă LiDAR-ul și ortofotoul. Esplanada (225800571) conține nodurile Ermidei; varianta v12 le are la locul bun, iar pavajul din ortofoto nu le deosebește: 67,9% pavat în v12, 67,6% în v13.",
+ "suprafete": {
+  "arii": [
+   {
+    "osm": 225800568,
+    "material": "terreiro",
+    "strat": 4
+   },
+   {
+    "osm": 708329399,
+    "material": "parcare",
+    "strat": 3
+   },
+   {
+    "osm": 225800571,
+    "material": "esplanada",
+    "strat": 4
+   },
+   {
+    "osm": 999972304,
+    "material": "esplanada",
+    "strat": 4
+   }
+  ],
+  "drumuri": [
+   {
+    "osm": 19643621,
+    "material": "pista",
+    "strat": 2,
+    "implicita": 4,
+    "osm_tip": "unclassified, dirt"
+   },
+   {
+    "osm": 96521130,
+    "material": "pista",
+    "strat": 1,
+    "implicita": 3,
+    "osm_tip": "track, gravel"
+   },
+   {
+    "osm": 225799364,
+    "material": "pista",
+    "strat": 1,
+    "implicita": 3,
+    "osm_tip": "track"
+   },
+   {
+    "osm": 225800569,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "steps"
+   },
+   {
+    "osm": 225800574,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 225800575,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 225800579,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 225802678,
+    "material": "pista",
+    "strat": 1,
+    "implicita": 3,
+    "osm_tip": "track"
+   },
+   {
+    "osm": 225802679,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway, fine_gravel"
+   },
+   {
+    "osm": 225802681,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 225802683,
+    "material": "pista",
+    "strat": 1,
+    "implicita": 3,
+    "osm_tip": "track"
+   },
+   {
+    "osm": 229830839,
+    "material": "pista",
+    "strat": 1,
+    "implicita": 3,
+    "osm_tip": "track"
+   },
+   {
+    "osm": 231559544,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 231560381,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 231560383,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 245837693,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 419691332,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 419691334,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 430551916,
+    "material": "drum_principal",
+    "strat": 2,
+    "implicita": 6,
+    "osm_tip": "tertiary"
+   },
+   {
+    "osm": 473617318,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 473617319,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 473617322,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 473617323,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 495719032,
+    "material": "drum_serviciu",
+    "strat": 2,
+    "implicita": 3.5,
+    "osm_tip": "service"
+   },
+   {
+    "osm": 708327543,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 708329991,
+    "material": "drum_serviciu",
+    "strat": 2,
+    "implicita": 3.5,
+    "osm_tip": "service, unpaved"
+   },
+   {
+    "osm": 742433048,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 742434443,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 1004511789,
+    "material": "drum_principal",
+    "strat": 2,
+    "implicita": 6,
+    "osm_tip": "tertiary, asphalt"
+   },
+   {
+    "osm": 1042731069,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path, ground"
+   },
+   {
+    "osm": 1056442940,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 1056442941,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 1056442943,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.2,
+    "osm_tip": "path"
+   },
+   {
+    "osm": 1056442944,
+    "material": "poteca",
+    "strat": 1,
+    "implicita": 1.5,
+    "osm_tip": "footway"
+   },
+   {
+    "osm": 1056442945,
+    "material": "parcare",
+    "strat": 3,
+    "implicita": 5,
+    "osm_tip": "service/parking_aisle, fine_gravel"
+   },
+   {
+    "osm": 1056442946,
+    "material": "parcare",
+    "strat": 3,
+    "implicita": 3.5,
+    "osm_tip": "service/driveway, fine_gravel"
+   },
+   {
+    "osm": 1369803448,
+    "material": "parcare",
+    "strat": 3,
+    "implicita": 3.5,
+    "osm_tip": "service/driveway, fine_gravel"
+   }
+  ]
+ }
+}
