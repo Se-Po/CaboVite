@@ -88,8 +88,10 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
 ## Flux de lucru
 
 - Nu comite și nu împinge nimic fără să-ți cer eu explicit.
-- Versiunea se schimbă o dată la fiecare push, cu etichetă `v0.0.N`. Fiecare
-  commit are un număr `0.0.N.xx`, scris ca prefix în subiect.
+- Versiunea se schimbă o dată la fiecare push, cu etichetă `v0.1.N`. Fiecare
+  commit are un număr `0.1.N.xx`, scris ca prefix în subiect. Numărătoarea
+  `0.1` pornește de la `v0.1.0` (2026-09-30), aceeași cifră ca `version` din
+  `package.json`; până atunci etichetele au fost `v0.0.N`, până la `v0.0.11`.
 
 ## Hărțile de relief
 
