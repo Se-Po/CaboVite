@@ -65,7 +65,7 @@ EXIF-ul — stă în `scripts/comun/`.
 - O animație proprie — întoarcerea camerei spre un punct de privire, un zbor de
   capitol — **nu** deschide al doilea `requestAnimationFrame`. Bucla rulează deja
   la fiecare cadru și decide doar *dacă* desenează, deci animația se agață în ea.
-  Modelul e `busola.pas()`, chemat ca primă instrucțiune din buclă.
+  Modelul e `zbor.pas()`, chemat ca primă instrucțiune din buclă.
 - Importă addon-urile ca `three/addons/...`, nu `three/examples/jsm/...`.
 - `THREE.Clock` e deprecat din r183 → folosește `THREE.Timer`.
 - `PCFSoftShadowMap` a fost **eliminat** în r186 → `THREE.PCFShadowMap`.
@@ -146,7 +146,7 @@ ar crește cu o celulă și peticul n-ar mai cădea pe noduri.
 
 Acceptarea, față de `harta_v2`, pe `.bin`-uri:
 - cutia, dimensiunile și `colturi_geo` sunt identice, deci ancora sanctuarului, γ și
-  gaura de sub petic rămân; busola scrie tot 213° SV;
+  gaura de sub petic rămân; busola scria tot 213° SV, pe vederea de pornire de atunci;
 - pe cele 492 837 de noduri de uscat ale conturului vechi, |Δz| ≤ 2,4 mm (o cuantă:
   zScara crește de la 0,00231 la 0,00241 m). Control: toate cele 14 203 noduri care
   în v2 stăteau pe 65535 sunt acum peste 143,64 m, până la 150,00;
@@ -352,50 +352,61 @@ cu mai puține zecimale ar lărgi eroarea proporțional, tăcut.
 privirii, ci minus el. „Nordul în sus" e `theta = γ`, nu `theta = 0`.
 
 Cifra afișată e azimutul **poziției** camerei — dinspre ce direcție privești —,
-nu al privirii. La pornire scrie `213° SV`, coerent cu `AZIMUT = 214` din
-`camera.js` și cu fotografia de referință.
+nu al privirii. La pornire scrie `306° NV` (306,28°).
 
-**Clicul nu întoarce scena cu nordul în sus.** Duce camera la un punct de
-privire ales, `AZIMUT_TINTA` din `busola.js`, acum **300° NV** — privirea dinspre
-nord-vest peste promontoriu. Eticheta butonului se scrie din constanta aceea, ca
-textul și comportamentul să nu se poată despărți. Dacă vrei totuși „nordul în
-sus", valoarea e 180: cifra fiind a poziției, stai în sud ca să privești spre nord.
+**Vederea de pornire** e `VEDERE_START` din `camera.js`: poziția camerei și
+ținta, în coordonatele scenei, citite din pagină pe 2026-09-30, pe vederea aleasă
+de autor — dinspre mare, peste faleze, cu sanctuarul sus și farul în dreapta.
+Scrise ca puncte, nu ca azimut: azimutul adevărat cere γ, care se află abia din
+sidecar, după ce camera există. Ținta citită stătea la y = −61, sub mare, fiindcă
+vederea fusese trasă lateral; s-a mutat pe raza privirii până la y = 60, cota pe
+care o cere `maxPolarAngle` ca să nu lase camera sub planul mării. Aceeași
+imagine — rotunjirea la centimetru rotește privirea cu 0,0006° —, pivotul la
+611,22 m în loc de 968,53. Pe orice ecran e aceeași, cu lateralele tăiate pe
+cele înguste: așa a cerut autorul. `incadreazaLaAspect()`, care dădea camera
+înapoi pe ecranele înguste, a plecat.
 
-**Camera se rotește punând `theta` ABSOLUT**, nu cu `rotateLeft()`. Acela există
-și e public în r186, dar adaugă un *delta* într-un acumulator care se scurge
-exponențial; deltele se compun, deci două clicuri repezi trec de nord cu exact
-cât mai rămăsese de aplicat. `setAzimuthalAngle()` nu există.
+**Clicul readuce vederea de pornire**, cu ținta, distanța și înălțimea, nu numai
+azimutul: busola cheamă `zbor.spre(VEDERE_START)`, același zbor din `zbor.js` cu
+care eticheta duce la sanctuar. Busola nu mai are zbor propriu. Dacă fișa
+sanctuarului e deschisă, se închide întâi — închiderea șterge sincron decalajul
+de obiectiv, altfel zborul ar ateriza cu imaginea mutată —, iar focusul trece pe
+rozetă. Un al doilea clic, cu camera deja acolo, nu mai zboară.
 
-**Theta absolut nu ajunge, totuși — inerția trebuie descărcată întâi.**
-`update()` nu citește doar poziția camerei, ci îi ADAUGĂ acumulatorul:
+**Zborul pune poziția ABSOLUT**, nu cu `rotateLeft()`. Acela există și e public
+în r186, dar adaugă un *delta* într-un acumulator care se scurge exponențial;
+deltele se compun, deci două clicuri repezi ar trece de țintă.
+
+**Absolut nu ajunge, totuși — inerția trebuie descărcată întâi**
+(`descarcaInertia`, în `camera.js`). `update()` nu citește doar poziția camerei,
+ci îi ADAUGĂ acumulatorul:
 `_spherical.theta += _sphericalDelta.theta * dampingFactor` (OrbitControls.js:717).
 Cu amortizare pornită acumulatorul nu se golește niciodată — se stinge doar cu
 ×(1 − dampingFactor) pe cadru (:801). Singura ramură care îl golește e cea fără
 amortizare (:808), iar `_sphericalDelta` e privat, deci aceea e toată calea
-publică spre el. `laClic()` stinge amortizarea, cheamă `update()` o dată și o
-repune — o singură dată la clic, nu pe fiecare cadru al zborului.
+publică spre el: amortizarea se stinge, `update()` se cheamă o dată, apoi se
+repune. Butonul rozetei nu e copil al canvasului, deci OrbitControls nu emite
+„start" la clicul pe el.
 
-`laStart` nu acoperă cazul: butonul rozetei nu e copil al canvasului, deci
-OrbitControls nu emite niciodată „start" la clicul pe el.
-
-Cât greșea, măsurat: după o aruncare de 66° urmată imediat de clic, zborul
-ateriza la **0,098°** de țintă — puțin, fiindcă `aplicaTheta` reașază poziția la
-fiecare cadru și aruncă astfel contaminarea cadrului trecut, deci supraviețuia
-numai ultima felie. Pe calea `prefers-reduced-motion` însă, unde `aplicaTheta`
-se cheamă o SINGURĂ dată, se pierdea toată prima felie: `inerție × dampingFactor`,
-măsurat exact **0,8°** pentru 10° rămase. Tocmai calea de accesibilitate greșea
-cel mai mult.
-
+Cât greșea, măsurat pe vechiul zbor al busolei, care rotea numai theta: după o
+aruncare de 66° urmată imediat de clic, ateriza la **0,098°** de țintă; pe calea
+`prefers-reduced-motion`, unde poziția se scria o singură dată, se pierdea toată
+prima felie, `inerție × dampingFactor`: măsurat exact **0,8°** pentru 10° rămase.
 Inerția se APLICĂ, nu se aruncă: ramura fără amortizare o adaugă întreagă înainte
 să golească. Camera ajunge unde se ducea gestul, iar zborul pleacă de acolo.
 
-**Probe care pot eșua.** La încadrarea de pornire busola scrie **213° SV**; cu
-nordul grilei ar scrie 214°, cu semnul lui γ inversat 215°. După clic,
-`__scena.controale.getAzimuthalAngle() * 180/Math.PI` trebuie să fie
-**−120,673704** — pe grilă ar fi fost exact −120, deci zecimalele sunt chiar
-dovada că punctul e cel adevărat, nu cel al grilei. Iar
-`__scena.busola.convergenta` trebuie să cadă la mai puțin de 0,001 de valoarea
-analitică: pragul e ales ca să pice dacă factorul elipsoidal lipsește.
+Tot la început, `spre()` golește zborul în curs. Altfel un zbor spre sanctuar încă
+în aer, urmat de un clic pe busolă sub `prefers-reduced-motion`, ar fi dus camera
+înapoi la sanctuar la cadrul următor: măsurat, la 1 092 m de vederea de pornire.
+
+**Probe care pot eșua.** La pornire busola scrie **306° NV**; cu nordul grilei ar
+scrie 307°, cu semnul lui γ inversat 308°. Poziția și ținta camerei sunt exact
+`VEDERE_START` la pornire și după clicul pe busolă, de oriunde ar pleca: în pagină,
+de la 2,3 km, la 4·10⁻¹⁴ m. Iar `__scena.busola.convergenta` trebuie să cadă la
+mai puțin de 0,001 de valoarea analitică: pragul e ales ca să pice dacă factorul
+elipsoidal lipsește. Zborul înapoi are probele lui și în `npm run verifica-sanctuar`:
+din zborul spre sanctuar, după o aruncare și sub reduced-motion (0 cadre), la
+sub 10⁻¹² m; aterizarea nu depinde de nord; al doilea clic nu pornește nimic.
 
 ## Punctul de sub clic
 
@@ -1120,8 +1131,17 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 
 - **`urmaresteGrupul()`** din `scena.js` alege cutia la fiecare cadru desenat:
   - cutia unită, dacă texelul ei stă sub TEXEL_MAXIM (0,3 m) sau nu trece de
-    pixelul ecranului la țintă. La pornire camera stă la 1,6–5,2 km, după
-    forma ecranului, iar pixelul are acolo cel puțin ~0,85 m;
+    pixelul ecranului la țintă. Pixelul e al canvasului, deci de dispozitiv;
+  - la pornire ținta e la 611 m. Primul cadru are soarele Relief — Satelit își pune
+    soarele abia când i-a sosit textura —, deci cutia unită rămâne numai pe un
+    canvas înalt de cel mult ~922 px de dispozitiv; sub Satelit histerezisul
+    păstrează alegerea (întoarcerea la cutia unită cere ≤ ~917 px). ~1 121 px e
+    pragul de ieșire din cutia unită cu soarele zborului deja pus. Pe telefoane și
+    pe ecranele dense harta pornește pe sanctuar — măsurat: 1440 × 900 la DPR 1 dă
+    „toate”, la DPR 2 „sanctuar”, cu 0,216 m pe texel sub soarele zborului —, iar
+    farul își primește umbra când te apropii de el. Cutia unită, forțată, ar fi
+    făcut umbrele sanctuarului, din mijlocul imaginii, de 2,3 ori mai difuze sub
+    Satelit și de 2,9 ori sub Relief;
   - altfel, grupul cel mai apropiat de țintă.
 - **Texelul cutiei unite depinde de soare**, deci pragul se judecă în buclă, nu la
   creare. `umbre.potriveste()` crește `versiuneSoare`, iar `pas()` recitește atunci

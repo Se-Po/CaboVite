@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { creeazaRenderer, redimensioneaza } from './renderer.js';
-import { creeazaCamera, incadreazaLaAspect } from './camera.js';
+import { creeazaCamera, VEDERE_START } from './camera.js';
 import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
@@ -94,9 +94,9 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   const scena = new THREE.Scene();
   scena.background = new THREE.Color(paleta.cer);
   // Ceața topește marginea îndepărtată a planului mării înainte să se vadă că se
-  // termină. Scalată pentru zona de ~3 km: cel mai depărtat colț de uscat e la
-  // ~3,5 km de cameră, deci ceața începe abia după el — altfel platoul s-ar
-  // decolora în culoarea cerului și ar părea că se topește.
+  // termină. Scalată pentru zona de ~3 km: din vederea de pornire, cel mai
+  // depărtat colț al hărții e la ~2,7 km de cameră, deci ceața începe abia după
+  // el — altfel platoul s-ar decolora în culoarea cerului și ar părea că se topește.
   scena.fog = new THREE.Fog(paleta.cer, 5000, 24000);
 
   const { camera, controale } = creeazaCamera(canvas);
@@ -307,18 +307,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     console.warn('vederea Satelit sărită, rămâne Relief:', e.message);
   }
 
-  // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
-  // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,
-  // încadrarea devine a lui și nu i-o mai luăm.
-  let incadrareAutomata = true;
-  // Declarat aici, fiindcă busola, creată înaintea lui, îl oprește.
-  let zborSanctuar = null;
-  const laStart = () => { incadrareAutomata = false; };
+  // Declarate aici, fiindcă clicul pe busolă, creată înaintea lor, le folosește.
+  let zbor = null, eticheta = null;
   // Fiecare ascultător, înscris în listă imediat: dacă un pas de mai jos aruncă,
   // `resize` și `matchMedia` ar ține viu tot contextul lui construieste(), cu relieful.
-  controale.addEventListener('start', laStart);
-  deEliberat.push(() => controale.removeEventListener('start', laStart));
-
   controale.addEventListener('change', cereRandare);
   deEliberat.push(() => controale.removeEventListener('change', cereRandare));
   const laResize = () => cereRandare();
@@ -340,12 +332,22 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // n-are ce arăta, iar fără WebGL nici nu se creează. Metadatele sunt ale BAZEI
   // — peticul n-are `colturi_geo` — și de acolo își deduce nordul adevărat.
   // Întoarce null dacă nu-l poate deduce; atunci pagina rămâne fără ea.
+  //
+  // Clicul pe ea readuce vederea de pornire. Fișa sanctuarului se închide întâi:
+  // închiderea șterge sincron decalajul de obiectiv, altfel zborul ar ateriza cu
+  // imaginea încă mutată. Focusul, rămas în fișa ascunsă, trece pe rozetă —
+  // Safari nu-l mută singur pe butonul apăsat.
   const busola = creeazaBusola({
     gazda: canvas.parentElement ?? document.body,
-    camera, controale, cereRandare,
+    controale,
     colturi: relief.meta?.colturi_geo,
-    // Un zbor al busolei oprește zborul spre sanctuar: două animații nu se ceartă.
-    laPornire: () => zborSanctuar?.opreste(),
+    laClic: () => {
+      if (eticheta?.stare.deschisa) {
+        eticheta.inchide();
+        document.querySelector('#busola .roza')?.focus();
+      }
+      zbor?.spre(VEDERE_START);
+    },
   });
   if (busola) deEliberat.push(() => busola.dispose());
 
@@ -373,19 +375,18 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   });
   if (punct) deEliberat.push(() => punct.dispose());
 
-  // Zborul spre sanctuar și eticheta lui. Zborul oprește încadrarea automată —
-  // camera nu mai e a noastră — și zborul busolei.
-  zborSanctuar = creeazaZbor({
+  // Zborul camerei, unul singur: spre sanctuar, de la etichetă, și înapoi la
+  // vederea de pornire, de la busolă. Un zbor nou îl înlocuiește pe cel în curs.
+  zbor = creeazaZbor({
     camera, controale, cereRandare,
     azimutNordAdevarat: busola?.azimutNordAdevarat ?? 0,
-    laPornire: () => { incadrareAutomata = false; busola?.opreste(); },
   });
-  deEliberat.push(() => zborSanctuar.dispose());
+  deEliberat.push(() => zbor.dispose());
 
   // Cât fișa e deschisă, imaginea se mută în partea de ecran pe care n-o acoperă:
   // pe telefon fișa e foaie jos și acoperă peste jumătate, pe desktop stă la
   // dreapta. Un decalaj de obiectiv (`setViewOffset`), nu altă țintă: camera și
-  // pivotul rămân unde le-a pus zborul, deci busola, raza panoului punctului și
+  // pivotul rămân unde le-a pus zborul, deci rozeta, raza panoului punctului și
   // proiecția etichetei merg neschimbate — toate citesc matricea de proiecție.
   let decalaj = null; // fracțiunile părții libere, sau null
   const aplicaDecalaj = () => {
@@ -415,22 +416,21 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     const distanta = Math.max(z.distanta, RAZA_COMPLEX / (t * camera.aspect * (L.x1 - L.x0)), (0.6 * RAZA_COMPLEX) / (t * (L.y1 - L.y0)));
     return { ...z, distanta };
   };
-  const eticheta = sanctuar?.poi?.zbor ? creeazaEticheta({
+  eticheta = sanctuar?.poi?.zbor ? creeazaEticheta({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, inaltimeLa, cereRandare,
     ancora: sanctuar.poi.ancora,
     continut: continut?.sanctuar,
-    laDeschidere: (fisa) => { potrivesteLaFisa(fisa); zborSanctuar.spre(zborLaFisa()); },
+    laDeschidere: (fisa) => { potrivesteLaFisa(fisa); zbor.spre(zborLaFisa()); },
     laInchidere: () => { decalaj = null; aplicaDecalaj(); },
   }) : null;
   if (eticheta) deEliberat.push(() => eticheta.dispose());
 
   renderer.setAnimationLoop(() => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
-    // doar dacă desenează — deci animația busolei se agață aici, nu într-un al
+    // doar dacă desenează — deci zborul camerei se agață aici, nu într-un al
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
-    busola?.pas();
-    zborSanctuar?.pas();
+    zbor.pas();
     const seMisca = controale.enableDamping && controale.update();
     if (redimensioneaza(renderer)) {
       const c = renderer.domElement;
@@ -438,7 +438,6 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       camera.updateProjectionMatrix();
       // decalajul fișei se socotește din nou: fișa și canvasul și-au schimbat mărimea
       if (decalaj) potrivesteLaFisa(document.getElementById('sanctuar-fisa')?.getBoundingClientRect());
-      if (incadrareAutomata) incadreazaLaAspect(camera, controale, camera.aspect);
       cerut = true;
     }
     if (!cerut && !seMisca) return;
@@ -480,7 +479,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo,
     // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
     get surse() { return surse; },
-    zbor: zborSanctuar, eticheta, umbre, umbreGrup, satelit,
+    zbor, eticheta, umbre, umbreGrup, satelit,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
@@ -532,10 +531,19 @@ function unesteSurse(a, b) {
  *
  * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
  * Altfel, de departe tot ea: cât texelul ei nu trece de mărimea unui pixel de ecran
- * la țintă, o hartă mai strânsă n-ar desena nimic în plus. La pornire camera stă la
- * 1,6–5,2 km, după forma ecranului, unde pixelul are cel puțin ~0,85 m, iar texelul cutiei
- * unite 0,50–0,60 m. De aproape,
- * grupul cel mai apropiat de țintă. Două praguri cu histerezis — ±10% pe pixel,
+ * la țintă, o hartă mai strânsă n-ar desena nimic în plus. Pixelul e al CANVASULUI
+ * (`canvas.height`), deci de dispozitiv, nu CSS. De aproape, grupul cel mai
+ * apropiat de țintă.
+ *
+ * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Primul cadru
+ * are soarele Relief — Satelit își pune soarele abia când i-a sosit textura —,
+ * deci cutia unită rămâne numai pe un canvas înalt de cel mult ~922 px de
+ * dispozitiv; sub Satelit histerezisul păstrează apoi alegerea (întoarcerea la
+ * cutia unită cere ≤ ~917 px). Pe telefoane și pe ecranele dense harta pornește
+ * strânsă pe sanctuar (~430 m de țintă; farul e la ~800 m), cu 0,21–0,22 m pe
+ * texel — farul își primește umbra când te apropii de el.
+ *
+ * Două praguri cu histerezis — ±10% pe pixel,
  * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu
  * redeseneze harta la fiecare cadru; o schimbare costă o singură redesenare.
  *

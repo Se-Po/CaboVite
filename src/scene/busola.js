@@ -1,7 +1,8 @@
 // Busola: o rozetă fixă în colțul paginii, cu acul spre nordul ADEVĂRAT.
 //
 // Trei lucruri face: arată unde e nordul, spune în cifre dinspre ce direcție
-// privești, și la clic readuce camera la un punct de privire ales.
+// privești, și la clic cere scenei să readucă vederea de pornire. Zborul acela e
+// al lui zbor.js; busola doar îl pornește.
 //
 // ─────────────────────────────────────────────────────────────────── nordul
 //
@@ -14,7 +15,7 @@
 //
 // Pe o rozetă cu acul de 42 px asta face 0,47 px — sub o jumătate de pixel.
 // Deci NU se vede, și tocmai de aceea nu se poate lăsa pe seama ochiului: se
-// verifică din cifră, unde 213 și 214 sunt doi întregi diferiți.
+// verifică din cifră: la vederea de pornire, 306 și 307 sunt doi întregi diferiți.
 //
 // γ nu e scris ca o constantă. Se calculează din `colturi_geo` al hărții de
 // BAZĂ, deci o hartă nouă, cu alt contur, își aduce propriul γ. Fără cheia
@@ -34,8 +35,6 @@
 // Ultima e cea care se ratează cel mai ușor. `theta = 0` pune în sus nordul
 // GRILEI, alături cu 0,67°.
 
-import { descarcaInertia } from './camera.js';
-
 const GRADE = 180 / Math.PI;
 const RADIANI = Math.PI / 180;
 
@@ -44,17 +43,6 @@ const RADIANI = Math.PI / 180;
 const A_GRS80 = 6378137;
 const F_GRS80 = 1 / 298.257222101;
 const E2_GRS80 = F_GRS80 * (2 - F_GRS80);
-
-// Unde duce clicul: azimutul POZIȚIEI camerei, în grade — aceeași cifră pe care
-// o scrie rozeta. 300° NV înseamnă camera așezată în nord-vest, privind spre
-// sud-est peste promontoriu.
-//
-// O busolă întoarce de obicei scena cu nordul în sus, ceea ce aici ar însemna
-// 180 (cifra fiind a poziției: stai în sud ca să privești spre nord). Punctul
-// ăsta e altceva, cerut anume — un punct de vedere, nu o orientare. Eticheta
-// butonului se scrie din constanta asta, ca textul și comportamentul să nu se
-// poată despărți.
-const AZIMUT_TINTA = 300;
 
 const PUNCTE = ['N', 'NE', 'E', 'SE', 'S', 'SV', 'V', 'NV'];
 const NUME_PUNCTE = ['nord', 'nord-est', 'est', 'sud-est',
@@ -120,12 +108,6 @@ export function convergentaDinColturi(colturi) {
 /** Unghi adus în [0, 360). */
 const normalizeaza = (g) => ((g % 360) + 360) % 360;
 
-/** Unghi adus în (−π, π]: drumul scurt, nu cel lung. */
-function drumScurt(rad) {
-  const cerc = 2 * Math.PI;
-  return ((((rad + Math.PI) % cerc) + cerc) % cerc) - Math.PI;
-}
-
 /** „1 grad", „19 grade", „20 de grade" — regula lui „de" din română. */
 function grade(n) {
   if (n === 1) return '1 grad';
@@ -154,16 +136,14 @@ const ROZETA = `
 /**
  * @param {object} o
  * @param {HTMLElement} o.gazda — unde se agață elementul
- * @param {import('three').PerspectiveCamera} o.camera
- * @param {object} o.controale — OrbitControls
- * @param {() => void} o.cereRandare
+ * @param {object} o.controale — OrbitControls; de la ele vine unghiul și `change`
  * @param {object} [o.colturi] — `colturi_geo` din sidecarul hărții de BAZĂ
- * @param {() => void} [o.laPornire] — chemat când pornește un zbor al busolei;
- *   scena oprește atunci zborul spre sanctuar, ca două animații să nu se certe
- * @returns {{pas, dispose, convergenta, azimutNordAdevarat}|null}
+ * @param {() => void} [o.laClic] — clicul pe rozetă; scena readuce atunci
+ *   vederea de pornire
+ * @returns {{dispose, convergenta, azimutNordAdevarat}|null}
  *   null dacă nordul adevărat nu se poate afla din date.
  */
-export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi, laPornire }) {
+export function creeazaBusola({ gazda, controale, colturi, laClic }) {
   const gamma = convergentaDinColturi(colturi);
   if (gamma === null) {
     console.warn('busolă: `colturi_geo` lipsește din sidecarul hărții de bază sau '
@@ -192,56 +172,18 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi, 
   const etichete = [...radacina.querySelectorAll('.eticheta')]
     .map((el) => [el, el.getAttribute('x'), el.getAttribute('y')]);
 
-  // Eticheta se scrie din constantă, nu de mână: un text care spune „spre nord"
-  // în timp ce butonul duce în altă parte e mai rău decât niciun text. Se pune
-  // cu setAttribute, ca innerHTML de mai sus să rămână numai literaluri.
-  const iTinta = Math.round(normalizeaza(AZIMUT_TINTA) / 45) % 8;
-  buton.setAttribute('aria-label',
-    `Readu camera la ${grade(AZIMUT_TINTA)}, ${NUME_PUNCTE[iTinta]}`);
+  // Eticheta spune ce face clicul. Se pune cu setAttribute, ca innerHTML de mai
+  // sus să rămână numai literaluri.
+  buton.setAttribute('aria-label', 'Readu camera la vederea de pornire');
   buton.setAttribute('title',
     'Dinspre ce direcție privești, față de nordul adevărat.'
-    + ` Apasă ca să readuci camera la ${AZIMUT_TINTA}° ${PUNCTE[iTinta]}.`);
+    + ' Apasă ca să revii la vederea de pornire.');
 
   gazda.appendChild(radacina);
 
-  // Media query proprie, nu cea din scena.js: interogată la clic și în fiecare
-  // cadru, deci mereu actuală, și fără un ascultător în plus de scos la dispose.
-  const faraMiscare = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
-
   let viu = true;
-  let zbor = null;
   let cronometru = 0;
   let ultimulUnghi = NaN;
-
-  /**
-   * Pune camera la un theta anume, păstrând înălțimea și distanța.
-   *
-   * Nu prin `setAzimuthalAngle()` — nu există în r186, numai getterul. Nici prin
-   * `rotateLeft()`, care există și e public: acela adună un DELTA în
-   * `_sphericalDelta`, iar deltele se compun. Două clicuri repezi ar trece de
-   * țintă cu exact cât mai rămăsese de aplicat. Aici punem theta ABSOLUT, deci
-   * ținta nu depinde de câte clicuri au fost.
-   *
-   * ATENȚIE: asta NU ne apără și de inerția utilizatorului. `update()` adaugă
-   * acumulatorul peste poziția pe care tocmai am scris-o, deci un theta absolut
-   * aterizează lângă țintă dacă acumulatorul nu e gol. De golit se golește în
-   * `laClic()`, o singură dată; vezi nota de acolo. Comentariul de aici spunea
-   * înainte că „nu rămâne nimic într-un acumulator" — era adevărat despre
-   * `rotateLeft()` și fals despre inerție.
-   *
-   * `update()` reface `lookAt`, aplică limitele și emite `change`, de unde se
-   * redesenează rozeta. E necesar aici, nu doar în buclă: cu `enableDamping`
-   * stins, linia din scena.js face scurtcircuit și `update()` nu s-ar chema.
-   */
-  function aplicaTheta(theta) {
-    const t = controale.target;
-    // raza orizontală = sin(phi)·distanță; minPolarAngle = 0,15 o ține > 0,
-    // deci nu există cazul degenerat „camera exact deasupra țintei".
-    const raza = Math.hypot(camera.position.x - t.x, camera.position.z - t.z);
-    camera.position.x = t.x + raza * Math.sin(theta);
-    camera.position.z = t.z + raza * Math.cos(theta);
-    controale.update();
-  }
 
   /** Unghiul acului pe ecran, în grade, sens orar de la „sus". */
   const unghiAc = () => controale.getAzimuthalAngle() * GRADE + azimutNordAdevarat;
@@ -279,92 +221,15 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi, 
   }
 
   const laSchimbare = () => { deseneaza(); programeazaAnunt(); };
-  // Din clipa în care utilizatorul atinge controalele, camera e a lui.
-  const laStart = () => { zbor = null; };
-
-  function laClic() {
-    // Întâi se descarcă inerția rămasă de la utilizator. Abia apoi se citește de
-    // unde plecăm — altfel `de` ar fi un unghi pe care camera tocmai îl părăsește.
-    //
-    // `update()` nu citește doar poziția camerei, ci îi ADAUGĂ acumulatorul:
-    // `_spherical.theta += _sphericalDelta.theta * dampingFactor`
-    // (OrbitControls.js:717). Cu amortizare pornită acumulatorul nu se golește
-    // niciodată, se stinge doar cu ×(1 − dampingFactor) pe cadru (:801). Singura
-    // ramură care îl golește e cea FĂRĂ amortizare (:808) — și aia e toată calea
-    // publică spre el, fiindcă `_sphericalDelta` e privat în r186.
-    //
-    // Cât greșea, măsurat: după o aruncare de 66° urmată imediat de clic, zborul
-    // ateriza la 0,098° de țintă. Puțin, fiindcă `aplicaTheta` reașază poziția la
-    // fiecare cadru și aruncă astfel contaminarea cadrului trecut — supraviețuia
-    // numai ultima felie. Dar pe calea `prefers-reduced-motion`, unde
-    // `aplicaTheta` se cheamă O SINGURĂ dată, se pierdea toată prima felie:
-    // `inerție × dampingFactor`, măsurat exact 0,8° pentru 10° rămase. Adică
-    // tocmai calea de accesibilitate greșea cel mai mult.
-    //
-    // `laStart` nu ajută aici: butonul rozetei nu e copil al canvasului, deci
-    // OrbitControls nu emite niciodată „start" la clicul pe el.
-    //
-    // Inerția se APLICĂ, nu se aruncă: ramura de la :808 o adaugă întreagă și abia
-    // apoi golește. E și mai cinstit — camera ajunge unde se ducea gestul, iar
-    // zborul pleacă de acolo. Saltul e mic în practică: acumulatorul se stinge la
-    // 60 Hz cât timp muți mâna spre rozetă, deci după o jumătate de secundă a mai
-    // rămas sub 10% din el.
-    descarcaInertia(controale);   // :808 golește `_sphericalDelta` ȘI `_panOffset`
-    laPornire?.();
-
-    const de = controale.getAzimuthalAngle();
-    // theta pentru care rozeta citește exact AZIMUT_TINTA.
-    //
-    // Cifra afișată e `180 − unghiulAcului`, iar unghiul acului e
-    // `theta + azimutNordAdevarat`. Inversate, dau theta de mai jos. Termenul cu
-    // azimutNordAdevarat e cel care face diferența dintre punctul ADEVĂRAT de
-    // 300° și cel de pe grilă — 0,67°, adică vreo 19 m de arc la raza camerei.
-    const la = (180 - AZIMUT_TINTA - azimutNordAdevarat) * RADIANI;
-    const delta = drumScurt(la - de);
-    if (Math.abs(delta) < 1e-4) return;
-    if (faraMiscare?.matches) { aplicaTheta(la); cereRandare(); return; }
-    // Durata crește cu unghiul: o corecție de trei grade n-are de ce să dureze
-    // cât o întoarcere de 180°.
-    zbor = { de, delta, t0: performance.now(),
-             durata: 350 + 450 * Math.abs(delta) / Math.PI };
-  }
-
-  /**
-   * Un pas de animație, chemat din `setAnimationLoop` al scenei.
-   *
-   * Regulile proiectului interzic al doilea `requestAnimationFrame` — și nici nu
-   * e nevoie de el: bucla rulează oricum la fiecare cadru și decide doar dacă
-   * desenează. Un singur ceas în pagină, deci nimic nu se poate desincroniza.
-   */
-  function pas() {
-    if (!viu || !zbor) return;
-    // Dacă între timp s-a cerut mai puțină mișcare, nu ducem animația la capăt
-    // „ca să fie frumos": sărim la capăt.
-    if (faraMiscare?.matches) {
-      const z = zbor;
-      zbor = null;
-      aplicaTheta(z.de + z.delta);
-      cereRandare();
-      return;
-    }
-    const t = Math.min(1, (performance.now() - zbor.t0) / zbor.durata);
-    const u = t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2; // easeInOutCubic
-    aplicaTheta(zbor.de + zbor.delta * u);
-    cereRandare();
-    if (t >= 1) zbor = null;
-  }
+  const laApasare = () => laClic?.();
 
   controale.addEventListener('change', laSchimbare);
-  controale.addEventListener('start', laStart);
-  buton.addEventListener('click', laClic);
+  buton.addEventListener('click', laApasare);
 
   deseneaza();
   programeazaAnunt();
 
   return {
-    pas,
-    /** Oprește zborul în curs, dacă e unul — îl cheamă zborul spre sanctuar. */
-    opreste() { zbor = null; },
     /** Azimutul în grilă al nordului adevărat, în grade. Expus pentru verificare. */
     azimutNordAdevarat,
     /** γ, dedus din date. Expus pentru verificare. */
@@ -373,10 +238,8 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi, 
       if (!viu) return;
       viu = false;
       controale.removeEventListener('change', laSchimbare);
-      controale.removeEventListener('start', laStart);
-      buton.removeEventListener('click', laClic);
+      buton.removeEventListener('click', laApasare);
       clearTimeout(cronometru);
-      zbor = null;
       radacina.remove();
     },
   };

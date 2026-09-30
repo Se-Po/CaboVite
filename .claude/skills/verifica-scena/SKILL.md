@@ -19,8 +19,10 @@ ochii prind. Parcurge lista și raportează fiecare punct cu dovadă.
    avertismentele de deprecare three.js contează toate.
 4. **Interacțiune** — mișcă camera. Se rotește lin? Controalele răspund?
    Se blochează la limite?
-5. **Mobil** — redimensionează la 390px lățime. Scena se reîncadrează? Textul
-   rămâne lizibil? Nu apare scroll orizontal?
+5. **Mobil** — redimensionează la 390px lățime. Vederea de pornire e aceeași pe
+   orice ecran, cu lateralele tăiate: sanctuarul rămâne în cadru? Butoanele și
+   panourile nu se ating între ele? Textul rămâne lizibil? Nu apare scroll
+   orizontal?
 6. **Memorie** — dacă modificarea schimbă capitolul sau încarcă/descarcă obiecte,
    loghează `renderer.info.memory` înainte și după. Numerele trebuie să revină
    la loc. Dacă urcă monoton, e scurgere.

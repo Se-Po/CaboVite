@@ -2,9 +2,9 @@ import { descarcaInertia } from './camera.js';
 
 // Zborul camerei spre un punct de privire: ținta, distanța, direcția, înălțimea.
 //
-// Busola întoarce numai azimutul; aici se mută tot — ținta de la promontoriu la
-// sanctuar, distanța de la kilometri la sute de metri. Aceleași reguli ca la
-// busolă, pe care nu le repet decât pe scurt:
+// Singurul din pagină: îl folosesc eticheta sanctuarului și busola, care readuce
+// vederea de pornire. Se mută tot — ținta, distanța de la kilometri la sute de
+// metri, direcția, înălțimea. Regulile:
 //   - un singur ceas: `pas()` se cheamă din `setAnimationLoop`, niciun al doilea
 //     requestAnimationFrame;
 //   - inerția utilizatorului se descarcă întâi (camera.js, `descarcaInertia`),
@@ -12,9 +12,12 @@ import { descarcaInertia } from './camera.js';
 //   - sub `prefers-reduced-motion` se sare direct la capăt;
 //   - orice atingere a controalelor anulează zborul: camera e a utilizatorului.
 //
-// Azimutul cerut e al POZIȚIEI camerei față de nordul ADEVĂRAT, ca cifra pe care o
-// scrie busola: „privești dinspre 200°". Pe grilă, theta = (180 − azimut − n) grade,
-// unde n e azimutul în grilă al nordului adevărat — formula busolei, inversată.
+// Punctul se dă în două feluri:
+//   - `{ tinta, pozitie }`, puncte în coordonatele scenei — vederea de pornire;
+//   - `{ tinta, distanta, azimut, elevatie }`. Azimutul e al POZIȚIEI camerei față
+//     de nordul ADEVĂRAT, ca cifra pe care o scrie busola: „privești dinspre 200°".
+//     Pe grilă, theta = (180 − azimut − n) grade, unde n e azimutul în grilă al
+//     nordului adevărat — formula busolei, inversată.
 
 const RAD = Math.PI / 180;
 const drumScurt = (d) => ((d + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -51,20 +54,32 @@ export function creeazaZbor({ camera, controale, cereRandare, azimutNordAdevarat
   return {
     /**
      * Pornește zborul.
-     * @param {{tinta: number[], distanta: number, azimut: number, elevatie: number}} spre
-     *   `azimut` în grade, al poziției camerei față de nordul adevărat; `elevatie` în grade.
+     * @param {{tinta: number[], pozitie?: number[], distanta?: number, azimut?: number, elevatie?: number}} spre
+     *   cu `pozitie`, punctul camerei în scenă; altfel `azimut` în grade, al
+     *   poziției camerei față de nordul adevărat, și `elevatie` în grade.
      */
-    spre({ tinta, distanta, azimut, elevatie }) {
+    spre({ tinta, pozitie, distanta, azimut, elevatie }) {
       if (!viu) return;
       descarcaInertia(controale);
+      // Un zbor vechi nu supraviețuiește: nici ieșirii de mai jos, nici saltului
+      // de sub reduced-motion, după care `pas()` l-ar fi dus mai departe.
+      zbor = null;
       laPornire?.();
       const de = sferic();
+      // Cu `pozitie`, coordonatele sferice ale camerei față de țintă, ca în sferic().
+      const d = pozitie ? pozitie.map((v, k) => v - tinta[k]) : null;
+      const r = d ? Math.hypot(d[0], d[1], d[2]) : distanta;
       const la = {
         t: tinta,
-        r: Math.min(controale.maxDistance, Math.max(controale.minDistance, distanta)),
-        theta: (180 - azimut - azimutNordAdevarat) * RAD,
-        phi: Math.min(controale.maxPolarAngle, Math.max(controale.minPolarAngle, (90 - elevatie) * RAD)),
+        r: Math.min(controale.maxDistance, Math.max(controale.minDistance, r)),
+        theta: d ? Math.atan2(d[0], d[2]) : (180 - azimut - azimutNordAdevarat) * RAD,
+        phi: Math.min(controale.maxPolarAngle, Math.max(controale.minPolarAngle,
+          d ? Math.acos(Math.min(1, Math.max(-1, d[1] / r))) : (90 - elevatie) * RAD)),
       };
+      // Deja acolo: un al doilea clic pe busolă nu zboară 900 ms pe loc.
+      const t = controale.target;
+      if (Math.hypot(t.x - la.t[0], t.y - la.t[1], t.z - la.t[2]) < 1e-6 && Math.abs(de.r - la.r) < 1e-6
+        && Math.abs(drumScurt(la.theta - de.theta)) * la.r < 1e-6 && Math.abs(la.phi - de.phi) * la.r < 1e-6) return;
       if (faraMiscare?.matches) { pune(la.t, la.r, la.theta, la.phi); cereRandare(); return; }
       const t0 = [controale.target.x, controale.target.y, controale.target.z];
       // Durata crește cu cât se schimbă scara și cu cât se mută ținta: de la 5 km
@@ -74,7 +89,7 @@ export function creeazaZbor({ camera, controale, cereRandare, azimutNordAdevarat
       zbor = { t0, de, la, dTheta: drumScurt(la.theta - de.theta), inceput: performance.now(),
         durata: Math.min(2400, 900 + 450 * scara + 400 * Math.min(1, mutare)) };
     },
-    /** Un pas, chemat primul din buclă, ca busola. */
+    /** Un pas, chemat primul din buclă. */
     pas() {
       if (!viu || !zbor) return;
       const z = zbor;

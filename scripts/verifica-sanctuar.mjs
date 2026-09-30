@@ -27,6 +27,7 @@ import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
 import { convergentaDinColturi } from '../src/scene/busola.js';
+import { VEDERE_START } from '../src/scene/camera.js';
 
 const BUGET = { cladiri: 70000, drapaj: 80000, json_kb: 150 };
 const FISIER = 'public/data/sanctuar_v2.json';
@@ -381,6 +382,63 @@ console.log('\nZborul spre sanctuar');
   // Control negativ: un zbor care ar fi luat nordul grilei drept nordul adevărat.
   const grila = faZbor(0, false, 0);
   proba(Math.abs(grila.busola - date.poi.zbor.azimut) > 0.5, `control negativ: pe nordul grilei busola ar citi ${grila.busola.toFixed(6)}° — pică`);
+
+  // Înapoi la vederea de pornire: clicul pe busolă, în timp ce zborul spre sanctuar
+  // e încă în aer. Vederea e dată ca puncte, deci nu depinde de nord.
+  console.log('\nZborul înapoi la vederea de pornire');
+  const faStart = ({ inertie = 0, redusLaClic = false, nZbor = n }) => {
+    // prefers-reduced-motion citit la fiecare pas, ca să se poată schimba în zbor
+    let redus = false;
+    globalThis.matchMedia = () => ({ get matches() { return redus; }, addEventListener() {} });
+    const camera = new THREE.PerspectiveCamera(45, 1.5, 10, 60000);
+    camera.position.set(500, 900, 1800);
+    const controale = new OrbitControls(camera, null);
+    controale.target.set(144, 60, 581);
+    controale.minDistance = 80; controale.maxDistance = 8000;
+    controale.maxPolarAngle = Math.PI / 2 - 0.04; controale.minPolarAngle = 0.15;
+    controale.enableDamping = true; controale.dampingFactor = 0.08;
+    controale.update();
+    let ceas = 0;
+    const acum = performance.now;
+    performance.now = () => ceas;
+    const zbor = creeazaZbor({ camera, controale, cereRandare: () => {}, azimutNordAdevarat: nZbor });
+    zbor.spre(date.poi.zbor);
+    for (let i = 0; i < 10; i++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    if (inertie) controale.rotateLeft(inertie);
+    redus = redusLaClic;
+    zbor.spre(VEDERE_START);
+    const activDupaSpre = zbor.activ;
+    let pasi = 0;
+    for (; pasi < 400 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    // Încă un cadru: sub reduced-motion, zborul vechi spre sanctuar nu trebuie să mai
+    // ia camera înapoi.
+    ceas += 16.7; zbor.pas(); controale.update();
+    zbor.spre(VEDERE_START);   // al doilea clic, pe loc
+    const peLoc = zbor.activ;
+    performance.now = acum;
+    globalThis.matchMedia = undefined;
+    const t = controale.target, p = camera.position;
+    const [px, py, pz] = VEDERE_START.pozitie, [tx, ty, tz] = VEDERE_START.tinta;
+    return { eP: Math.hypot(p.x - px, p.y - py, p.z - pz), eT: Math.hypot(t.x - tx, t.y - ty, t.z - tz),
+      activ: zbor.activ, activDupaSpre, peLoc, pasi, p: p.clone(), t: t.clone() };
+  };
+  const repaus = faStart({});
+  for (const [z, cum] of [[repaus, 'din zborul spre sanctuar'], [faStart({ inertie: 0.6 }), 'după o aruncare de 0,6 rad'],
+    [faStart({ inertie: 0.6, redusLaClic: true }), 'sub prefers-reduced-motion, cu zborul spre sanctuar în aer']]) {
+    proba(!z.activ && z.eP < 1e-9 && z.eT < 1e-9, `${cum}: aterizează la ${Math.max(z.eP, z.eT).toExponential(1)} m, în ${z.pasi} cadre`);
+  }
+  const faraMiscare = faStart({ inertie: 0.6, redusLaClic: true });
+  proba(!faraMiscare.activDupaSpre && faraMiscare.pasi === 0, 'sub prefers-reduced-motion camera e la capăt imediat după clic');
+  proba(!repaus.peLoc, 'al doilea clic, deja acolo, nu pornește niciun zbor');
+  const faraNord = faStart({ nZbor: 0 });
+  proba(faraNord.p.distanceTo(repaus.p) < 1e-9 && faraNord.t.distanceTo(repaus.t) < 1e-9,
+    `aterizarea nu depinde de nord: cu nordul grilei, la ${faraNord.p.distanceTo(repaus.p).toExponential(1)} m`);
+  // Ce scrie busola în vederea de pornire: 306° NV. Pe nordul grilei ar scrie 307.
+  const [px, , pz] = VEDERE_START.pozitie, [tx, , tz] = VEDERE_START.tinta;
+  const thetaStart = Math.atan2(px - tx, pz - tz) / RAD;
+  const citeste = (nord) => ((180 - thetaStart - nord) % 360 + 360) % 360;
+  proba(Math.round(citeste(n)) === 306 && Math.round(citeste(0)) === 307,
+    `busola citește ${citeste(n).toFixed(2)}° (306° NV); pe nordul grilei ar citi ${citeste(0).toFixed(2)}°`);
 }
 
 // ------------------------------------------------------------ 8. clădirea lovită
