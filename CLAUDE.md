@@ -410,9 +410,30 @@ sub 10⁻¹² m; aterizarea nu depinde de nord; al doilea clic nu pornește nimi
 
 ## Punctul de sub clic
 
-`src/scene/punct.js` — clic stâng pe scenă, iar panoul din stânga spune unde e
-punctul, în trei sisteme, și cât de sus. Butonul copiază tot, cu punct zecimal:
+`src/scene/punct.js` — clic stâng pe scenă, iar panoul din dreapta-jos spune unde
+e punctul, în trei sisteme, și cât de sus. Butonul copiază tot, cu punct zecimal:
 panoul e text românesc și se citește, textul copiat pleacă în altă parte.
+
+**Pornește minimizat.** Se vede numai butonul „Coordonate”. Cât e minimizat,
+clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeLa()`
+întoarce `null`; o apăsare începută înainte de minimizare nu mai culege nici ea.
+Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
+rămâne. Rotirea camerei nu depinde de el. Unde stă:
+- pe desktop, dreapta-jos, sub coloana busolei;
+- pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
+- pe telefon, pe rândul de jos, la stânga coloanei busolei și a lui Satelit;
+- sub 22,5rem, deschis, urcă deasupra lui Satelit, pe toată lățimea; sub 17rem
+  butonul rămâne numai cu semnul. Așa ajunge și un telefon de 390 px cu pagina
+  mărită de două ori. Îngust și sub 30rem înălțime, cutia coboară peste Satelit.
+
+Cutia deschisă primește clicurile: are înălțime maximă și defilează, cu antetul
+lipit sus, deci „–” se vede mereu. Prin ea nu se culege și nu se rotește camera;
+o cutie prin care treceau rotița și degetul nu defila deloc — măsurat la 195 px,
+rotița muta camera cu 66 m. Pe desktop fișa sanctuarului și panoul deschis stau în
+aceeași coloană: pe ecrane înalte fișa se oprește deasupra panoului (24rem rezervă;
+pe o clădire panoul ocupă de jos 21,64rem), iar sub ~56rem își împart înălțimea
+dintre 10rem și marginea de jos și defilează fiecare. Pe telefon fișa e o foaie jos,
+peste busolă, Satelit și panou, ca înainte.
 
 **Nu se dă raycast pe plasă.** `raycaster.intersectObject()` pe geometria
 neindexată costă **53 ms pe rază**, măsurat pe cele 2,56 milioane de triunghiuri
@@ -706,7 +727,9 @@ Probele, în pagină (panoul Browser):
   pe care three îl ține global pentru materialele PBR, și fără Satelit;
 - **căile de eșec:** sidecar lipsă (Vite dă index.html), KTX2 trunchiat, un octet
   schimbat, HTTP 404, rețea căzută — fiecare `null` cu un singur avertisment;
-- la 390 px butonul nu atinge busola, panoul punctului, subsolul sau eticheta;
+- la 390 px butonul nu atinge busola, panoul punctului — minimizat sau deschis pe
+  o clădire —, rândul cu sursele sau eticheta; la fel la 320, 700, 1440 și
+  844 × 390 (2026-09-30);
   build-ul de producție încarcă Satelit cu transcodorul din `/assets/`.
 
 ## Sanctuarul
@@ -1254,6 +1277,22 @@ publicare, și adaptată, textul „Informação geográfica cedida pela Direç�
 Território”. Îl scrie `scrieSurse()` din `src/main.js`, o singură dată, cu
 `lang="pt"`, ori de câte ori subsolul are o sursă DGT. Sidecarurile publicate nu
 s-au rescris pentru asta.
+
+În pagină rămâne un singur rând, fără fundal, sus-stânga: „© DGT · ©
+OpenStreetMap”. Se citește prin contur: opt umbre de 1–1,5 px fără estompare
+desenează în jurul literelor un inel plin din culoarea fundalului, deci contrastul e
+al lui `--ink` pe `--bg`, peste 14:1. Numai cu umbre estompate, recenzia măsurase pe
+cerul de pornire, pe tema întunecată, mediana 3,47:1. Inelul de focus al rândului e
+de culoarea textului, între două chenare din culoarea fundalului: cel auriu obișnuit
+avea ~1:1 față de cer. Regulile OSM (OSMF,
+Attribution Guidelines) cer ca atribuirea să se vadă fără interacțiune; „©
+OpenStreetMap” e o formă acceptată, iar legătura duce la pagina lor de copyright.
+„© DGT” deschide o modală cu tot restul — textul SNIG, atribuțiile, licențele,
+prelucrările —, un `<dialog>` deschis cu `showModal()`: focusul rămâne înăuntru,
+Escape o închide, pagina de dedesubt e inertă. Rândul și modala se fac o singură
+dată; sursa Satelit, care sosește după pornire, rescrie numai textele, deci o
+modală deschisă rămâne deschisă. Cât e deschisă, Escape-ul e al ei: fișa
+sanctuarului, inertă dedesubt, nu-l mai fură.
 
 Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v4` și
 `harta_v5`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până

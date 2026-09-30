@@ -8,10 +8,10 @@ import * as THREE from 'three';
 // și imaginea să fie mereu ale aceluiași cadru.
 //
 // Trei lucruri pe care nu le face o etichetă simplă:
-//   - OCOLEȘTE panourile: busola, panoul punctului, subsolul cu surse, legenda și
-//     fișa deschisă. Încearcă sus, dreapta, stânga, jos, și ia prima poziție liberă.
-//     Obstacolele se citesc din DOM, nu se presupun: panoul punctului crește după
-//     un clic, iar pe telefon subsolul curge odată cu pagina.
+//   - OCOLEȘTE panourile: busola, butonul Satelit, panoul punctului, rândul cu
+//     sursele, legenda și fișa deschisă. Încearcă sus, dreapta, stânga, jos, și ia
+//     prima poziție liberă. Obstacolele se citesc din DOM, nu se presupun: panoul
+//     punctului se deschide, se minimizează și crește după un clic.
 //   - Când ancora iese din cadru sau e în spatele camerei, eticheta stă lipită de
 //     marginea ecranului, cu o săgeată spre sanctuar: rămâne un drum într-acolo.
 //   - Când relieful acoperă sanctuarul, eticheta rămâne, dar punctată: altfel ai
@@ -21,7 +21,9 @@ import * as THREE from 'three';
 // dialog nemodal: harta rămâne vie în spatele ei, Escape o închide și readuce
 // focusul pe etichetă.
 
-const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .cutie', '#surse', '#legenda', '#straturi button'];
+// Panoul punctului, pe cele două stări: butonul minimizat și cutia deschisă. Amândouă
+// există de la creare, deci observatorul de mai jos le vede; cea ascunsă se sare.
+const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .activeaza', '#punct .cutie', '#surse', '#legenda', '#straturi button'];
 const DIST_ETICHETA = 12; // px între ancoră și etichetă
 const MARGINE = 8;        // px de la marginea ecranului
 
@@ -120,13 +122,20 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
   };
   // Întâi fișa, apoi zborul: zborul are nevoie de locul pe care îl ocupă ea.
   const laClic = () => { deschide(); laDeschidere?.(fisa.getBoundingClientRect()); };
-  const laTasta = (e) => { if (e.key === 'Escape' && !fisa.hidden) { e.preventDefault(); inchideFisa(); } };
+  // Escape-ul unei modale deschise deasupra (sursele) e al ei: fișa, inertă sub
+  // ea, nu-l fură și nu-i blochează închiderea cu preventDefault.
+  const laTasta = (e) => {
+    if (e.key !== 'Escape' || fisa.hidden || e.defaultPrevented || e.target?.closest?.('dialog[open]')) return;
+    e.preventDefault();
+    inchideFisa();
+  };
   buton.addEventListener('click', laClic);
   inchide.addEventListener('click', () => inchideFisa());
   document.addEventListener('keydown', laTasta);
 
-  // Obstacolele se pot mișca fără ca harta să se redeseneze: panoul punctului
-  // crește după un clic, subsolul curge cu pagina. Atunci se cere un cadru.
+  // Obstacolele se pot mișca fără ca harta să se redeseneze: panoul punctului se
+  // deschide și crește după un clic, iar textul capitolelor va curge cu pagina.
+  // Atunci se cere un cadru.
   let murdar = true;
   const marcheaza = () => { murdar = true; cereRandare(); };
   const observator = typeof ResizeObserver === 'function' ? new ResizeObserver(marcheaza) : null;

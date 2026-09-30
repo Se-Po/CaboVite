@@ -19,6 +19,13 @@
 // evenimentele native ajung oricum pe canvas. Ce le deosebește e un prag de
 // deplasare: peste câțiva pixeli, gestul a fost rotire.
 //
+// ───────────────────────────────────────────────────────────── minimizat
+//
+// Panoul pornește minimizat: în dreapta-jos se vede numai butonul „Coordonate”,
+// iar clicul pe scenă nu culege nimic — nicio rază, niciun rând scris. Activat,
+// face tot ce e descris aici; minimizat din nou, se suspendă, dar ține ultimul
+// punct. Rotirea camerei nu depinde de el: e a lui OrbitControls în ambele stări.
+//
 // ────────────────────────────────────────────────── ce cifre au acoperire
 //
 // Coordonatele sunt ÎNTOTDEAUNA adevărate — raza lovește un loc real chiar și pe
@@ -72,7 +79,7 @@ const brut = (v, zec) => v.toFixed(zec);
  * @param {(raza: THREE.Ray) => ({t: number, cheie: string, x: number, y: number, z: number}|null)} [o.loveste]
  *   — clădirile sanctuarului: prima lovită de rază, dacă e una
  * @param {(cheie: string) => string} [o.numeElement] — numele de afișat al unui element
- * @returns {{dispose: () => void, culegeLa: Function}|null}
+ * @returns {{dispose: () => void, culegeLa: Function, activeaza: Function, minimizeaza: Function, activ: boolean}|null}
  */
 export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, zMin, loveste, numeElement }) {
   // Proba e un apel adevărat, nu o verificare de chei: `laGeo` întoarce null
@@ -165,8 +172,19 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const radacina = document.createElement('div');
   radacina.id = 'punct';
   // Numai literaluri. Cifrele se scriu mai jos cu textContent.
+  //
+  // Semnul butonului e desenat, nu o literă: glifa ⌖ lipsește din unele fonturi
+  // de telefon, iar o cititoare de ecran ar rosti-o.
   radacina.innerHTML =
-    '<div class="cutie">'
+    '<button class="activeaza" type="button" aria-expanded="false" aria-controls="punct-cutie"'
+    + ' title="Arată coordonatele punctului pe care dai clic">'
+    + '<svg class="semn" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    + '<circle cx="12" cy="12" r="6.5"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg>'
+    + '<span class="text">Coordonate</span></button>'
+    + '<div class="cutie" id="punct-cutie" hidden>'
+    + '<div class="antet"><h2 class="titlu">Coordonate</h2>'
+    + '<button class="minimizeaza" type="button" aria-label="Minimizează coordonatele"'
+    + ' title="Minimizează: clicul pe hartă nu mai măsoară"><span aria-hidden="true">–</span></button></div>'
     + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul.</p>'
     + '<dl class="mari" hidden>'
     + '<dt class="cl" hidden>clădire</dt><dd class="cl" hidden></dd>'
@@ -183,6 +201,9 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     + '<span class="anunt" role="status" aria-live="polite"></span>'
     + '</div>';
 
+  const activeazaBtn = radacina.querySelector('.activeaza');
+  const minimizeazaBtn = radacina.querySelector('.minimizeaza');
+  const cutie = radacina.querySelector('.cutie');
   const indemn = radacina.querySelector('.indemn');
   const dlMari = radacina.querySelector('.mari');
   const dlMici = radacina.querySelector('.mici');
@@ -207,6 +228,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   gazda.appendChild(radacina);
 
   let viu = true;
+  let activ = false;    // minimizat: nu culege nimic
   let ales = null;      // ultimul punct cules, gata de copiat
   let cronoCopiere = 0;
 
@@ -296,11 +318,12 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
 
   const laApasare = (ev) => {
     // Pe atingere `button` e tot 0, deci un tap trece pe aceeași cale.
-    if (ev.button !== 0) return;
+    if (!activ || ev.button !== 0) return;
     apasat = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
   };
 
   const laRidicare = (ev) => {
+    if (!activ) { apasat = null; return; }
     if (!apasat || ev.pointerId !== apasat.id) return;
     const dist = Math.hypot(ev.clientX - apasat.x, ev.clientY - apasat.y);
     apasat = null;
@@ -311,6 +334,22 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
 
   const laAnulare = () => { apasat = null; };
 
+  /**
+   * Activează sau minimizează. Focusul trece pe butonul care apare: cel apăsat
+   * tocmai dispare, iar focusul lăsat pe un element ascuns cade pe <body>.
+   */
+  function seteaza(stare, cuFocus) {
+    if (!viu) return;
+    activ = stare;
+    apasat = null;   // o apăsare începută înainte nu mai culege
+    cutie.hidden = !stare;
+    activeazaBtn.hidden = stare;
+    activeazaBtn.setAttribute('aria-expanded', String(stare));
+    if (cuFocus) (stare ? minimizeazaBtn : activeazaBtn).focus();
+  }
+  const laActivare = () => seteaza(true, true);
+  const laMinimizare = () => seteaza(false, true);
+
   canvas.addEventListener('pointerdown', laApasare);
   // Ridicarea se ascultă pe fereastră, nu pe canvas: OrbitControls mută
   // `pointermove`/`pointerup` pe `ownerDocument` cât ține tragerea, iar o tragere
@@ -320,14 +359,20 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   globalThis.addEventListener('pointerup', laRidicare);
   globalThis.addEventListener('pointercancel', laAnulare);
   buton.addEventListener('click', laCopiere);
+  activeazaBtn.addEventListener('click', laActivare);
+  minimizeazaBtn.addEventListener('click', laMinimizare);
 
   return {
-    /** Pentru verificare din consolă: culege fără eveniment de pointer. */
+    /** Pentru verificare din consolă: culege fără eveniment de pointer. Minimizat, null. */
     culegeLa: (clientX, clientY) => {
+      if (!activ) return null;
       const p = punctSubCursor({ clientX, clientY });
       if (p) arata(p);
       return p;
     },
+    activeaza: () => seteaza(true, false),
+    minimizeaza: () => seteaza(false, false),
+    get activ() { return activ; },
     dispose() {
       if (!viu) return;
       viu = false;
@@ -335,6 +380,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       globalThis.removeEventListener('pointerup', laRidicare);
       globalThis.removeEventListener('pointercancel', laAnulare);
       buton.removeEventListener('click', laCopiere);
+      activeazaBtn.removeEventListener('click', laActivare);
+      minimizeazaBtn.removeEventListener('click', laMinimizare);
       clearTimeout(cronoCopiere);
       apasat = null;
       ales = null;

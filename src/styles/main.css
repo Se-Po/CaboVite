@@ -47,6 +47,9 @@ html, body {
   z-index: 0;
 }
 
+/* Textul capitolelor stă peste scenă. Cât `<main>` e gol — sau între paragrafe —,
+   clicurile și tragerile trec la canvas: o cutie goală, cu padding, ar fi oprit
+   invizibil rotirea camerei în banda de sus. Numai copiii lui le primesc. */
 #continut {
   position: relative;
   z-index: 1;
@@ -56,69 +59,122 @@ html, body {
   font-family: var(--serif);
   font-size: 1.11rem;
   line-height: 1.78;
+  pointer-events: none;
 }
+#continut > * { pointer-events: auto; }
 
-/* Atribuirea datelor: un rând pe fundal opac, care se citește peste teren fără
-   să depindă de culoarea de dedesubt. `--muted` pe `--bg` are 6,5:1 pe tema
-   deschisă și 7,1:1 pe cea întunecată; `--accent`, pe legături, 7,6:1 și 7,2:1.
-   Deschis, arată textele complete.
+/* Atribuirea datelor: un singur rând, fără fundal, în colțul de sus-stânga —
+   „© DGT · © OpenStreetMap". Regulile OSM cer ca atribuirea să se vadă fără
+   interacțiune, iar colțul hărții e locul lor obișnuit; jos stau Satelit și
+   panoul punctului. Tot restul stă în modală (`.surse-modala`, mai jos).
 
-   Pe ecran lat stă FIX, jos la mijloc, ca atribuirea unei hărți. În fluxul
-   paginii, după textul provizoriu de azi, cădea în banda panoului punctului
-   (sus-stânga, până la y 228 după un clic): până la ~1074 px lățime rândul
-   ajungea sub panou, iar pe butonul „Copiază" atingerea nu mai ajungea la el.
-   Jos la mijloc nu e nimic pe lățimile peste 34rem — busola și panoul stau sus. */
+   Fără cutie, textul se citește prin contur: opt umbre de 1–1,5 px fără estompare
+   desenează în jurul fiecărei litere un inel plin din culoarea fundalului paginii,
+   iar două umbre estompate îl topesc în scenă. Contrastul se judecă deci între
+   `--ink` și `--bg` — peste 14:1 pe ambele teme —, nu față de cer. Doar cu umbre
+   estompate, cum era întâi, inelul avea lângă o literă de 2 px 30–50% opacitate:
+   recenzia a măsurat pe cerul de pornire, pe tema întunecată, mediana 3,47:1. */
 #surse {
   position: fixed;
-  left: 50%;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: 3;   /* deschis, stă peste panouri: l-a deschis cineva ca să-l citească */
-  width: max-content;
-  max-width: min(40rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
+  top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  left: calc(0.75rem + env(safe-area-inset-left, 0px));
+  z-index: 2;
+  max-width: calc(100vw - 1.5rem);
   margin: 0;
-  padding: 0.35rem 0.8rem;
+  font-family: var(--sans);
+}
+#surse .rand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-shadow:
+    -1px -1px 0 var(--bg), 1px -1px 0 var(--bg), -1px 1px 0 var(--bg), 1px 1px 0 var(--bg),
+    0 -1.5px 0 var(--bg), 0 1.5px 0 var(--bg), -1.5px 0 0 var(--bg), 1.5px 0 0 var(--bg),
+    0 0 4px var(--bg), 0 0 8px var(--bg);
+}
+/* Țintă de atingere de 2,75rem, ca celelalte butoane ale paginii. */
+#surse .atribuire,
+#surse .rand a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+#surse .atribuire:hover,
+#surse .rand a:hover,
+#surse .atribuire:focus-visible,
+#surse .rand a:focus-visible { text-decoration: underline; }
+/* Inelul de focus auriu obișnuit are ~1:1 față de cerul de dedesubt. Aici inelul
+   e de culoarea textului, cu un chenar din culoarea fundalului de ambele părți —
+   umbra de 7 px stă sub contur, deci se vede orice ar fi în spate. */
+#surse .atribuire:focus-visible,
+#surse .rand a:focus-visible {
+  outline-color: var(--ink);
+  border-radius: 4px;
+  box-shadow: 0 0 0 7px var(--bg);
+}
+
+/* Modala surselor. `showModal()` o pune în stratul de sus, deasupra oricărui
+   z-index, și face restul paginii inert. Padding-ul stă pe înveliș, nu pe dialog:
+   un clic pe dialogul însuși e atunci un clic pe fundal. */
+.surse-modala {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: 85vh;
+  padding: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--muted);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
   font-family: var(--sans);
   font-size: 1rem;
   line-height: 1.5;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
 }
-#surse summary { cursor: pointer; }
-#surse ul { margin: 0.5rem 0; padding-left: 1.2rem; }
-#surse p { margin: 0 0 0.3rem; }
-#surse a { color: var(--accent); }
+.surse-modala::backdrop { background: rgb(0 0 0 / 0.45); }
+.surse-modala .invelis { padding: 0.75rem 1.25rem 1.25rem; }
+.surse-modala .antet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.surse-modala h2 { margin: 0; font-size: 1.2rem; }
+.surse-modala .inchide {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.surse-modala .inchide:hover { border-color: var(--gold); }
+.surse-modala ul { margin: 0.5rem 0; padding-left: 1.2rem; }
+.surse-modala p { margin: 0 0 0.3rem; }
+.surse-modala a { color: var(--accent); }
 
-/* Pe telefon, jos nu e loc: busola și panoul punctului coboară în colțuri. Acolo
-   subsolul stă în fluxul paginii, după text, iar marginea de dedesubt îl lasă să
-   urce peste ele când pagina e derulată până la capăt. Măsura e panoul DESCHIS,
-   nu cel de la pornire: după un clic are 196 px plus 12 px până la margine. */
-@media (max-width: 34rem) {
-  #surse {
-    position: relative;
-    left: auto;
-    bottom: auto;
-    transform: none;
-    z-index: 1;
-    width: fit-content;
-    max-height: none;
-    margin: 0 auto calc(14rem + env(safe-area-inset-bottom, 0px));
-  }
+/* Contrast forțat: haloul dispare, deci rândul primește o cutie a sistemului. */
+@media (forced-colors: active) {
+  #surse .rand { background: Canvas; border: 1px solid CanvasText; }
+  .surse-modala { border: 1px solid CanvasText; }
+  .surse-modala .inchide { border-color: ButtonText; }
 }
 
 /* Fără scenă, pagina rămâne o pagină obișnuită. */
 body[data-scena="indisponibila"] #continut { background: var(--bg); }
-
-.provizoriu {
-  color: var(--muted);
-  font-style: italic;
-  border-left: 2px solid var(--gold);
-  padding-left: 18px;
-}
 
 /* Un contur de focus vizibil, pentru linkurile din text. Fără el, pagina rămâne
    cu inelul implicit al browserului, care pe fond cald aproape nu se vede. */
@@ -309,11 +365,19 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * Panoul cu coordonatele punctului ales. Unealtă, nu conținut: se șterge blocul
  * ăsta împreună cu `creeazaPunct()` din scena.js, iar pagina rămâne întreagă.
  *
- * STÂNGA, fiindcă busola e dreapta — sus pe desktop, jos sub 34rem, unde busola
- * coboară și ea. Cele două nu se ating pe nicio lățime.
+ * DREAPTA-JOS. Pornește minimizat — numai butonul „Coordonate" —, iar deschis
+ * crește în sus din același colț. Pe telefon busola și Satelit ocupă colțul, deci
+ * panoul stă pe rândul de jos, la stânga coloanei lor.
  *
- * `pointer-events: none` pe recipient, `auto` numai pe buton: altfel panoul ar
- * fura tocmai clicurile pe teren pe care e pus să le raporteze.
+ * `pointer-events: none` pe recipient, `auto` pe butonul minimizat și pe cutia
+ * deschisă: restul colțului rămâne al hărții, iar un buton fără `auto` ar lăsa
+ * clicul să treacă la canvas — ar culege și ar roti camera. Cutia însăși primește
+ * clicurile: are înălțime maximă și defilează, iar o cutie prin care trec rotița și
+ * degetul nu defilează deloc — măsurat la 195 px, rotița muta camera cu 66 m.
+ *
+ * Înălțimea maximă ține cutia sub busolă (desktop) sau sub rândul cu sursele
+ * (telefon, ecrane scunde). Antetul stă lipit sus, deci „–" se vede oricât ar
+ * defila restul.
  *
  * Culorile după contrast, ca la busolă: `--ink` pe cifrele mari, `--muted` pe
  * etichete și pe rândurile mici, `--accent` pe altitudinea fără acoperire —
@@ -322,15 +386,50 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  */
 #punct {
   position: fixed;
-  top: 1rem;
-  left: 1rem;
+  right: 1rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   font-family: var(--sans);
 }
 
+/* Minimizat: un buton ca Satelit, cu o cruce de vizare desenată. */
+#punct .activeaza {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.9rem;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#punct .activeaza:hover { border-color: var(--gold); }
+#punct .semn {
+  width: 1.15em;
+  height: 1.15em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 #punct .cutie {
+  pointer-events: auto;
   width: min(17rem, calc(100vw - 2rem));
+  /* sub coloana busolei: 1rem + rozeta 6rem + citirea ~2rem, un gol și marginea de jos */
+  max-height: calc(100dvh - 10.75rem - env(safe-area-inset-bottom, 0px));
+  overflow: auto;
+  overscroll-behavior: contain;   /* defilarea ajunsă la capăt nu trece la pagină */
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -339,6 +438,32 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   color: var(--ink);
   font-variant-numeric: tabular-nums;  /* cifrele nu mai zvâcnesc la fiecare clic */
 }
+
+#punct .antet {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: -0.3rem -0.4rem 0.35rem 0;
+  background: var(--surface);
+}
+#punct .titlu { margin: 0; font-size: 0.95rem; font-weight: 700; }
+#punct .minimizeaza {
+  pointer-events: auto;
+  min-width: 2.75rem;          /* 44 px: ținta minimă de atingere */
+  min-height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 700 1.2rem/1 var(--sans);
+  cursor: pointer;
+}
+#punct .minimizeaza:hover { border-color: var(--gold); }
 
 #punct .indemn {
   margin: 0;
@@ -427,19 +552,76 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * `hidden` e doar `display: none` din foaia browserului, cu specificitatea
  * (0,1,0): orice regulă de mai sus care are id în selector îl bate și l-ar anula
  * tăcut. Aici specificitatea e (1,1,0) — egală cu a lui `.copiaza`, deci decide
- * ordinea din fișier. De aceea stă la urmă: ca să acopere tot ce e deasupra ei. */
+ * ordinea din fișier. De aceea stă la urmă: ca să acopere tot ce e deasupra ei —
+ * și `display: inline-flex` de pe `.activeaza`. */
 #punct [hidden] { display: none; }
 
-/* Pe telefon coboară, ca busola, dar în colțul celălalt. */
-@media (max-width: 34rem) {
-  #punct {
-    top: auto;
-    left: 0.75rem;
-    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+/* Ecran lat, dar scund — telefonul culcat, 844 × 390: coloana busolei coboară până
+   la ~9rem, iar panoul deschis ar urca peste ea. Stă la stânga coloanei și poate
+   urca până sub rândul cu sursele. */
+@media not all and (max-width: 34rem) {
+  @media (max-height: 32rem) {
+    #punct { right: 8rem; }
+    #punct .cutie { max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px)); }
   }
-  #punct .cutie { width: min(14.5rem, calc(100vw - 7rem)); padding: 0.55rem 0.7rem; }
+}
+
+/* Pe telefon busola e în colț, cu Satelit deasupra: panoul stă pe rândul de jos, la
+   stânga coloanei lor, și urcă până sub rândul cu sursele. La 390 px, busola
+   începe la x 306 și Satelit la 282; cutia, de la 42 la 274. */
+@media (max-width: 34rem) {
+  #punct { right: 7.25rem; }
+  #punct .cutie {
+    width: min(14.5rem, calc(100vw - 8rem));
+    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px));
+    padding: 0.55rem 0.7rem;
+  }
   #punct .mari dd { font-size: 1rem; }
   #punct .mici dd { font-size: 0.72rem; }
+}
+
+/* Sub 22,5rem (~360 px) cutia n-ar mai încăpea lângă coloană: rândurile mici ar
+   ieși din ea. Deschisă, urcă deasupra lui Satelit, pe toată lățimea, iar butonul
+   minimizat rămâne pe rândul de jos. Tot aici ajunge telefonul cu pagina mărită
+   de două ori (390 px → 195): cutia se oprește sub rândul cu sursele, care are
+   atunci două rânduri, și defilează; rândurile mici trec pe o coloană. */
+@media (max-width: 22.5rem) {
+  #punct .cutie {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(11rem + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    /* 11rem jos, 6,25rem sus: rândul cu sursele, care aici are două rânduri */
+    max-height: calc(100dvh - 17.25rem - env(safe-area-inset-bottom, 0px));
+  }
+  #punct .mici { grid-template-columns: 1fr; }
+  #punct .mici dd { text-align: left; white-space: normal; }
+}
+
+/* Îngust și scund — pagina mărită de patru ori, 1280 × 1024 → 320 × 256: deasupra
+   lui Satelit n-ar rămâne nimic. Cât e deschisă, cutia coboară peste Satelit și
+   busolă, până sub rândul cu sursele. */
+@media (max-width: 22.5rem) and (max-height: 30rem) {
+  #punct .cutie {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 7rem - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Sub 17rem butonul minimizat nu mai încape cu numele lângă coloana busolei:
+   rămâne semnul, iar numele rămâne pentru cititoarele de ecran. Ținta rămâne de
+   2,9rem pe ambele laturi. */
+@media (max-width: 17rem) {
+  #punct .activeaza { justify-content: center; min-width: 2.9rem; padding: 0.45rem 0.7rem; }
+  #punct .activeaza .text {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* ------------------------------------------------------ legenda previzualizării
@@ -447,14 +629,16 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * Numai cu ?previzualizare=… în adresă. Unealtă de verificat datele, nu
  * conținut: se șterge împreună cu src/scene/previzualizare.js.
  *
- * Jos în dreapta pe desktop, deasupra rândului de atribuire. Sub 34rem busola și
- * panoul coboară amândouă, deci legenda urcă sus — unde e textul, care coboară
- * sub ea; vezi regula de la capătul blocului.
+ * Butonul Satelit nu apare în modul ăsta, deci legenda îi ia locul: jos-stânga pe
+ * desktop, deasupra busolei pe telefon. Dreapta-jos e al panoului punctului, iar
+ * sus-stânga al rândului cu sursele. Minimizat, panoul n-o atinge; deschis, o
+ * poate acoperi pe telefon și pe ecranele late de 34–~43rem — e o unealtă de
+ * verificat datele, deci pentru citit legenda se minimizează panoul.
  */
 #legenda {
   position: fixed;
-  right: 1rem;
-  bottom: 4.5rem;   /* deasupra rândului de atribuire, fix jos la mijloc */
+  left: 1rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   pointer-events: none;
   width: min(16rem, calc(100vw - 2rem));
@@ -474,16 +658,15 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #legenda .fara { color: var(--muted); font-size: 0.78rem; }
 #legenda .mostra { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.35rem; vertical-align: -0.1rem; border-radius: 2px; }
 
-/* Sub 34rem jos e ocupat de busolă și de panou, iar sus e textul. Legenda urcă
-   sus, iar textul coboară sub ea cât timp există. */
 @media (max-width: 34rem) {
-  #legenda { top: 1rem; bottom: auto; right: 0.75rem; }
-  body:has(#legenda) #continut { padding-top: 9rem; }
+  #legenda { left: auto; right: 0.75rem; bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (forced-colors: active) {
   #punct .cutie,
-  #punct .copiaza { background: Canvas; border-color: CanvasText; color: CanvasText; }
+  #punct .copiaza,
+  #punct .minimizeaza { background: Canvas; border-color: CanvasText; color: CanvasText; }
+  #punct .activeaza { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
   #punct .mari dd.fara { color: Highlight; }
 }
 
@@ -540,8 +723,9 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   right: 1rem;
   top: 10rem;
   width: min(24rem, calc(100vw - 2rem));
-  /* deasupra subsolului cu surse, fix jos la mijloc pe ecranele late */
-  max-height: calc(100vh - 16rem);
+  /* deasupra rândului de jos — butonul Satelit, panoul punctului minimizat —, și
+     cel puțin 8rem pe ecranele scunde, unde diferența ar ieși zero sau negativă */
+  max-height: max(8rem, calc(100vh - 16rem));
   overflow: auto;
   padding: 1rem 1.1rem;
   border: 1px solid var(--line);
@@ -573,6 +757,24 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   cursor: pointer;
 }
 #sanctuar-fisa .inchide:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* Pe desktop fișa și panoul punctului stau în aceeași coloană din dreapta: fișa de
+   la 10rem în jos, panoul de jos în sus. Deschise amândouă, nu se acoperă — fișa
+   ar sta peste panou (z 3 peste 2), cu tot cu butonul de minimizare:
+   - înalt: fișa se oprește deasupra panoului. Pe o clădire panoul ocupă de jos
+     21,64rem, măsurat la 700 × 800 (sacristia de sud); 24rem lasă loc și unui nume
+     pe două rânduri, plus un gol;
+   - mai jos de ~56rem (900 px) nu mai rămâne destul pentru amândouă: își împart
+     înălțimea dintre 10rem și marginea de jos, cu un gol de 1rem, și defilează
+     fiecare. Antetul panoului și butonul „Închide" al fișei rămân la vedere. */
+@media not all and (max-width: 34rem) {
+  body:has(#punct .cutie:not([hidden])) #sanctuar-fisa {
+    max-height: max(calc((100vh - 11.75rem) / 2), calc(100vh - 34rem));
+  }
+  body:has(#sanctuar-fisa:not([hidden])) #punct .cutie {
+    max-height: calc((100vh - 11.75rem) / 2);
+  }
+}
 
 @media (max-width: 34rem) {
   /* pe telefon, foaie jos, peste busolă cât e deschisă */

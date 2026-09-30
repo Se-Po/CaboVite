@@ -16,11 +16,13 @@ const subsol = document.querySelector('#surse');
  * oriunde se afișează. Subsolul apare numai când scena chiar le afișează: fără
  * WebGL, pagina nu arată nimic din ele și n-are ce atribui.
  *
- * Un rând scurt, care e el însuși atribuire întreagă — autor, licență,
- * „prelucrate" —, iar dedesubt, deschise la cerere, textele complete. Varianta
- * cu toate trei atribuirile afișate stătea, cu textul provizoriu de azi, chiar
- * în mijlocul ecranului, peste scenă. `<details>` se deschide și de la tastatură,
- * fără niciun cod.
+ * În pagină rămâne un singur rând, fără fundal, în colțul de sus-stânga:
+ * „© DGT · © OpenStreetMap". E cât cer regulile OSM (OSMF, Attribution
+ * Guidelines): atribuirea se vede fără niciun clic, iar „© OpenStreetMap" duce la
+ * pagina lor de copyright. Tot restul — textul cerut de SNIG, atribuțiile
+ * întregi, licențele, ce s-a prelucrat — stă într-o modală deschisă din „© DGT".
+ * `<dialog>` nativ, cu `showModal()`: focusul rămâne înăuntru, Escape o închide,
+ * iar pagina de dedesubt e inertă, fără niciun cod pentru asta.
  *
  * Atribuirile vin din sidecaruri; ce s-a prelucrat spune scena, fiindcă numai ea
  * știe ce a folosit. `textContent`, nu `innerHTML`: sunt date, nu marcaj.
@@ -43,23 +45,94 @@ const LICENTE = {
   'ODbL 1.0': 'https://opendatacommons.org/licenses/odbl/1-0/',
 };
 
+const el = (tag, text) => { const e = document.createElement(tag); if (text) e.textContent = text; return e; };
+
+// Numele scurt al unui producător, pentru rândul vizibil: acronimul dintre
+// paranteze („Direção-Geral do Território (DGT)" → „DGT"), „OpenStreetMap" pentru
+// contribuitorii lui, altfel numele întreg.
+const numeScurt = (p) => p.match(/\(([^)]+)\)\s*$/)?.[1] ?? (/OpenStreetMap/.test(p) ? 'OpenStreetMap' : p);
+
+/**
+ * Rândul și modala se fac o singură dată. Scrierile de după — sursa Satelit
+ * sosește după pornire — schimbă numai textele: o modală deschisă rămâne
+ * deschisă, iar butonul nu-și pierde focusul.
+ */
+let dom = null;
+function construiesteSubsol() {
+  const buton = el('button');
+  buton.type = 'button';
+  buton.className = 'atribuire';
+  buton.setAttribute('aria-haspopup', 'dialog');
+  const legaturi = el('span');
+  const rand = el('p');
+  rand.className = 'rand';
+  rand.append(buton, legaturi);
+
+  const dialog = el('dialog');
+  dialog.className = 'surse-modala';
+  dialog.setAttribute('aria-labelledby', 'surse-titlu');
+  // Închiderea la clic în afară, unde browserul o știe singur; mai jos, pentru rest.
+  dialog.setAttribute('closedby', 'any');
+  const titlu = el('h2', 'Sursele datelor');
+  titlu.id = 'surse-titlu';
+  const inchide = el('button', 'Închide');
+  inchide.type = 'button';
+  inchide.className = 'inchide';
+  const antet = el('div');
+  antet.className = 'antet';
+  antet.append(titlu, inchide);
+  const corp = el('div');
+  corp.className = 'corp';
+  // Învelișul acoperă tot dialogul, deci un clic pe dialogul însuși e pe fundal.
+  const invelis = el('div');
+  invelis.className = 'invelis';
+  invelis.append(antet, corp);
+  dialog.append(invelis);
+  subsol.replaceChildren(rand, dialog);
+
+  buton.addEventListener('click', () => dialog.showModal());
+  inchide.addEventListener('click', () => dialog.close());
+  // Safari nu readuce singur focusul pe butonul care a deschis-o.
+  dialog.addEventListener('close', () => buton.focus());
+  // Pe fundal numai dacă și apăsarea, și ridicarea au fost acolo: o selecție de
+  // text trasă din modală până pe fundal nu o închide.
+  let apasatPeFundal = false;
+  dialog.addEventListener('pointerdown', (e) => { apasatPeFundal = e.target === dialog; });
+  dialog.addEventListener('click', (e) => {
+    if (apasatPeFundal && e.target === dialog) dialog.close();
+    apasatPeFundal = false;
+  });
+  return { buton, legaturi, dialog, corp, inchide };
+}
+
 function scrieSurse(surse) {
   if (!subsol || !surse?.length) return;
-  const el = (tag, text) => { const e = document.createElement(tag); if (text) e.textContent = text; return e; };
+  dom ??= construiesteSubsol();
   const unice = (cheie) => [...new Set(surse.map((s) => s[cheie]).filter(Boolean))];
 
-  // Rândul vizibil. ODbL cere ca „© contribuitorii OpenStreetMap" să ducă la pagina
-  // lor de copyright; dacă o sursă are portalul acolo, producătorul ei devine legătură.
-  const rezumat = el('summary', 'Date: © ');
-  unice('producator').forEach((p, i) => {
-    if (i) rezumat.append(', ');
-    const portal = surse.find((s) => s.producator === p && /openstreetmap\.org\/copyright/.test(s.portal ?? ''))?.portal;
-    if (!portal) { rezumat.append(p); return; }
-    const a = el('a', p);
-    a.href = portal;
-    rezumat.append(a);
-  });
-  rezumat.append(` · ${unice('licenta').join(', ')} · prelucrate`);
+  // Rândul vizibil. ODbL: „© OpenStreetMap" duce la pagina lor de copyright, dacă o
+  // sursă are portalul acolo. Ceilalți producători sunt butonul care deschide modala.
+  const portalOsm = (p) => surse.find((s) => s.producator === p && /openstreetmap\.org\/copyright/.test(s.portal ?? ''))?.portal;
+  const producatori = unice('producator');
+  const altii = producatori.filter((p) => !portalOsm(p)).map((p) => `© ${numeScurt(p)}`);
+  dom.buton.textContent = altii.length ? altii.join(', ') : 'Sursele datelor';
+  dom.buton.setAttribute('aria-label', `${dom.buton.textContent} — sursele și licențele`);
+  // Legăturile se actualizează pe loc când sunt tot atâtea — de obicei, fiindcă
+  // Satelit aduce tot o sursă DGT: una recreată și-ar pierde focusul.
+  const osm = producatori.filter(portalOsm);
+  const vechi = [...dom.legaturi.querySelectorAll('a')];
+  if (vechi.length === osm.length) {
+    osm.forEach((p, i) => { vechi[i].textContent = `© ${numeScurt(p)}`; vechi[i].href = portalOsm(p); });
+  } else {
+    dom.legaturi.replaceChildren(...osm.flatMap((p) => {
+      const sep = el('span', ' · ');
+      sep.setAttribute('aria-hidden', 'true');
+      const a = el('a', `© ${numeScurt(p)}`);
+      a.href = portalOsm(p);
+      return [sep, a];
+    }));
+  }
+
   const lista = el('ul');
   // Metadatele SNIG ale datelor DGT cer, la orice publicare, și adaptată, textul
   // acesta, în portugheză. Se scrie o singură dată, oricâte surse DGT ar fi; `lang`
@@ -88,27 +161,19 @@ function scrieSurse(surse) {
     a.href = url.href;
     nota.append(' Datele: ', a, '.');
   }
-  const detalii = el('details');
-  detalii.append(rezumat, lista, nota);
-  subsol.replaceChildren(detalii);
+  // Un focus din conținutul care se rescrie ar cădea pe <body>, sub modală.
+  if (dom.dialog.open && dom.corp.contains(document.activeElement)) dom.inchide.focus();
+  dom.corp.replaceChildren(lista, nota);
   subsol.hidden = false;
 }
 
+// Fără scenă, pagina n-ar avea nimic de arătat până vin capitolele. Un anunț
+// neutru: calea asta o iau și WebGL-ul lipsă, și o eroare la încărcare.
 function faraScena(motiv) {
   canvas?.remove();
   document.body.dataset.scena = 'indisponibila';
+  if (continut && !continut.textContent.trim()) continut.append(el('p', 'Harta 3D nu a putut porni.'));
   console.info('Pagina rulează fără scenă 3D:', motiv);
-}
-
-// Textul ÎNAINTE de scenă, nu după.
-//
-// Blocul ăsta stătea sub `try`, deci prima vopsire aștepta 4 225 774 de octeți
-// de relief și construirea a 1,36 milioane de triunghiuri. Principiul
-// proiectului spune că textul e conținutul și scena îl servește; codul spunea
-// invers. Mutat aici, nu mai așteaptă nimic.
-if (continut && !continut.textContent.trim()) {
-  continut.innerHTML =
-    '<p class="provizoriu">Textul capitolelor se adaugă la pasul următor.</p>';
 }
 
 try {
