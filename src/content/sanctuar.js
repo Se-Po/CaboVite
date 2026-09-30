@@ -2,7 +2,8 @@
 // eticheta de pe hartă.
 //
 // Date, nu cod. Fiecare afirmație are sursa ei primară, cu adresa de unde se
-// poate citi, și a trecut prin agentul verificator-surse (2026-09-29). Fișa SIPA
+// poate citi, și a trecut prin agentul verificator-surse (2026-09-29; ce s-a schimbat
+// în v0.0.11, pe 2026-09-30). Fișa SIPA
 // (monumentos.gov.pt) nu mai răspunde; se citește din Arquivo.pt, arhiva web
 // portugheză. La fel fișa Património Cultural, a cărei adresă nouă refuză
 // cererile automate. Unde sursele se contrazic, se spune.
@@ -23,6 +24,26 @@ const VISIT_SESIMBRA = {
   nume: 'Visit Sesimbra',
   url: 'https://www.visitsesimbra.pt/to-visit/62/santu-rio-do-cabo-espichel',
 };
+const REVIVE_ANEXA = {
+  nume: 'Margarida Elias, memoria istorică anexată concursului REVIVE (anexa 3)',
+  url: 'https://revive.turismodeportugal.pt/sites/default/files/CE_Anexo3_MemoriaHistorica_CaboEspichel.pdf',
+};
+const REVIVE_PAGINA = {
+  nume: 'REVIVE, pagina Santuário do Cabo Espichel',
+  url: 'https://revive.turismodeportugal.pt/pt-pt/santuario-espichel',
+};
+const CAMARA_TEMPORADA = {
+  nume: 'Câmara Municipal de Sesimbra, Temporada de Música da Casa da Ópera',
+  url: 'https://www.sesimbra.pt/agenda-online/evento/temporada-de-musica-da-casa-de-opera-do-cabo-espichel-64',
+};
+const PINHO_LEAL = {
+  nume: 'Pinho Leal, Portugal Antigo e Moderno, vol. IX (1880), p. 137',
+  url: 'https://archive.org/stream/portugalantigoe06ferrgoog#page/n141/mode/1up',
+};
+const PINHO_LEAL_138 = {
+  nume: 'Pinho Leal, Portugal Antigo e Moderno, vol. IX (1880), p. 138',
+  url: 'https://archive.org/stream/portugalantigoe06ferrgoog#page/n142/mode/1up',
+};
 
 export const SANCTUAR = {
   nume: 'Santuário de Nossa Senhora do Cabo Espichel',
@@ -37,12 +58,16 @@ export const SANCTUAR = {
       surse: [SIPA],
     },
     {
-      text: 'Biserica de azi a fost începută în 1701, pe locul uneia mai vechi, și inaugurată în 1707. Proiectul e atribuit arhitectului João Antunes.',
-      surse: [SIPA],
+      text: 'Biserica de azi a fost începută în 1701, pe locul uneia mai vechi, și inaugurată în iulie 1707, când imaginea Fecioarei a fost mutată în ea din ermidă. Proiectul e atribuit, fără unanimitate, arhitectului regal João Antunes; Património Cultural dă ca alternativă pe părintele Francisco Tinoco da Silva.',
+      surse: [SIPA, REVIVE_ANEXA, PATRIMONIO],
     },
     {
       text: 'Casele pelerinilor — cele două aripi lungi, cu arcade la parter — au fost începute în 1715. Lucrările s-au intensificat între 1745 și 1760, iar aripa de nord a fost prelungită în 1794.',
       surse: [SIPA],
+    },
+    {
+      text: 'În 1880, Pinho Leal număra 63 de arce la aripa de nord și 47 la cea de sud, sub o arcadă comună, pe sub care se putea ajunge la biserică ferit de soare și de ploaie.',
+      surse: [PINHO_LEAL],
     },
     {
       text: 'Între aripi stă terreiro-ul, o piață dreptunghiulară de 27 m lățime și circa 150 m lungime, cu un cruzeiro — o cruce pe o platformă cu trei trepte — la capătul de est.',
@@ -53,18 +78,18 @@ export const SANCTUAR = {
       surse: [SIPA],
     },
     {
+      text: 'Casa da Ópera, din care azi au rămas doar urme, a fost ridicată în 1770 de círio-ul din Lisabona — o confrerie de pelerini —, cu decoruri și amenajări.',
+      surse: [SIPA, REVIVE_ANEXA, CAMARA_TEMPORADA],
+    },
+    {
       text: 'Biserica, casele pelerinilor și terreiro-ul sunt clasate Imóvel de Interesse Público prin Decretul nr. 37 728 din 5 ianuarie 1950.',
       surse: [PATRIMONIO, SIPA],
     },
   ],
   conflicte: [
     {
-      text: 'Începutul bisericii: 1701, după cronologia fișei SIPA și după Visit Sesimbra. Una dintre inscripțiile pe azulejos din Ermida da Memória, transcrisă tot în fișa SIPA, spune însă „Dá-se o principio à majestosa egreja, em 1707".',
-      surse: [SIPA, VISIT_SESIMBRA],
-    },
-    {
-      text: 'Casa da Ópera, azi în ruină, e datată 1770 de fișa SIPA, care o atribuie círio-ului — confreriei de pelerini — din Lisabona. Site-ul Câmarei Municipal de Sesimbra o pune, fără an, printre edificiile ridicate între 1701 și 1770. Portalul turistic Visit Sesimbra, al aceleiași Câmare, o dă „de finais de oitocentos" — de la sfârșitul secolului al XIX-lea —, deși în aceeași frază așază edificiile principale între 1701 și 1770. Sursele nu se împacă.',
-      surse: [SIPA, CAMARA, VISIT_SESIMBRA],
+      text: 'Visit Sesimbra, portalul turistic al Câmarei, datează Casa da Ópera „de finais de oitocentos" — de la sfârșitul secolului al XIX-lea —, în aceeași frază care așază edificiile principale între 1701 și 1770; pagina REVIVE a imobilului repetă datarea. Niciuna nu spune pe ce se sprijină. Memoria istorică anexată concursului REVIVE și pagina de agendă a Câmarei o pun în 1770, iar în 1880 Pinho Leal o găsea deja uzată, cu rândul de loje de odinioară înlocuit de o galerie.',
+      surse: [VISIT_SESIMBRA, REVIVE_PAGINA, REVIVE_ANEXA, CAMARA_TEMPORADA, PINHO_LEAL_138],
     },
   ],
   // Ce spune panoul punctului când un clic cade pe o clădire, după prefixul cheii
