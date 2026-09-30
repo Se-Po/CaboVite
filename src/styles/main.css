@@ -436,3 +436,108 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #punct .copiaza { background: Canvas; border-color: CanvasText; color: CanvasText; }
   #punct .mari dd.fara { color: Highlight; }
 }
+
+/* ------------------------------------------------------- sanctuarul
+ *
+ * Eticheta de pe hartă și fișa ei. Eticheta stă în stratul textului (1), sub
+ * unelte: e un reper, nu o unealtă, și n-are voie să acopere busola sau panoul
+ * punctului — le ocolește singură, din eticheta.js. Fișa e o unealtă (3).
+ *
+ * Culori după contrast, ca la busolă și la punct: `--ink` pe `--surface` pentru
+ * nume, `--accent` pe chenar și pe legături (7,6:1 / 7,2:1), `--muted` pe sursele
+ * mici (6,5:1 / 7,1:1). `--gold` numai pe focus, niciodată pe text.
+ */
+#sanctuar-eticheta {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+#sanctuar-eticheta .pin {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+}
+#sanctuar-eticheta[data-mod="margine"] .pin { display: none; }
+#sanctuar-eticheta .poi {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  max-width: min(16rem, 62vw);
+  min-height: 2.75rem;
+  padding: 0.45rem 0.8rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 1rem/1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+#sanctuar-eticheta .poi:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#sanctuar-eticheta.ocluzat .poi { border-style: dashed; }
+#sanctuar-eticheta .sageata:not(:empty) { margin-right: 0.4rem; color: var(--accent); }
+
+#sanctuar-fisa {
+  position: fixed;
+  z-index: 3;
+  right: 1rem;
+  top: 10rem;
+  width: min(24rem, calc(100vw - 2rem));
+  /* deasupra subsolului cu surse, fix jos la mijloc pe ecranele late */
+  max-height: calc(100vh - 16rem);
+  overflow: auto;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: 1rem/1.55 var(--sans);
+}
+#sanctuar-fisa h2 {
+  margin: 0 5.5rem 0.6rem 0;
+  font: 700 1.2rem/1.3 var(--serif);
+}
+#sanctuar-fisa h2:focus { outline: none; }
+#sanctuar-fisa h2:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#sanctuar-fisa ul { margin: 0 0 0.75rem; padding-left: 1.1rem; }
+#sanctuar-fisa li { margin-bottom: 0.55rem; }
+#sanctuar-fisa .sursa, #sanctuar-fisa .model { color: var(--muted); font-size: 0.92rem; }
+#sanctuar-fisa a { color: var(--accent); }
+#sanctuar-fisa .inchide {
+  float: right;
+  min-height: 2.75rem;
+  margin: -0.25rem -0.35rem 0 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--bg);
+  color: var(--ink);
+  font: 600 0.95rem/1 var(--sans);
+  cursor: pointer;
+}
+#sanctuar-fisa .inchide:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+@media (max-width: 34rem) {
+  /* pe telefon, foaie jos, peste busolă cât e deschisă */
+  #sanctuar-fisa {
+    left: 0.5rem;
+    right: 0.5rem;
+    top: auto;
+    bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 55vh;
+  }
+}
+
+@media (forced-colors: active) {
+  #sanctuar-eticheta .poi, #sanctuar-fisa, #sanctuar-fisa .inchide { background: Canvas; color: CanvasText; border-color: CanvasText; }
+  #sanctuar-eticheta .pin { background: Highlight; border-color: Canvas; }
+  #sanctuar-fisa a { color: LinkText; }
+}

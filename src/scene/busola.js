@@ -34,6 +34,8 @@
 // Ultima e cea care se ratează cel mai ușor. `theta = 0` pune în sus nordul
 // GRILEI, alături cu 0,67°.
 
+import { descarcaInertia } from './camera.js';
+
 const GRADE = 180 / Math.PI;
 const RADIANI = Math.PI / 180;
 
@@ -156,10 +158,12 @@ const ROZETA = `
  * @param {object} o.controale — OrbitControls
  * @param {() => void} o.cereRandare
  * @param {object} [o.colturi] — `colturi_geo` din sidecarul hărții de BAZĂ
+ * @param {() => void} [o.laPornire] — chemat când pornește un zbor al busolei;
+ *   scena oprește atunci zborul spre sanctuar, ca două animații să nu se certe
  * @returns {{pas, dispose, convergenta, azimutNordAdevarat}|null}
  *   null dacă nordul adevărat nu se poate afla din date.
  */
-export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi }) {
+export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi, laPornire }) {
   const gamma = convergentaDinColturi(colturi);
   if (gamma === null) {
     console.warn('busolă: `colturi_geo` lipsește din sidecarul hărții de bază sau '
@@ -305,10 +309,8 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi }
     // zborul pleacă de acolo. Saltul e mic în practică: acumulatorul se stinge la
     // 60 Hz cât timp muți mâna spre rozetă, deci după o jumătate de secundă a mai
     // rămas sub 10% din el.
-    const amortiza = controale.enableDamping;
-    controale.enableDamping = false;
-    controale.update();   // :808 golește `_sphericalDelta` ȘI `_panOffset`
-    controale.enableDamping = amortiza;
+    descarcaInertia(controale);   // :808 golește `_sphericalDelta` ȘI `_panOffset`
+    laPornire?.();
 
     const de = controale.getAzimuthalAngle();
     // theta pentru care rozeta citește exact AZIMUT_TINTA.
@@ -361,6 +363,8 @@ export function creeazaBusola({ gazda, camera, controale, cereRandare, colturi }
 
   return {
     pas,
+    /** Oprește zborul în curs, dacă e unul — îl cheamă zborul spre sanctuar. */
+    opreste() { zbor = null; },
     /** Azimutul în grilă al nordului adevărat, în grade. Expus pentru verificare. */
     azimutNordAdevarat,
     /** γ, dedus din date. Expus pentru verificare. */

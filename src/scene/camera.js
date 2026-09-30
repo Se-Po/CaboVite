@@ -83,6 +83,25 @@ export function creeazaCamera(canvas, tinta = TINTA.clone()) {
  * Se aplică doar cât timp utilizatorul nu a mișcat singur camera: după aceea
  * încadrarea e a lui, nu a noastră.
  */
+/**
+ * Golește inerția rămasă de la utilizator, APLICÂND-O întâi.
+ *
+ * `update()` nu citește doar poziția camerei, ci îi adaugă acumulatorul privat
+ * `_sphericalDelta` (OrbitControls.js:717). Cu amortizare pornită el nu se
+ * golește niciodată, doar se stinge; singura ramură care îl golește e cea fără
+ * amortizare (:808), care îl și adaugă întreg înainte. Un zbor care n-ar trece
+ * pe aici ar ateriza alături de țintă cu cât mai rămăsese de aplicat — pe calea
+ * `prefers-reduced-motion`, măsurat, 0,8° din 10°. Vezi busola.js.
+ *
+ * Stătea în busola.js; îl cere și zborul spre sanctuar, deci stă aici, o dată.
+ */
+export function descarcaInertia(controale) {
+  const amortiza = controale.enableDamping;
+  controale.enableDamping = false;
+  controale.update();
+  controale.enableDamping = amortiza;
+}
+
 export function incadreazaLaAspect(camera, controale, aspect) {
   const referinta = 1.5; // aspectul pentru care e aleasă DIST
   const factor = Math.min(3.2, Math.max(1, referinta / Math.max(aspect, 0.2)));

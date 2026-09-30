@@ -3,6 +3,7 @@
 // Textul e conținutul, scena îl servește. Dacă WebGL nu pornește, canvasul
 // dispare și pagina rămâne o pagină, nu un ecran de eroare.
 import { porneste } from './scene/scena.js';
+import { SANCTUAR } from './content/sanctuar.js';
 
 const canvas = document.querySelector('#scena');
 const continut = document.querySelector('#continut');
@@ -35,20 +36,37 @@ function arataSurse(surse) {
   }
 }
 
+// Licențele cunoscute, cu textul lor oficial. Una necunoscută rămâne text simplu.
+const LICENTE = {
+  'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0/',
+  'ODbL 1.0': 'https://opendatacommons.org/licenses/odbl/1-0/',
+};
+
 function scrieSurse(surse) {
   if (!subsol || !surse?.length) return;
   const el = (tag, text) => { const e = document.createElement(tag); if (text) e.textContent = text; return e; };
   const unice = (cheie) => [...new Set(surse.map((s) => s[cheie]).filter(Boolean))];
 
-  const rezumat = el('summary', `Date: © ${unice('producator').join(', ')} · ${unice('licenta').join(', ')} · prelucrate`);
+  // Rândul vizibil. ODbL cere ca „© contribuitorii OpenStreetMap" să ducă la pagina
+  // lor de copyright; dacă o sursă are portalul acolo, producătorul ei devine legătură.
+  const rezumat = el('summary', 'Date: © ');
+  unice('producator').forEach((p, i) => {
+    if (i) rezumat.append(', ');
+    const portal = surse.find((s) => s.producator === p && /openstreetmap\.org\/copyright/.test(s.portal ?? ''))?.portal;
+    if (!portal) { rezumat.append(p); return; }
+    const a = el('a', p);
+    a.href = portal;
+    rezumat.append(a);
+  });
+  rezumat.append(` · ${unice('licenta').join(', ')} · prelucrate`);
   const lista = el('ul');
   for (const s of surse) lista.append(el('li', s.atributie));
   const nota = el('p', `Prelucrate pentru această pagină: ${unice('prelucrare').join('; ')}. Licența: `);
   unice('licenta').forEach((l, i) => {
     if (i) nota.append(', ');
-    if (l !== 'CC BY 4.0') { nota.append(l); return; }
+    if (!LICENTE[l]) { nota.append(l); return; }
     const a = el('a', l);
-    a.href = 'https://creativecommons.org/licenses/by/4.0/';
+    a.href = LICENTE[l];
     nota.append(a);
   });
   nota.append('.');
@@ -85,7 +103,7 @@ if (continut && !continut.textContent.trim()) {
 }
 
 try {
-  const scena = await porneste(canvas);
+  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR } });
   if (!scena) {
     faraScena('WebGL indisponibil');
   } else {
@@ -94,7 +112,8 @@ try {
     // Linia de bază pentru verificările de memorie de mai târziu.
     console.info('scenă pornită —', scena.nrTriunghiuri, 'triunghiuri',
       scena.petic ? `(bază ${scena.teren.nrTriunghiuri} + petic ${scena.petic.nrTriunghiuri})` : '',
-      scena.memorie());
+      scena.memorie(),
+      scena.sanctuar ? `sanctuar: ${scena.sanctuar.nrTriunghiuri.cladiri} + ${scena.sanctuar.nrTriunghiuri.drapaj} pe teren` : '');
     globalThis.__scena = scena; // cârlig pentru verificare din consolă
   }
 } catch (e) {

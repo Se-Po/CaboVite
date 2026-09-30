@@ -4,7 +4,11 @@ import { creeazaCamera, incadreazaLaAspect } from './camera.js';
 import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
-import { incarcaRelief, straturiNdvi } from './loaders.js';
+import { incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
+import { creeazaSanctuar } from './sanctuar.js';
+import { creeazaZbor } from './zbor.js';
+import { creeazaEticheta } from './eticheta.js';
+import { creeazaUmbre } from './umbre.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
 import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './palette.js';
 import { creeazaBusola } from './busola.js';
@@ -20,7 +24,7 @@ import { instantaneuMemorie } from './dispose.js';
 // are ce desena; asta ține și amortizarea controalelor lină.
 
 /** @param {HTMLCanvasElement} canvas */
-export async function porneste(canvas) {
+export async function porneste(canvas, { continut } = {}) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -43,7 +47,7 @@ export async function porneste(canvas) {
   };
 
   try {
-    return await construieste(canvas, renderer, deEliberat, curata);
+    return await construieste(canvas, renderer, deEliberat, curata, continut);
   } catch (e) {
     curata();
     renderer.dispose();
@@ -57,7 +61,7 @@ export async function porneste(canvas) {
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata) {
+async function construieste(canvas, renderer, deEliberat, curata, continut) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
   // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
@@ -71,6 +75,9 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   // excepția urcă în `porneste()` ca înainte.
   const reliefGata = incarcaRelief();
   reliefGata.catch(() => {});
+  // Sanctuarul pleacă odată cu relieful: n-au nimic de împărțit. Nu respinge
+  // niciodată — întoarce null și spune de ce —, deci nici n-are nevoie de catch.
+  const sanctuarGata = incarcaSanctuar();
 
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
@@ -145,7 +152,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   const ndviPeEcran = Boolean(ndvi.baza) && (Boolean(culoare) || culoriMasurate);
   const RELIEF = 'relieful, decupat după conturul zonei și adus la grila scenei';
   const NDVI = 'indicele de vegetație, calculat din roșul și infraroșul ortofotoului';
-  const surse = [...new Map([
+  let surse = [...new Map([
     [relief.meta?.sursa, RELIEF],
     [reliefPetic?.meta?.sursa, RELIEF],
     [culoriMasurate ? atribuirePaleta() : null, 'culorile vegetației, măsurate pe ortofoto'],
@@ -168,16 +175,72 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   }
   ndvi = null;
 
+  // Un singur accesor al altitudinii randate: peticul de 1 m unde există, baza de
+  // 2 m în rest. Îl folosesc sanctuarul — pentru talpa pereților —, panoul punctului
+  // și obiectul întors.
+  const inaltimeLa = (x, z) => (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z));
+
+  // Santuário de Nossa Senhora do Cabo Espichel. Se adaugă peste teren; dacă
+  // lipsește sau nu se poate construi, scena merge mai departe fără el.
+  const b = relief.meta?.bbox_tm06;
+  const sanctuar = creeazaSanctuar({
+    date: await sanctuarGata, inaltimeLa,
+    ancora: b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null,
+    retea: { relief, reliefPetic, pastreaza, subPetic },
+  });
+  if (sanctuar) {
+    for (const o of sanctuar.obiecte) scena.add(o);
+    deEliberat.push(() => sanctuar.dispose());
+    const PRELUCRARE = {
+      osm: 'conturul unor clădiri, al zidurilor, al apeductului și al suprafețelor de pe teren, verificat pe LiDAR',
+      mds: 'înălțimile și formele clădirilor, măsurate pe modelul de suprafață, deasupra terenului',
+      ortofoto: 'culorile acoperișurilor sanctuarului și lățimea drumurilor, măsurate pe ortofoto',
+    };
+    surse = unesteSurse(surse, sanctuar.surse.map((s) => ({ ...s, prelucrare: PRELUCRARE[s.cheie] ?? 'geometria sanctuarului' })));
+  }
+
+  // Umbrele sanctuarului: o hartă strânsă pe complex, desenată o singură dată.
+  // Separabile — dacă nu se pot face, clădirile rămân, doar fără umbră.
+  let umbre = null;
+  if (sanctuar) {
+    try {
+      umbre = creeazaUmbre({
+        renderer, soare: lumini.soare,
+        cutie: sanctuar.cutieCladiri,
+        arunca: [sanctuar.obiect],
+        primesc: [sanctuar.obiect, ...sanctuar.obiecte.slice(1), teren.obiect, ...(petic ? [petic.obiect] : [])],
+      });
+      const u = umbre;
+      deEliberat.push(() => u.dispose());
+      // Harta se desenează o singură dată. După pierderea contextului WebGL, three
+      // face un WebGLShadowMap nou, dar cu `autoUpdate = false` lumina ar fi sărită
+      // de-acum încolo: umbrele s-ar compara cu o textură nedesenată. Ascultătorul
+      // three.js e înregistrat înaintea noastră, deci contextul e deja refăcut aici.
+      const laRestaurare = () => { u.refa(); cereRandare(); };
+      canvas.addEventListener('webglcontextrestored', laRestaurare);
+      deEliberat.push(() => canvas.removeEventListener('webglcontextrestored', laRestaurare));
+    } catch (e) {
+      console.warn('umbrele sanctuarului sărite:', e.message);
+    }
+  }
+
   // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
   // reașază la fiecare schimbare de formă a ecranului. La prima lui mișcare,
   // încadrarea devine a lui și nu i-o mai luăm.
   let incadrareAutomata = true;
+  // Declarat aici, fiindcă busola, creată înaintea lui, îl oprește.
+  let zborSanctuar = null;
   const laStart = () => { incadrareAutomata = false; };
+  // Fiecare ascultător, înscris în listă imediat: dacă un pas de mai jos aruncă,
+  // `resize` și `matchMedia` ar ține viu tot contextul lui construieste(), cu relieful.
   controale.addEventListener('start', laStart);
+  deEliberat.push(() => controale.removeEventListener('start', laStart));
 
   controale.addEventListener('change', cereRandare);
+  deEliberat.push(() => controale.removeEventListener('change', cereRandare));
   const laResize = () => cereRandare();
   globalThis.addEventListener('resize', laResize);
+  deEliberat.push(() => globalThis.removeEventListener('resize', laResize));
 
   // Amortizarea e mișcare care continuă după ce utilizatorul a dat drumul —
   // exact ce cere prefers-reduced-motion să nu se întâmple.
@@ -188,6 +251,7 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   };
   aplicaMiscare();
   faraMiscare?.addEventListener?.('change', aplicaMiscare);
+  deEliberat.push(() => faraMiscare?.removeEventListener?.('change', aplicaMiscare));
 
   // Busola. E DOM peste scenă, nu geometrie, dar aparține scenei: fără cameră
   // n-are ce arăta, iar fără WebGL nici nu se creează. Metadatele sunt ale BAZEI
@@ -197,6 +261,8 @@ async function construieste(canvas, renderer, deEliberat, curata) {
     gazda: canvas.parentElement ?? document.body,
     camera, controale, cereRandare,
     colturi: relief.meta?.colturi_geo,
+    // Un zbor al busolei oprește zborul spre sanctuar: două animații nu se ceartă.
+    laPornire: () => zborSanctuar?.opreste(),
   });
   if (busola) deEliberat.push(() => busola.dispose());
 
@@ -212,28 +278,91 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   const punct = creeazaPunct({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, geo,
-    inaltimeLa: (x, z) =>
-      (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z)),
+    inaltimeLa,
     limitaDatelor,
     zMin: relief.meta?.zMin_m,
+    loveste: sanctuar?.loveste,
+    numeElement: (cheie) => continut?.sanctuar?.nume_elemente?.find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
   });
   if (punct) deEliberat.push(() => punct.dispose());
+
+  // Zborul spre sanctuar și eticheta lui. Zborul oprește încadrarea automată —
+  // camera nu mai e a noastră — și zborul busolei.
+  zborSanctuar = creeazaZbor({
+    camera, controale, cereRandare,
+    azimutNordAdevarat: busola?.azimutNordAdevarat ?? 0,
+    laPornire: () => { incadrareAutomata = false; busola?.opreste(); },
+  });
+  deEliberat.push(() => zborSanctuar.dispose());
+
+  // Cât fișa e deschisă, imaginea se mută în partea de ecran pe care n-o acoperă:
+  // pe telefon fișa e foaie jos și acoperă peste jumătate, pe desktop stă la
+  // dreapta. Un decalaj de obiectiv (`setViewOffset`), nu altă țintă: camera și
+  // pivotul rămân unde le-a pus zborul, deci busola, raza panoului punctului și
+  // proiecția etichetei merg neschimbate — toate citesc matricea de proiecție.
+  let decalaj = null; // fracțiunile părții libere, sau null
+  const aplicaDecalaj = () => {
+    const c = renderer.domElement, cw = c.clientWidth, ch = c.clientHeight;
+    if (!decalaj || !cw || !ch) { camera.clearViewOffset(); cereRandare(); return; }
+    camera.setViewOffset(cw, ch, (0.5 - (decalaj.x0 + decalaj.x1) / 2) * cw, (0.5 - (decalaj.y0 + decalaj.y1) / 2) * ch, cw, ch);
+    cereRandare();
+  };
+  const potrivesteLaFisa = (fisa) => {
+    const c = renderer.domElement.getBoundingClientRect();
+    decalaj = { x0: 0, x1: 1, y0: 0, y1: 1 };
+    if (fisa && c.width && c.height) {
+      if (fisa.width >= 0.8 * c.width && fisa.top > c.top + 0.25 * c.height) decalaj.y1 = Math.min(1, (fisa.top - c.top) / c.height);
+      // Laterală până la trei sferturi din lățime: între 545 și 666 px fișa trece de
+      // 60% — și mai mult cu textul mărit —, iar un prag la 40% lăsa complexul sub
+      // ea. Peste trei sferturi nu mai rămâne loc în care să încapă ceva.
+      else if (fisa.left > c.left + 0.25 * c.width) decalaj.x1 = Math.min(1, (fisa.left - c.left) / c.width);
+    }
+    aplicaDecalaj();
+  };
+  // Distanța zborului: cel puțin cât cere punctul de privire, și destul ca
+  // complexul — ~110 m de la centrul terreiro-ului până la biserică și la capetele
+  // aripilor — să încapă în partea liberă, pe lățime și pe înălțime.
+  const RAZA_COMPLEX = 110;
+  const zborLaFisa = () => {
+    const z = sanctuar.poi.zbor, t = Math.tan((camera.fov * Math.PI) / 360), L = decalaj ?? { x0: 0, x1: 1, y0: 0, y1: 1 };
+    const distanta = Math.max(z.distanta, RAZA_COMPLEX / (t * camera.aspect * (L.x1 - L.x0)), (0.6 * RAZA_COMPLEX) / (t * (L.y1 - L.y0)));
+    return { ...z, distanta };
+  };
+  const eticheta = sanctuar?.poi?.zbor ? creeazaEticheta({
+    gazda: canvas.parentElement ?? document.body,
+    canvas, camera, inaltimeLa, cereRandare,
+    ancora: sanctuar.poi.ancora,
+    continut: continut?.sanctuar,
+    laDeschidere: (fisa) => { potrivesteLaFisa(fisa); zborSanctuar.spre(zborLaFisa()); },
+    laInchidere: () => { decalaj = null; aplicaDecalaj(); },
+  }) : null;
+  if (eticheta) deEliberat.push(() => eticheta.dispose());
 
   renderer.setAnimationLoop(() => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
     // doar dacă desenează — deci animația busolei se agață aici, nu într-un al
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
     busola?.pas();
+    zborSanctuar?.pas();
     const seMisca = controale.enableDamping && controale.update();
     if (redimensioneaza(renderer)) {
       const c = renderer.domElement;
       camera.aspect = c.clientWidth / c.clientHeight;
       camera.updateProjectionMatrix();
+      // decalajul fișei se socotește din nou: fișa și canvasul și-au schimbat mărimea
+      if (decalaj) potrivesteLaFisa(document.getElementById('sanctuar-fisa')?.getBoundingClientRect());
       if (incadrareAutomata) incadreazaLaAspect(camera, controale, camera.aspect);
       cerut = true;
     }
     if (!cerut && !seMisca) return;
     cerut = false;
+    // Eticheta se așază pe cadrul care se desenează acum, nu pe cel de dinainte.
+    // Pentru asta îi trebuie matricea de acum: OrbitControls.update() cheamă
+    // lookAt(), care reface matrixWorld cu poziția nouă dar rotația VECHE, iar
+    // render() o reface abia după. Fără linia de mai jos, la o orbitare de 3° pe
+    // cadru pinul stătea la 44 px de biserică.
+    camera.updateMatrixWorld();
+    eticheta?.pas();
     renderer.render(scena, camera);
   });
 
@@ -258,25 +387,21 @@ async function construieste(canvas, renderer, deEliberat, curata) {
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, busola, punct, geo, surse,
+    renderer, scena, camera, controale, teren, petic, sanctuar, busola, punct, geo, surse,
+    zbor: zborSanctuar, eticheta, umbre,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
     // nicio valoare sub gaură. Nimic nu-l cheamă acum, dar e accesorul firesc
     // pentru așezarea unui reper pe teren, la capitolele care urmează.
-    inaltimeLa: (x, z) =>
-      (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z)),
+    inaltimeLa,
     cereRandare,
     memorie: () => instantaneuMemorie(renderer),
     dispose() {
       viu = false;
       relief = null;
       renderer.setAnimationLoop(null);
-      controale.removeEventListener('change', cereRandare);
-      controale.removeEventListener('start', laStart);
-      globalThis.removeEventListener('resize', laResize);
-      faraMiscare?.removeEventListener?.('change', aplicaMiscare);
-      // Aceeași listă ca la eșecul pornirii, nu o copie scrisă de mână.
+      // Ascultătorii se scot tot prin listă. Aceeași listă ca la eșecul pornirii, nu o copie scrisă de mână.
       //
       // Două căi care eliberează aceleași resurse se despart încet: una capătă o
       // resursă nouă, cealaltă n-o află niciodată, iar ce rămâne viu sunt tocmai
@@ -292,4 +417,20 @@ async function construieste(canvas, renderer, deEliberat, curata) {
       // deci viu intenționat, nu din scăpare.
     },
   };
+}
+
+/**
+ * Unește două liste de surse pe `atributie`. Două intrări cu aceeași atribuire —
+ * ortofotoul, de pildă, folosit și de teren și de sanctuar — devin una, cu
+ * prelucrările amândurora: un Map simplu ar fi păstrat-o numai pe a doua.
+ */
+function unesteSurse(a, b) {
+  const m = new Map(a.map((s) => [s.atributie, { ...s }]));
+  for (const s of b) {
+    const vechi = m.get(s.atributie);
+    if (!vechi) { m.set(s.atributie, { ...s }); continue; }
+    if (s.prelucrare && !vechi.prelucrare?.includes(s.prelucrare))
+      vechi.prelucrare = vechi.prelucrare ? `${vechi.prelucrare}; ${s.prelucrare}` : s.prelucrare;
+  }
+  return [...m.values()];
 }

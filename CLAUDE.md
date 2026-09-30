@@ -36,6 +36,7 @@ se poartă în română.
 | `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
+| `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu REVIVE și cu el însuși |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -539,6 +540,17 @@ comună, deci mutarea unui obiect întreg: Ermida da Memória, cu adro-ul și te
   (87 → 76, 250 → 366, 3 521 → 3 666 m²). Pentru acelea judecă proba amprentelor,
   mai jos.
 
+Amprentele nu sunt deplasate față de LiDAR. Proba e în `npm run verifica-sanctuar`:
+conturul modelului cade pe pixeli de clădire (nMDS > 1 m) în 98,3% din aria lui,
+iar mutat 2 m perpendicular pe aripi, în 84,7%. Și golurile TIN ale MDT-ului — unde
+DGT a scos clădirile și a interpolat plan — stau în amprente: ~93% din pixelii TIN
+aflați la cel mult 10 m de ele cad înăuntru. Invers nu: TIN-ul acoperă numai 28%
+din amprente (cât tipărește `nmds-sanctuar`), fiindcă DGT a interpolat doar acolo
+unde n-a avut puncte de sol. Cifrele din cercetare — „98–100% pe golurile TIN”,
+corelația 0,512 → 0,520 — nu le reface niciun cod și au fost scoase.
+Ortofotoul nu e true-ortho: avionul a văzut clădirile oblic. Poziția se verifică pe
+LiDAR, nu pe ortofoto.
+
 `scripts/sanctuar/inventar.json` leagă fiecare construcție din poza de referință
 de un element OSM, de o trasare pe straturile DGT sau de o excludere cu motiv.
 Poza, din Google Maps 3D, e numai o listă a ce există: nu se trasează nimic pe ea.
@@ -626,6 +638,13 @@ pozei" din `decizii.json`. Din cele 37 de drumuri de acolo, 29 au bucăți în z
 Lățimea e măsurată pe ortofoto la 19; celelalte 18, cu mai puțin de trei stații
 măsurabile, iau lățimea implicită a tipului lor.
 
+În pagină, `src/scene/drapaj.js` le așază **exact pe triunghiurile randate**: fiecare
+poligon se decupează cu cele două triunghiuri ale fiecărei celule, cu aceeași
+diagonală ca `terrain.js`, pe petic acolo unde e peticul. Sunt coplanare cu terenul,
+deci nu se ridică în metri: cu NEAR 10, adâncimea are 0,15 m rezoluție la 5 km și
+ar pâlpâi. Fiecare strat are materialul lui, cu `polygonOffset` în trepte.
+Măsurat: 182 565 de vârfuri, maximum 0,021 mm față de triunghiul de sub ele.
+
 ### Fațadele: o fotografie calibrată pe model
 
 Arcadele, ferestrele, portalurile și golurile clopotnițelor sunt citite pe
@@ -669,6 +688,93 @@ raze cu planul corect, nu o nouă citire.
   sus a turnurilor iese la 146,6, nu la 146,5 cât dădea REVIVE;
 - golurile clopotnițelor: „em duas faces”, SIPA; fața de est măsurată, a doua
   presupusă cea exterioară, NEVERIFICAT.
+
+**Ocluzia.** Soarele are umbre adevărate; lumina cerului (HemisphereLight) nu, iar
+fundul unei galerii ar primi exact cât fațada. Aripa S stă mereu în umbră, deci
+acolo arcada n-ar mai avea deloc contrast. Fiecare vârf poartă o ocluzie
+(`ocluzie`, un octet): cât cer vede suprafața, ca aproximare pe tipuri — fundul
+galeriei 0,4, tavanul 0,3, intradosul 0,55. Shaderul o aplică NUMAI luminii
+indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat.
+
+### În pagină
+
+- `creeazaSanctuar()` nu aruncă. Fiecare element e în `try`-ul lui, iar datele lui se
+  verifică întâi: JSON n-are NaN, dar are `null`, iar `null` intră în aritmetică drept
+  0 — un colț mutat tăcut în originea scenei.
+- Talpa pereților: cel mai jos punct al reliefului paginii (`inaltimeLa`, interpolat
+  biliniar) în colțurile și la mijlocul laturilor conturului, minus 0,5 m — marja
+  acoperă diferența dintre interpolare și triunghiurile plasei.
+- `loveste(raza)` dă clădirea din fața razei: cutia fiecărui element, apoi
+  Möller–Trumbore numai pe triunghiurile lui. Panoul punctului o preferă terenului
+  când e mai aproape și scrie și cota solului.
+- Eticheta e un buton DOM, proiectat în ramura de randare, după
+  `camera.updateMatrixWorld()`: `OrbitControls.update()` cheamă `lookAt()`, care
+  reface matricea cu poziția nouă și rotația VECHE, iar `render()` o reface abia
+  după. Fără ea, la o orbitare de 3° pe cadru pinul stătea la 44 px de biserică;
+  cu ea, la 0,06 px. Ocolește panourile,
+  trece la marginea ecranului cu o săgeată când ancora iese din cadru și se face
+  punctată când relieful o acoperă. **Vizibil = `getClientRects().length`**, nu
+  `offsetParent`: acela e null și pentru `position: fixed`, adică pentru fișa de pe
+  telefon, sub care eticheta ajungea fără să știe.
+- Clicul deschide fișa, APOI zboară: zborul primește cutia fișei. Cât fișa e
+  deschisă, un decalaj de obiectiv (`setViewOffset`) mută imaginea în partea liberă —
+  foaia de jos pe telefon, panoul din dreapta pe desktop — iar distanța crește cât
+  să încapă complexul (~110 m în jurul terreiro-ului). Camera și pivotul nu se mută.
+  Pe telefon, fără el, biserica ieșea din ecran la x = −18. Fișa laterală contează
+  de la un sfert din lățime: între 545 și 666 px trece de 60%, iar un prag la 40%
+  lăsa complexul sub ea.
+- `creeazaSanctuar()` își golește scriitorul imediat după predare, iar `dispose()`
+  stinge pozițiile pe care le ține `loveste`: obiectul întors trăiește în
+  `globalThis.__scena`, deci altfel rămâneau 2,38 MiB după dispose(); acum 0.
+
+### Umbrele
+
+`src/scene/umbre.js`: o singură hartă de 2048², strânsă pe clădiri plus lungimea
+umbrei (60 m; la 18° o clădire de 15 m aruncă 46 m), deci 0,211 m pe texel. Cutia
+lasă apeductul afară: merge ~550 m spre est și dubla fereastra luminii (0,336 m pe
+texel) pentru umbre de 2–8 m. Harta ține ~32 MiB pe placă — adâncime plus culoare,
+pe care r186 o alocă oricum.
+`autoUpdate = false`: se desenează o dată. Aruncă umbră numai sanctuarul; primesc
+sanctuarul, suprafețele și terenul. Tocmai de aceea trebuie refăcută la
+`webglcontextrestored`: three face atunci un WebGLShadowMap nou, iar o lumină cu
+`autoUpdate = false` și fără `needsUpdate` e sărită. Proba: contextul pierdut și
+refăcut dă 0 pixeli diferiți; fără umbre, pe aceeași vedere, diferă 8 393.
+
+Soarele NU se mută: camera de umbră stă unde stă lumina, la 4 km, și doar marginile
+ei se strâng pe complex. O poziție mutată, chiar pe aceeași direcție, ar fi rotunjit
+altfel vectorul luminii pe toată harta. Proba: în țintă fixă 640 × 400, în trei
+vederi, **0 pixeli diferiți** în afara dreptunghiului umbrei; la fel cu sanctuarul
+cu totul ascuns.
+
+### Probele: `npm run verifica-sanctuar`
+
+Codul paginii, în Node, cu `fetch` înlocuit. Probele de fond au control negativ —
+aceeași probă pe o greșeală cunoscută, care trebuie să pice: acoperișurile,
+amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
+- **încărcătorul:** index.html cu 200, 404, JSON trunchiat, nume străin, schemă
+  necunoscută, material fără rgb, listă lipsă — `null` și un avertisment, fără
+  aruncare; ancoră greșită; o coordonată `null` sare numai elementul ei;
+- **bugetul:** clădiri ≤ 70 000 de triunghiuri (azi 17 449), suprafețe ≤ 80 000
+  (60 855), JSON ≤ 150 KB (93,5);
+- **geometria:** vârfuri finite, ocluzie pe fiecare, stâlpi în ordine cu goluri
+  ≥ 0,2 m, corpuri convexe — proba care a prins linia rotită a aripii N;
+- **suprafețele** stau pe triunghiurile randate: 0 vârfuri în afară, maximum 1 mm;
+  control: față de relieful interpolat biliniar, abaterea ar fi 175 mm;
+- **față de LiDAR** (cere rastrul): acoperișurile pe pixelii interiori, la cel puțin
+  0,75 m de pereți — mediana 0,000, p90 0,249 m (prag 0,25 / 0,8), iar ridicat cu
+  1 m pică; amprentele cad pe clădire în 98,3% din aria lor, iar mutate 2 m
+  perpendicular pe aripi, 84,7%. Vârfurile turnurilor sunt numai o probă de
+  consistență: `varf` e chiar maximul MDS al părții, deci ea prinde doar o
+  greșeală de transport până în pagină;
+- **REVIVE 2019**, ca probă independentă: streașinile și coamele aripilor și vârful
+  turnului trec. Coama navei (LiDAR 146,85, REVIVE 145,90) și cupola Casei da Água
+  (145,48 față de 143,27) nu — tipărite DE VERIFICAT, fără să oprească rularea:
+  planele navei au p90 0,06 m, deci cifra de pe planșă numește probabil alt punct;
+- **zborul** aterizează la 1e-13 m din repaus, după o aruncare și sub
+  `prefers-reduced-motion` (acolo în 0 cadre), iar busola citește 205°; control:
+  pe nordul grilei ar citi 204,33°;
+- **raza** verticală pe navă lovește acoperișul la 1 mm; una prin golul unui arc
+  trece de fațadă și lovește fundul galeriei la 11,8 m; una în stâlp, la 10 m.
 
 ## Principii de design (nenegociabile)
 

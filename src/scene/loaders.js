@@ -146,3 +146,40 @@ export function straturiNdvi(relief, reliefPetic) {
       + 'ca peticul să nu se coloreze după altă logică decât baza');
   return { baza: undefined, petic: undefined };
 }
+
+/**
+ * Datele sanctuarului, produse de `npm run build-sanctuar`.
+ *
+ * NU aruncă niciodată, ca stratul NDVI: sanctuarul se adaugă peste teren, iar
+ * pagina trebuie să pornească și fără el. Validarea e tot pe conținut — Vite
+ * răspunde la un fișier lipsă cu 200 și pagina index.
+ *
+ * Ancora (centrul cutiei hărții pe care sunt scrise coordonatele) NU se verifică
+ * aici: încărcarea pleacă în paralel cu relieful, deci harta încă nu e aici. O
+ * verifică `creeazaSanctuar()`.
+ *
+ * @returns {Promise<object|null>}
+ */
+export async function incarcaSanctuar(url = '/data/sanctuar_v1.json') {
+  const lipsa = (motiv) => {
+    console.warn(`sanctuarul lipsește (${motiv}) — scena pornește fără el`);
+    return null;
+  };
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return lipsa(`HTTP ${r.status}`);
+    let d;
+    try { d = await r.json(); } catch { return lipsa('nu e JSON'); }
+    if (!/^sanctuar_v\d+$/.test(d?.nume ?? '')) return lipsa(`nume necunoscut: ${d?.nume}`);
+    if (d.versiune_schema !== 1) return lipsa(`schema ${d.versiune_schema}, aștept 1`);
+    for (const k of ['corpuri', 'turnuri', 'cupole', 'ziduri', 'apeduct', 'surse'])
+      if (!Array.isArray(d[k])) return lipsa(`lipsește ${k}`);
+    if (typeof d.materiale !== 'object' || !d.materiale) return lipsa('lipsesc materialele');
+    for (const [k, m] of Object.entries(d.materiale))
+      if (!Array.isArray(m?.rgb) || m.rgb.length !== 3 || !m.rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255))
+        return lipsa(`materialul ${k} n-are rgb`);
+    return d;
+  } catch (e) {
+    return lipsa(e.message);
+  }
+}

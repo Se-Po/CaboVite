@@ -22,7 +22,8 @@
     "suprafete-sanctuar": "node scripts/suprafete-sanctuar.mjs",
     "build-sanctuar": "node scripts/build-sanctuar.mjs",
     "verifica-teren": "node scripts/verifica-teren.mjs",
-    "verifica-tiff": "node scripts/verifica-tiff.mjs"
+    "verifica-tiff": "node scripts/verifica-tiff.mjs",
+    "verifica-sanctuar": "node scripts/verifica-sanctuar.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

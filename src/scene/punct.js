@@ -69,9 +69,12 @@ const brut = (v, zec) => v.toFixed(zec);
  * @param {object} o.geo — de la creeazaGeo()
  * @param {Array<{x,z}>} [o.limitaDatelor] — `poligon_scena` din sidecar
  * @param {number} [o.zMin] — `zMin_m`, cota umpluturii, pentru explicație
+ * @param {(raza: THREE.Ray) => ({t: number, cheie: string, x: number, y: number, z: number}|null)} [o.loveste]
+ *   — clădirile sanctuarului: prima lovită de rază, dacă e una
+ * @param {(cheie: string) => string} [o.numeElement] — numele de afișat al unui element
  * @returns {{dispose: () => void, culegeLa: Function}|null}
  */
-export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, zMin }) {
+export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, zMin, loveste, numeElement }) {
   // Proba e un apel adevărat, nu o verificare de chei: `laGeo` întoarce null
   // dacă lipsesc `colturi_geo` sau `bbox_tm06`, iar un panou care arată
   // longitudinea „null" e mai rău decât unul care lipsește.
@@ -126,14 +129,26 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
           if (dm === null || dm > 0) a = m; else b = m;
         }
         raza.at((a + b) / 2, temp);
-        return { x: temp.x, z: temp.z };
+        return cuCladire({ x: temp.x, z: temp.z, t: (a + b) / 2 });
       }
       tAnterior = t; semnAnterior = d;
     }
 
     // Dincolo de uscat, raza cade pe planul apei — ca să se poată arăta și marea.
-    if (raza.intersectPlane(planApa, temp)) return { x: temp.x, z: temp.z };
-    return null;
+    if (raza.intersectPlane(planApa, temp)) return cuCladire({ x: temp.x, z: temp.z, t: temp.distanceTo(raza.origin) });
+    return cuCladire(null);
+  }
+
+  /**
+   * O clădire a sanctuarului lovită ÎNAINTEA terenului câștigă: punctul e pe ea.
+   * Raycast-ul pe plasa terenului costa 53 ms; pe clădiri e ieftin — câteva mii de
+   * triunghiuri, cu respingere pe cutii —, deci aici se folosește.
+   */
+  function cuCladire(pTeren) {
+    if (!loveste) return pTeren;
+    const c = loveste(raycaster.ray);
+    if (!c || (pTeren && pTeren.t <= c.t)) return pTeren;
+    return { x: c.x, z: c.z, t: c.t, cladire: { cheie: c.cheie, y: c.y } };
   }
 
   /** Ce se poate spune despre altitudinea într-un punct. Ordinea contează. */
@@ -154,7 +169,9 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     '<div class="cutie">'
     + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul.</p>'
     + '<dl class="mari" hidden>'
+    + '<dt class="cl" hidden>clădire</dt><dd class="cl" hidden></dd>'
     + '<dt>altitudine</dt><dd class="alt"></dd>'
+    + '<dt class="sol" hidden>sol</dt><dd class="sol" hidden></dd>'
     + '<dt>longitudine</dt><dd class="lon"></dd>'
     + '<dt>latitudine</dt><dd class="lat"></dd>'
     + '</dl>'
@@ -177,7 +194,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     lat: radacina.querySelector('.lat'),
     sc: radacina.querySelector('.sc'),
     tm: radacina.querySelector('.tm'),
+    cl: radacina.querySelector('dd.cl'),
+    sol: radacina.querySelector('dd.sol'),
   };
+  const randuriCladire = [...radacina.querySelectorAll('.cl, .sol')];
 
   if (Number.isFinite(zMin)) {
     camp.alt.title = `Apa e codată la ${nr(zMin, 0)} m în hartă — artificiu de `
@@ -191,7 +211,15 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   let cronoCopiere = 0;
 
   function arata(p) {
-    const { h, eticheta } = altitudineaLa(p.x, p.z);
+    const teren = altitudineaLa(p.x, p.z);
+    // Pe o clădire, altitudinea e a punctului de pe ea; solul de dedesubt se spune separat.
+    const { h, eticheta } = p.cladire ? { h: p.cladire.y, eticheta: null } : teren;
+    const numeCl = p.cladire ? (numeElement?.(p.cladire.cheie) ?? p.cladire.cheie) : null;
+    for (const r of randuriCladire) r.hidden = !p.cladire;
+    if (p.cladire) {
+      camp.cl.textContent = numeCl;
+      camp.sol.textContent = teren.h === null ? teren.eticheta : `${nr(teren.h, 2)} m`;
+    }
     const g = geo.laGeo(p.x, p.z);
     const t = geo.laTM06(p.x, p.z);
 
@@ -212,8 +240,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     dlMici.hidden = false;
     buton.hidden = false;
 
-    ales = { p, h, eticheta, g, t };
-    anunt.textContent = h === null
+    ales = { p, h, eticheta, g, t, numeCl, sol: teren };
+    anunt.textContent = numeCl
+      ? `${numeCl}: punct la altitudinea ${nr(h, 2)} metri; solul de dedesubt la ${teren.h === null ? teren.eticheta : `${nr(teren.h, 2)} metri`}.`
+      : h === null
       ? `Punct la longitudinea ${nr(g.lon, 6)}, latitudinea ${nr(g.lat, 6)}. Altitudine: ${eticheta}.`
       : `Punct la longitudinea ${nr(g.lon, 6)}, latitudinea ${nr(g.lat, 6)}, altitudinea ${nr(h, 2)} metri.`;
   }
@@ -221,9 +251,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   /** Blocul de copiat. Aceleași cifre ca în panou, cu punct zecimal. */
   function textDeCopiat() {
     if (!ales) return '';
-    const { p, h, eticheta, g, t } = ales;
+    const { p, h, eticheta, g, t, numeCl, sol } = ales;
     return [
       'Cabo Espichel — punct ales',
+      ...(numeCl ? [`clădire      ${numeCl}`, `sol          ${sol.h === null ? sol.eticheta : `${brut(sol.h, 2)} m`}`] : []),
       `longitudine  ${brut(g.lon, 6)}`,
       `latitudine   ${brut(g.lat, 6)}`,
       `altitudine   ${h === null ? eticheta : `${brut(h, 2)} m`}`,
