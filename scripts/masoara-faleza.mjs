@@ -1,5 +1,5 @@
 // Falezele în vederea Satelit: de la ce pantă fotografia verticală nu mai spune
-// nimic și cu ce lumină se colorează acolo stânca.
+// nimic și cu ce lumină s-ar colora acolo stânca.
 //
 //   npm run masoara-faleza
 //
@@ -16,8 +16,8 @@
 //   cele mai mici pătrate, cu jumătate din fațete ținute deoparte pentru control;
 // - pragurile: cât „detaliu” are fotografia pe metrul de SUPRAFAȚĂ, pe clase de
 //   pantă — gradientul luminanței pe metrul orizontal, înmulțit cu cos θ. Pragul de
-//   sus e panta la care cade sub 50% din cel de pe terenul plat; amestecul începe
-//   cu 15° mai jos.
+//   sus e panta la care cade sub 50% din cel de pe terenul plat; amestecul ar
+//   începe cu 15° mai jos.
 //
 // Scrie date-sursa/derivate/faleza.json.
 //
@@ -102,7 +102,7 @@ const potrivire = (set) => {
 };
 const r2 = (set, p) => { let sr = 0, st = 0, m = 0; for (const d of set) m += Y(d.foto); m /= set.length;
   for (const d of set) { const pr = Y(d.alb) * (p.alfa * d.ns + p.beta); sr += (Y(d.foto) - pr) ** 2; st += (Y(d.foto) - m) ** 2; } return 1 - sr / st; };
-// Lumina se potrivește acolo unde se folosește: pe pantele abrupte, 30°–70°, fără
+// Lumina se potrivește acolo unde s-ar folosi: pe pantele abrupte, 30°–70°, fără
 // vegetație. Pe terenul plat n·s abia variază, deci direcția soarelui n-ar conta
 // și n-ar avea cum să fie verificată — acolo R² ieșea 0,18, iar soarele Relief
 // potrivea la fel de bine ca al zborului.
@@ -137,7 +137,7 @@ console.log(`\ndetaliul cade sub 50% la ${panta1}°; amestecul spre stâncă: ${
 const lab = (c) => laOklab(...c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055))));
 const dE = (a, c) => 100 * Math.hypot(a[0] - c[0], a[1] - c[1], a[2] - c[2]);
 const med = (v) => { const q = Float64Array.from(v).sort(); return q[q.length >> 1]; };
-// Fațetele ținute deoparte din zona în care se folosește stânca.
+// Fațetele ținute deoparte din zona în care s-ar folosi stânca.
 const langa = ctrl.filter((d) => d.panta >= panta0);
 const model = (d, pp, ns) => d.alb.map((v) => v * (pp.alfa * ns + pp.beta));
 const dSoare = med(langa.map((d) => dE(lab(model(d, p, d.ns)), lab(d.foto))));

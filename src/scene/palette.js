@@ -230,10 +230,11 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  *
  * Apa. Fațetele de la mal coboară până la umplutura de −8 m pe cel mult 2 m în plan,
  * deci au panta de cel puțin 0,757 (76°), peste pragul falezei: ies calcar exact, pe
- * toate cele care se văd: 5 378 pe bază, 2 714 pe petic, pe harta_v4. Cele 1 001 + 549 cu toate
- * vârfurile la −8 m n-au NDVI și iau calea fără strat — stau întregi sub planul
- * opac al mării. Tot sub mare stau și 26 de fațete ale peticului, în inelul de
- * cusătură, unde relieful e interpolat între umplutură și uscat.
+ * toate cele care se văd: 5 378 pe bază (harta_v4), 2 714 pe petic (harta_v5).
+ * Cele 1 001 + 549 cu toate vârfurile la −8 m n-au NDVI și iau calea fără strat —
+ * stau întregi sub planul opac al mării. Tot sub mare stau și 26 de fațete ale
+ * peticului, în inelul de cusătură, unde relieful e interpolat între umplutură și
+ * uscat.
  *
  * ─── Cât de bine, măsurat pe cele 1 415 685 de fațete de uscat ale bazei harta_v4
  *

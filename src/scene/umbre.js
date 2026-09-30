@@ -3,10 +3,9 @@ import * as THREE from 'three';
 // Umbrele clădirilor: sanctuarul și, din v0.1.0, cele din afara lui.
 //
 // Soarele vederii Relief stă la 18° deasupra orizontului, din vest-sud-vest, ca
-// straturile falezei să se citească în lumină razantă; vederea Satelit îl pune pe
-// al zborului (39,5° / 94°). La unghiul ăsta o clădire de 15 m
+// straturile falezei să se citească în lumină razantă. La 18° o clădire de 15 m
 // aruncă o umbră de ~46 m; fără ea, volumele par lipite pe teren, iar arcadele și
-// portalurile par desenate.
+// portalurile par desenate. Vederea Satelit pune soarele zborului (39,5° / 94°).
 //
 // Ieftin, fiindcă nici clădirile, nici lumina nu se mișcă de la un cadru la altul:
 //   - o singură hartă de umbre, de 2048², strânsă pe complex — nu pe cei 4 km²
