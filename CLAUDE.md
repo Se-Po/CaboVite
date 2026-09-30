@@ -555,8 +555,8 @@ Regula costă +23 ms la construcția bazei, în Node.
 **Expunerea se calculează.** Sky.js e scris pentru ~0,5 sub ACES; sub AgX la 1 iese
 altfel. `expunereCer` e factorul la care orizontul OPUS soarelui are luminanța culorii
 de cer a temei (`paleta.cer`), deci pagina rămâne la fel de luminoasă ca înainte:
-2,18 ziua și 0,21 în tema întunecată, cu soarele Relief (18° / 244°); iar cu soarele
-zborului (39,5° / 94°), al vederii Satelit care vine, 0,79 și 0,075 — Preetham e mult mai luminos cu soarele sus.
+2,18 ziua și 0,21 în tema întunecată, cu soarele Relief (18° / 244°); cu soarele
+zborului (39,5° / 94°), 0,79 și 0,075 — Preetham e mult mai luminos cu soarele sus.
 
 **Portul JS.** `cerLiniar()` și `agx()` refac în JS exact formulele shaderului și
 ale lui `AgXToneMapping` din r186 (matricile coloană cu coloană, ca în GLSL). Cu ele
@@ -581,8 +581,9 @@ terenul de aproape iese neschimbat. Cadre desenate în 2 s de repaus: 0.
 
 ## Vederea Satelit
 
-Fotografia aeriană DGT, pregătită ca textură pentru relief: vederea care o va
-drapa pe hartă vine în commit-ul următor.
+Butonul „Satelit”, jos-stânga (pe telefon deasupra busolei), comută între
+fotografia aeriană pe relief și vederea Relief — culorile din albedo, de mai sus.
+Pornește pe Satelit; alegerea se ține în `localStorage`, în try/catch.
 
 ### Texturile: `npm run textura-ortofoto`
 
@@ -608,8 +609,8 @@ versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 
   25, 54, 84. Fotografia se topește în ea între 25 și 50 m de la mal — de acolo
   încolo nicio bandă nu mai stă la ΔE 2 de apa adâncă —, iar pixelii fără date o
   primesc direct. Amestecul e copt în RGB, fără canal alfa: mipurile ar media
-  altfel culoarea și ponderea separat. Planul mării din afara texturii va primi
-  exact culoarea aceasta, ca marginea să nu se vadă.
+  altfel culoarea și ponderea separat. Planul mării din afara texturii are exact
+  culoarea aceasta, deci marginea nu se vede.
 - **Codarea.** UASTC, calitate 2, cu RDO și zstd 18 — aleasă de autor: 3,88 MB baza
   și 6,03 MB peticul (9,9 MB), ΔE_OK×100 după decodare 0,25 / 0,52 (p99 1,42 /
   1,94). ETC1S ar fi dat 0,77 + 1,20 MB, cu ΔE 1,32 / 1,34 (p99 5,8 / 6,6).
@@ -617,6 +618,63 @@ versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 
   numai cu al doilea, peticul ieșea diferit de la o rulare la alta. Pe GPU, UASTC
   devine ASTC 4×4 pe telefon și BC7 pe desktop, un octet pe pixel: ~18 MB cu tot
   cu mipurile, nu ~71 MB cât ar ocupa necomprimat.
+
+### În pagină: `src/scene/satelit.js`
+
+- **Neiluminat**, ca 3D Tiles de la Google: `MeshBasicMaterial`, `toneMapped:
+  false`, deci octeții fotografiei ajung pe ecran așa cum sunt. Lumina e deja în
+  fotografie; pe un material luminat umbrele s-ar dubla, iar soarele scenei (244°)
+  e aproape opus celui din zbor (94°). Umbrele modelelor nu cad pe teren în
+  Satelit: fotografia le are deja, pe ale clădirilor adevărate.
+- **Coordonatele texturii se calculează în shader**, din `position.xz` (matricea
+  plaselor e identitatea): `vMapUv = mapTransform · (x, z, 1)`, cu `texture.matrix`
+  scris din bbox. v crește spre SUD — KTX2 comprimat nu se întoarce la încărcare.
+  Un atribut `uv` ar fi costat 16–33 MB.
+- **Soarele** trece pe al zborului (94,0° / 39,5°), ca clădirile modelate și cerul
+  să arate ora fotografiei; umbrele se reîncadrează (`umbre.potriveste()`), cerul
+  își reface expunerea, ceața și fundalul iau noul orizont. Înapoi, soarele se pune
+  DIN COPIE, nu recalculat.
+- **Marea**, în cutia texturii, e fotografia; în afara ei, apa adâncă măsurată;
+  ceața pe pixel rămâne (cu AgX inclus de mână: materialul nu e tone-mapped).
+- Suprafețele sanctuarului de pe teren (drapajul) se ascund: fotografia le are.
+- **Încărcarea.** `creeazaIncarcatorKtx2` importă KTX2Loader dinamic — `loaders.js`
+  e importat și de uneltele Node. Transcodorul NU se copiază în `public/`:
+  KTX2Loader din r186 îl găsește cu `new URL(…, import.meta.url)`, iar Vite îl emite
+  la build; cu `setTranscoderPath('/basis/')` s-ar fi livrat de două ori (585 KB).
+  `incarcaOrto()` nu aruncă și verifică mărimea, sha256 (înainte de `parse`, care
+  mută bufferul în worker) și antetul KTX2. Fără `crypto.subtle` — un telefon pe
+  `http://192.168…`, la serverul de dezvoltare — se sare numai sha256. Shaderele
+  Satelit se compilează cu `compileAsync` pe plase-proxy cu aceeași geometrie, nu pe
+  cele vii (un cadru desenat între timp ar fi arătat o stare amestecată), iar
+  texturile urcă pe placă cu `initTexture`, înainte de prima comutare. Baza și
+  peticul împart un program. Pe un GPU fără format comprimat, transcodarea dă RGBA
+  (~71 MB): atunci peticul folosește textura bazei. `pregateste()` nu respinge —
+  un import eșuat al încărcătorului, după un deploy, lasă Relief și un avertisment,
+  nu un buton blocat. Cu preferința Relief nu se descarcă nimic până la primul
+  clic; butonul are `aria-busy` cât se încarcă. `?previzualizare` forțează Relief,
+  fără buton. Crearea e în `try`, ca la cer și la umbre.
+  Recenzia three.js a găsit exact aceste șase lucruri; sunt reparate.
+
+Probele, în pagină (panoul Browser):
+- **Relief rămâne la octet:** trei vederi 640 × 400 în țintă fixă, înainte de orice
+  comutare și după Relief → Satelit → Relief: **0 pixeli diferiți** în toate trei.
+  Control: cu soarele lăsat pe al zborului, ~255 000 diferă pe fiecare;
+- **înregistrarea:** vedere ortografică de sus, 0,25 m pe pixel, pe două ferestre de
+  platou din petic, fotografia față de culorile Relief NEILUMINATE (NDVI-ul vine din
+  aceeași fotografie): maximul corelației (0,86 / 0,83) la (−0,25; 0) m — exact
+  deplasarea pe sol aplicată fotografiei și nu și NDVI-ului. Control: textura mutată
+  cu 2 m mută maximul cu exact 8 pixeli. Cu culorile Relief LUMINATE maximul ieșea
+  la 1 m: umbrirea mută aparent formele pe pante;
+- **culoarea:** ferestrele de referință din sidecar (terreiro, platoul de lângă far,
+  versantul de nord) ies în pagină cu aceiași octeți, ΔE 0; textura citită fără sRGB
+  ar da 2,72 pe terreiro. Marea din larg, privită de la 2 m, iese 25, 54, 84;
+- **resursele:** zece comutări lasă programele (11) și texturile (6) neschimbate;
+  după `dispose()`, 0 geometrii și o singură textură — `DFG_LUT`, tabelul de 16 × 16
+  pe care three îl ține global pentru materialele PBR, și fără Satelit;
+- **căile de eșec:** sidecar lipsă (Vite dă index.html), KTX2 trunchiat, un octet
+  schimbat, HTTP 404, rețea căzută — fiecare `null` cu un singur avertisment;
+- la 390 px butonul nu atinge busola, panoul punctului, subsolul sau eticheta;
+  build-ul de producție încarcă Satelit cu transcodorul din `/assets/`.
 
 ## Sanctuarul
 
@@ -878,14 +936,16 @@ umbrei (60 m; la 18° o clădire de 15 m aruncă 46 m), deci 0,211 m pe texel. C
 lasă apeductul afară: merge ~550 m spre est și dubla fereastra luminii (0,336 m pe
 texel) pentru umbre de 2–8 m. Harta ține ~32 MiB pe placă — adâncime plus culoare,
 pe care r186 o alocă oricum.
-`autoUpdate = false`: se desenează o dată. Aruncă umbră numai sanctuarul; primesc
+`autoUpdate = false`: se desenează la pornire și apoi numai când soarele se mută
+între vederi. Aruncă umbră numai sanctuarul; primesc
 sanctuarul, suprafețele și terenul. Tocmai de aceea trebuie refăcută la
 `webglcontextrestored`: three face atunci un WebGLShadowMap nou, iar o lumină cu
 `autoUpdate = false` și fără `needsUpdate` e sărită. Proba: contextul pierdut și
 refăcut dă 0 pixeli diferiți; fără umbre, pe aceeași vedere, diferă 8 393.
 
-Soarele NU se mută: camera de umbră stă unde stă lumina, la 4 km, și doar marginile
-ei se strâng pe complex. O poziție mutată, chiar pe aceeași direcție, ar fi rotunjit
+Soarele nu se mută ca să încadreze umbra — numai între vederi, Relief ↔ Satelit,
+unde `potriveste()` reîncadrează cutia și redesenează harta o dată. Camera de umbră
+stă unde stă lumina, la 4 km, și doar marginile ei se strâng pe complex. O poziție mutată, chiar pe aceeași direcție, ar fi rotunjit
 altfel vectorul luminii pe toată harta. Proba: în țintă fixă 640 × 400, în trei
 vederi, **0 pixeli diferiți** în afara dreptunghiului umbrei; la fel cu sanctuarul
 cu totul ascuns.
@@ -1062,7 +1122,7 @@ mării, la cel mult 40 m de ceva mai înalt de 3 m.
 - controale: soarele opus dă scorul ~0 (0,004 față de 0,446), iar elevația ± 5° îl
   scade.
 
-Vederea Satelit, care vine, va folosi soarele sanctuarului.
+Pagina folosește soarele sanctuarului.
 
 **Proba independentă e cerul.** Perechea (azimut, elevație) trebuie să fie o
 poziție prin care soarele chiar a trecut în fereastra de zbor a lotului 4

@@ -245,9 +245,59 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #busola .citire { font-size: 0.82rem; }
 }
 
+/* ------------------------------------------------------- vederea Satelit
+ *
+ * Un comutator, ca butonul de straturi al unei hărți. Eticheta rămâne „Satelit";
+ * starea o spune `aria-pressed` și, pentru ochi, fondul plin și bifa. Pe desktop
+ * stă jos-stânga — acolo nu e nimic —, pe telefon deasupra busolei, la îndemâna
+ * degetului mare. Ținta rămâne peste 44 px.
+ */
+#straturi {
+  position: fixed;
+  left: 1rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  font-family: var(--sans);
+}
+#straturi button {
+  min-height: 2.9rem;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#straturi button::before { content: "☐ "; color: var(--muted); }
+#straturi button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+#straturi button[aria-pressed="true"]::before { content: "☑ "; color: inherit; }
+#straturi button[aria-busy="true"] { cursor: progress; opacity: 0.75; }
+#straturi button:hover { border-color: var(--gold); }
+#straturi .anunt {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 34rem) {
+  #straturi {
+    left: auto;
+    right: 0.75rem;
+    bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Modul de contrast forțat înlocuiește culorile autorului cu ale sistemului;
    `fill` din variabile n-ar mai însemna nimic acolo. */
 @media (forced-colors: active) {
+  #straturi button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+  #straturi button[aria-pressed="true"] { background: Highlight; color: HighlightText; }
   #busola .roza { background: Canvas; border-color: CanvasText; }
   #busola .disc { fill: Canvas; stroke: CanvasText; }
   #busola .ac-nord { fill: Highlight; }

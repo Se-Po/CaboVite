@@ -5,6 +5,7 @@ import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { creeazaCer } from './cer.js';
+import { creeazaSatelit } from './satelit.js';
 import { incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
 import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
@@ -25,7 +26,7 @@ import { instantaneuMemorie } from './dispose.js';
 // are ce desena; asta ține și amortizarea controalelor lină.
 
 /** @param {HTMLCanvasElement} canvas */
-export async function porneste(canvas, { continut } = {}) {
+export async function porneste(canvas, { continut, laSurse } = {}) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -48,7 +49,7 @@ export async function porneste(canvas, { continut } = {}) {
   };
 
   try {
-    return await construieste(canvas, renderer, deEliberat, curata, continut);
+    return await construieste(canvas, renderer, deEliberat, curata, continut, laSurse);
   } catch (e) {
     curata();
     renderer.dispose();
@@ -62,7 +63,7 @@ export async function porneste(canvas, { continut } = {}) {
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata, continut) {
+async function construieste(canvas, renderer, deEliberat, curata, continut, laSurse) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
   // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
@@ -217,7 +218,8 @@ async function construieste(canvas, renderer, deEliberat, curata, continut) {
     surse = unesteSurse(surse, sanctuar.surse.map((s) => ({ ...s, prelucrare: PRELUCRARE[s.cheie] ?? 'geometria sanctuarului' })));
   }
 
-  // Umbrele sanctuarului: o hartă strânsă pe complex, desenată o singură dată.
+  // Umbrele sanctuarului: o hartă strânsă pe complex, desenată la pornire și apoi
+  // numai când se mută soarele (Relief ↔ Satelit).
   // Separabile — dacă nu se pot face, clădirile rămân, doar fără umbră.
   let umbre = null;
   if (sanctuar) {
@@ -230,8 +232,8 @@ async function construieste(canvas, renderer, deEliberat, curata, continut) {
       });
       const u = umbre;
       deEliberat.push(() => u.dispose());
-      // Harta se desenează o singură dată. După pierderea contextului WebGL, three
-      // face un WebGLShadowMap nou, dar cu `autoUpdate = false` lumina ar fi sărită
+      // Harta nu se redesenează singură (autoUpdate = false). După pierderea
+      // contextului WebGL, three face un WebGLShadowMap nou, dar lumina ar fi sărită
       // de-acum încolo: umbrele s-ar compara cu o textură nedesenată. Ascultătorul
       // three.js e înregistrat înaintea noastră, deci contextul e deja refăcut aici.
       const laRestaurare = () => { u.refa(); cereRandare(); };
@@ -240,6 +242,36 @@ async function construieste(canvas, renderer, deEliberat, curata, continut) {
     } catch (e) {
       console.warn('umbrele sanctuarului sărite:', e.message);
     }
+  }
+
+  // Vederea Satelit: ortofotoul pe relief, comutabil cu vederea de mai sus. Pornește
+  // pe Relief și trece singur pe Satelit când texturile sunt gata — dacă omul nu
+  // și-a ales altfel data trecută. Separabil: fără textură, sau dacă nu se poate
+  // crea deloc, rămâne Relief — ca la cer și la umbre.
+  let satelit = null;
+  try {
+    if (!b) throw new Error('harta n-are bbox_tm06');
+    satelit = creeazaSatelit({
+      renderer, scena, camera, teren, petic, mare, soare: lumini.soare, cer, umbre,
+      drapaj: sanctuar ? sanctuar.obiecte.slice(1) : [],
+      centru: { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 },
+      numeBaza: relief.meta.nume, numePetic: reliefPetic?.meta.nume ?? null,
+      gazda: canvas.parentElement ?? document.body,
+      cereRandare,
+      // Soarele s-a mutat: ceața și fundalul iau noul orizont al cerului.
+      laSoareNou: () => {
+        if (!cer) return;
+        const orizont = new THREE.Color().setRGB(...cer.orizont, THREE.SRGBColorSpace);
+        scena.fog.color.copy(orizont);
+        scena.background = orizont;
+      },
+      laSursa: (s) => { surse = unesteSurse(surse, [s]); laSurse?.(surse); },
+      fortatRelief: Boolean(culoare),
+    });
+    const sat = satelit;
+    deEliberat.push(() => sat.dispose());
+  } catch (e) {
+    console.warn('vederea Satelit sărită, rămâne Relief:', e.message);
   }
 
   // Cât timp utilizatorul nu a atins camera, încadrarea e a noastră și se
@@ -405,8 +437,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut) {
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, sanctuar, busola, punct, geo, surse,
-    zbor: zborSanctuar, eticheta, umbre,
+    renderer, scena, camera, controale, teren, petic, sanctuar, busola, punct, geo,
+    // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
+    get surse() { return surse; },
+    zbor: zborSanctuar, eticheta, umbre, satelit,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are

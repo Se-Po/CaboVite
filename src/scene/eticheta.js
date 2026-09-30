@@ -21,7 +21,7 @@ import * as THREE from 'three';
 // dialog nemodal: harta rămâne vie în spatele ei, Escape o închide și readuce
 // focusul pe etichetă.
 
-const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .cutie', '#surse', '#legenda'];
+const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .cutie', '#surse', '#legenda', '#straturi button'];
 const DIST_ETICHETA = 12; // px între ancoră și etichetă
 const MARGINE = 8;        // px de la marginea ecranului
 

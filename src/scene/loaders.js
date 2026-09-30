@@ -1,5 +1,5 @@
-// Încărcarea resurselor. Loaderele grele (glTF/Draco/KTX2) se vor adăuga aici,
-// ca o singură instanță refolosită — deocamdată relieful și stratul lui NDVI.
+// Încărcarea resurselor: relieful și stratul lui NDVI, sanctuarul și texturile
+// Satelit (KTX2). Loaderele grele stau aici, câte o singură instanță.
 
 /**
  * Încarcă heightmap-ul produs de `npm run build-petic`, împreună cu baza lui,
@@ -181,5 +181,77 @@ export async function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
     return d;
   } catch (e) {
     return lipsa(e.message);
+  }
+}
+
+/**
+ * Încărcătorul KTX2 — o singură instanță, cu `detectSupport` înaintea oricărei
+ * încărcări, cum cere regula proiectului.
+ *
+ * Importat dinamic, nu în capul fișierului: `loaders.js` e importat și în Node, de
+ * verifica-teren și verifica-sanctuar, iar KTX2Loader își face acolo un pool de
+ * workeri de care nu e nevoie. Așa, și în pagină, ajunge într-un fișier separat,
+ * cerut numai când trebuie.
+ */
+export async function creeazaIncarcatorKtx2(renderer) {
+  const { KTX2Loader } = await import('three/addons/loaders/KTX2Loader.js');
+  return new KTX2Loader().detectSupport(renderer);
+}
+
+/** Sidecarul unei texturi Satelit: `<hartă>-orto_vN.json`. Aruncă numai pe greșeli de programare. */
+export async function incarcaSidecarOrto(nume) {
+  const r = await fetch(`/data/${nume}.json`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  let m;
+  try { m = await r.json(); } catch { throw new Error('sidecarul nu e JSON'); }
+  if (m?.nume !== nume) throw new Error(`sidecarul e al lui ${m?.nume}, nu al lui ${nume}`);
+  const b = m.bbox_tm06;
+  if (!b || !['xMin', 'xMax', 'yMin', 'yMax'].every((k) => Number.isFinite(b[k])) || !(b.xMax > b.xMin && b.yMax > b.yMin))
+    throw new Error('bbox_tm06 lipsă sau greșit');
+  if (!Number.isInteger(m.latime) || !Number.isInteger(m.inaltime) || !/^[0-9a-f]{64}$/.test(m.sha256 ?? '') || !Number.isInteger(m.octeti))
+    throw new Error('dimensiunile, octeții sau sha256 lipsesc');
+  return m;
+}
+
+/**
+ * Textura Satelit a unei hărți. NU aruncă: fără ea, pagina rămâne pe Relief.
+ *
+ * Fișierul se verifică înainte de decodare — mărimea, sha256, antetul KTX2 cu
+ * lățimea, înălțimea și numărul de niveluri —, fiindcă `parse()` mută bufferul în
+ * workerul de transcodare: după el nu mai e nimic de verificat.
+ *
+ * @returns {Promise<{meta: object, textura: THREE.CompressedTexture}|null>}
+ */
+export async function incarcaOrto(nume, ktx2, metaGata = null) {
+  const lipsa = (motiv) => {
+    console.warn(`textura Satelit ${nume} lipsește (${motiv})`);
+    return null;
+  };
+  try {
+    const meta = metaGata ?? await incarcaSidecarOrto(nume);
+    const r = await fetch(`/data/${nume}.ktx2`);
+    if (!r.ok) return lipsa(`HTTP ${r.status}`);
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength !== meta.octeti) return lipsa(`${buf.byteLength} octeți, aștept ${meta.octeti}`);
+    const dv = new DataView(buf);
+    const magic = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb];
+    if (!magic.every((v, i) => dv.getUint8(i) === v)) return lipsa('nu e KTX2');
+    const w = dv.getUint32(20, true), h = dv.getUint32(24, true), niv = dv.getUint32(40, true);
+    if (w !== meta.latime || h !== meta.inaltime || niv !== meta.niveluri)
+      return lipsa(`antetul spune ${w} × ${h}, ${niv} niveluri; sidecarul ${meta.latime} × ${meta.inaltime}, ${meta.niveluri}`);
+    // `crypto.subtle` există numai în context securizat (HTTPS, localhost). Un telefon
+    // care deschide serverul de dezvoltare pe http://192.168… nu-l are: acolo se
+    // sare doar verificarea asta — mărimea și antetul au trecut deja —, nu textura.
+    if (globalThis.crypto?.subtle) {
+      const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      if (sha !== meta.sha256) return lipsa('sha256 nu se potrivește');
+    } else {
+      console.info(`textura Satelit ${nume}: sha256 neverificat (pagina nu e într-un context securizat)`);
+    }
+    // parse() nu întoarce o promisiune; o eroare de transcodare vine pe onError.
+    const textura = await new Promise((res, rej) => ktx2.parse(buf, res, rej));
+    return { meta, textura };
+  } catch (e) {
+    return lipsa(e?.message ?? String(e));
   }
 }

@@ -111,7 +111,9 @@ if (continut && !continut.textContent.trim()) {
 }
 
 try {
-  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR } });
+  // `laSurse`: vederea Satelit își adaugă sursa când îi sosește textura, după ce
+  // subsolul a fost deja scris; atunci se scrie din nou.
+  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR }, laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); } });
   if (!scena) {
     faraScena('WebGL indisponibil');
   } else {

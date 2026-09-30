@@ -3,9 +3,9 @@
 //
 //   npm run masoara-zbor
 //
-// De ce: vederea Satelit, care vine, va arăta fotografia neiluminată, iar clădirile
-// și cerul vor trebui luminate cu soarele din ea, altfel umbrele modelelor ar merge
-// într-o parte și cele din fotografie în alta. Cifra de până acum — azimut 96°, elevație
+// De ce: vederea Satelit a paginii arată fotografia neiluminată, iar clădirile și
+// cerul trebuie luminate cu soarele din ea, altfel umbrele modelelor merg într-o
+// parte și cele din fotografie în alta. Cifra de până acum — azimut 96°, elevație
 // 22,5° — venea dintr-o potrivire Lambert pe apele de țiglă ale aripii de nord
 // (culori-sanctuar.mjs), iar cu fereastra de zbor a lotului 4 (24.05–25.07.2025) nu
 // se împăca: la azimut 96° soarele n-a stat în vara aceea la 22,5°.
@@ -252,7 +252,7 @@ for (const [nume, F] of Object.entries(ZONE)) {
 const [A, B] = [rezultate.sanctuar, rezultate.far];
 const dAB = Math.hypot(((A.azimut_grila - B.azimut_grila + 540) % 360) - 180, A.elevatie - B.elevatie);
 console.log(`  sanctuarul și farul diferă cu ${dAB.toFixed(2)}°`);
-if (dAB > 2) console.log('  (peste 2°: mozaicul poate avea linii de zbor diferite; pagina va folosi soarele sanctuarului)');
+if (dAB > 2) console.log('  (peste 2°: mozaicul poate avea linii de zbor diferite; pagina folosește soarele sanctuarului)');
 
 // ------------------------------------------------------------ 2. ora zborului
 

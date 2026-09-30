@@ -27,6 +27,10 @@ const UNIFORME_CER = ['sunPosition', 'rayleigh', 'turbidity', 'mieCoefficient', 
  * între 5 și 24 km. De la câteva sute de metri înălțime, 24 km cad la 6 pixeli sub
  * orizont, deci marea rămânea închisă până la linia cerului și se vedea o dungă.
  * Aerul dintre ochi și marea îndepărtată o luminează treptat.
+ *
+ * Un material fără tone mapping (marea fotografiată a vederii Satelit) n-are
+ * funcția AgX în shader; atunci se include de mână — culoarea cerului trebuie să
+ * treacă prin ea, altfel ceața n-ar mai avea culoarea cerului de deasupra.
  */
 export function ceataCer(sh, cer) {
   for (const k of UNIFORME_CER) sh.uniforms[k] = cer.uniforme[k];
@@ -35,6 +39,9 @@ export function ceataCer(sh, cer) {
     .replace('#include <project_vertex>', '#include <project_vertex>\n\tvPozLume = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
   sh.fragmentShader = sh.fragmentShader
     .replace('void main() {', `varying vec3 vPozLume;
+#ifndef TONE_MAPPING
+#include <tonemapping_pars_fragment>
+#endif
 ${GLSL_CER}
 void main() {`)
     .replace('#include <fog_fragment>', `#ifdef USE_FOG
@@ -79,6 +86,7 @@ export function creeazaMare(paleta, cer = null, intindere = 120000) {
   let viu = true;
   return {
     obiect,
+    material,
     dispose() {
       if (!viu) return;
       viu = false;

@@ -1,10 +1,12 @@
 // Decodoarele Draco și KTX2 pentru glTF.
 //
-// NU se rulează încă. Nimic din `src/` nu importă GLTFLoader, DRACOLoader sau
-// KTX2Loader, iar `public/` se copiază întreg în `dist/`: rulat degeaba, pune
-// acolo 1 349 591 de octeți pe care nu-i cere nicio linie de cod. Se rulează
-// când intră primul `.glb` — de aceea cele două directoare sunt și gitignorate,
-// ca o clonă curată să nu le moștenească.
+// NU se rulează încă. Nimic din `src/` nu importă GLTFLoader sau DRACOLoader, iar
+// `public/` se copiază întreg în `dist/`: rulat degeaba, pune acolo peste un MB pe
+// care nu-l cere nicio linie de cod. De aceea cele două directoare sunt gitignorate.
+//
+// Texturile vederii Satelit NU au nevoie de el: KTX2Loader din r186 își găsește
+// singur transcodorul, cu `new URL('../libs/basis/…', import.meta.url)`, iar Vite
+// îl emite la build. Cu `setTranscoderPath('/basis/')` s-ar fi livrat de două ori.
 
 import { cp, mkdir } from 'node:fs/promises';
 

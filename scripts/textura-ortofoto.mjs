@@ -8,7 +8,7 @@
 // fără ca harta să se schimbe.
 //
 // Geometria. Marginile de pixel ale texturii sunt metri TM06 scriși în sidecar
-// (`conventie: muchii de pixel`); pagina va calcula din ei coordonatele texturii,
+// (`conventie: muchii de pixel`); pagina calculează din ei coordonatele texturii,
 // în shader, din poziția fiecărui vârf. Colțurile de nord-vest cad pe metri întregi
 // (baza −95792 / −136402, peticul −94823 / −137295), deci al treilea nivel al
 // peticului (1 m) cade texel pe texel peste bază. Dimensiunile sunt multipli de 64,
@@ -19,7 +19,7 @@
 // lumină LINIARĂ, cum reflectă suprafața; o medie a octeților sRGB ar întuneca
 // trecerile dintre lumină și umbră.
 //
-// Marea. Planul mării va avea în afara texturii o singură culoare: apa adâncă,
+// Marea. Planul mării are în afara texturii o singură culoare: apa adâncă,
 // măsurată pe ortofoto. Ca textura să se topească în el fără margine, pe mare
 // fotografia se amestecă, cu distanța de la mal, în culoarea aceea, iar pixelii
 // fără date (colțurile de vest) o primesc direct. Amestecul e copt în RGB, nu ținut
