@@ -568,7 +568,6 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
   e greșit — încercat;
 - toate fațetele de la apă de deasupra mării ies calcar (5 378 pe bază, 2 714 pe petic);
 - calea fără strat o iau numai fațetele scufundate întregi (1 001 + 549);
-- **0** fațete diferă între tema de zi și cea de noapte;
 - peticul față de ce ar picta baza sub el: ΔE_OK×100 al mediilor **0,245** pe toată
   zona, 0,116 pe fâșia de 20 m de la margine — dreptunghiul peticului nu se vede;
 - numai cu dala de ortofoto pe disc: ΔE față de ortofoto, pe cele 1 415 685 de
@@ -590,9 +589,10 @@ Regula costă +23 ms la construcția bazei, în Node.
 
 **Expunerea se calculează.** Sky.js e scris pentru ~0,5 sub ACES; sub AgX la 1 iese
 altfel. `expunereCer` e factorul la care orizontul OPUS soarelui are luminanța culorii
-de cer a temei (`paleta.cer`), deci pagina rămâne la fel de luminoasă ca înainte:
-2,18 ziua și 0,21 în tema întunecată, cu soarele Relief (18° / 244°); cu soarele
-zborului (39,5° / 94°), 0,79 și 0,075 — Preetham e mult mai luminos cu soarele sus.
+de cer a paletei (`paleta.cer`, 0x7d92a6), deci pagina rămâne la fel de luminoasă ca
+înainte: 0,21 cu soarele Relief (18° / 244°), 0,075 cu al zborului (39,5° / 94°) —
+Preetham e mult mai luminos cu soarele sus. Tema deschisă de până la v0.1.1, cu
+cerul 0xdfe8ef, avea 2,18 și 0,79.
 
 **Portul JS.** `cerLiniar()` și `agx()` refac în JS exact formulele shaderului și
 ale lui `AgXToneMapping` din r186 (matricile coloană cu coloană, ca în GLSL). Cu ele
@@ -1196,6 +1196,11 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 ## Principii de design (nenegociabile)
 
 - **Accesibilitate:** fonturi mari, contrast ridicat. Cititorii pot fi vârstnici.
+- **O singură temă, întunecată**, oricum ar fi setat sistemul: `:root` din
+  `main.css` și `PALETA` din `palette.js` (cerul și marea scenei). `color-scheme:
+  dark`, în CSS și în `index.html`, ține întunecate și controalele native, cu
+  barele de defilare. Tema deschisă, aleasă după `prefers-color-scheme`, a plecat
+  după v0.1.1, la cererea autorului.
 - **Responsivitate** reală, pe toate dimensiunile și nivelurile de zoom.
 - **Navigare clară:** nav sticky, breadcrumbs, scrollspy.
 - **Degradare grațioasă:** pagina trebuie să rămână lizibilă și fără WebGL.

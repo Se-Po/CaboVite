@@ -1,28 +1,22 @@
 /* Baza paginii. Paleta și tipografia sunt moștenite din pagina existentă:
-   stive de fonturi de sistem, fără fonturi web, contrast ridicat. */
+   stive de fonturi de sistem, fără fonturi web, contrast ridicat.
+
+   O singură temă, întunecată, oricum ar fi setat sistemul. Până la v0.1.1 pagina
+   urma `prefers-color-scheme` și avea și o temă deschisă. `color-scheme: dark`
+   cere browserului controalele native — barele de defilare ale modalei și ale
+   panoului punctului — tot întunecate; `index.html` îl spune și înainte de CSS. */
 
 :root {
-  --bg: #f7f3ea;
-  --surface: #fffdf7;
-  --ink: #24211c;
-  --muted: #5e564b;
-  --line: #e4dccb;
-  --accent: #7a3b2e;
-  --gold: #94752f;
+  color-scheme: dark;
+  --bg: #17150f;
+  --surface: #1e1b15;
+  --ink: #ece5d6;
+  --muted: #aaa08e;
+  --line: #332e24;
+  --accent: #d99177;
+  --gold: #d3b063;
   --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Cambria, "Times New Roman", serif;
   --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17150f;
-    --surface: #1e1b15;
-    --ink: #ece5d6;
-    --muted: #aaa08e;
-    --line: #332e24;
-    --accent: #d99177;
-    --gold: #d3b063;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -71,7 +65,7 @@ html, body {
    Fără cutie, textul se citește prin contur: opt umbre de 1–1,5 px fără estompare
    desenează în jurul fiecărei litere un inel plin din culoarea fundalului paginii,
    iar două umbre estompate îl topesc în scenă. Contrastul se judecă deci între
-   `--ink` și `--bg` — peste 14:1 pe ambele teme —, nu față de cer. Doar cu umbre
+   `--ink` și `--bg` — 14,6:1 —, nu față de cer. Doar cu umbre
    estompate, cum era întâi, inelul avea lângă o literă de 2 px 30–50% opacitate:
    recenzia a măsurat pe cerul de pornire, pe tema întunecată, mediana 3,47:1. */
 #surse {
@@ -202,11 +196,11 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * numai butonul — ca derularea textului pe sub ea să meargă mai departe.
  *
  * Culorile poartă informația după contrast, nu după gust: `--accent` pe acul de
- * nord și pe litera N (7,6:1 pe tema deschisă, 7,2:1 pe cea întunecată),
- * `--muted` pe rest (6,5 / 7,1), `--ink` pe cifră. `--gold` NU atinge text sau
- * linii subțiri: pe tema deschisă are 3,91:1 pe `--bg`, sub pragul de 4,5:1.
- * Rămâne unde 3:1 e de ajuns — inelul de focus și conturul la trecerea cu
- * mouse-ul.
+ * nord și pe litera N (7,2:1 pe discul `--bg`), `--muted` pe rest (7,1:1),
+ * `--ink` pe cifră (13,7:1, pe `--surface`). `--gold` NU atinge text sau linii
+ * subțiri. Regula vine din tema deschisă de până la v0.1.1, unde avea 3,91:1,
+ * sub pragul de 4,5:1; pe cea întunecată are 8,8:1, dar rămâne tot unde 3:1 e
+ * de ajuns — inelul de focus și conturul la trecerea cu mouse-ul.
  *
  * Discul e OPAC, nu translucid. Altfel contrastul acului s-ar măsura față de
  * niște pixeli necunoscuți de teren, iar niciuna din cifrele de mai sus n-ar mai
@@ -677,8 +671,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * punctului — le ocolește singură, din eticheta.js. Fișa e o unealtă (3).
  *
  * Culori după contrast, ca la busolă și la punct: `--ink` pe `--surface` pentru
- * nume, `--accent` pe chenar și pe legături (7,6:1 / 7,2:1), `--muted` pe sursele
- * mici (6,5:1 / 7,1:1). `--gold` numai pe focus, niciodată pe text.
+ * nume (13,7:1), `--accent` pe chenar și pe legături (6,8:1), `--muted` pe
+ * sursele mici (6,6:1). `--gold` numai pe focus, niciodată pe text.
  */
 #sanctuar-eticheta {
   position: fixed;

@@ -10,8 +10,8 @@ import { Sky } from 'three/addons/objects/Sky.js';
 // - Expunerea. Sky.js e scris pentru o expunere de ~0,5 sub ACES; sub AgX, la 1,
 //   cum stă scena, ar ieși spălat sau prea întunecat. Factorul `expunereCer` se
 //   CALCULEAZĂ, nu se alege din ochi: orizontul din partea opusă soarelui trebuie
-//   să aibă luminanța culorii de cer a temei (`paleta.cer`), deci pagina rămâne
-//   la fel de luminoasă ca înainte, în ambele teme.
+//   să aibă luminanța culorii de cer a paletei (`paleta.cer`), deci pagina
+//   rămâne la fel de luminoasă ca înainte de cerul Preetham.
 // - Ceața. Ceața three are o singură culoare, iar cerul nu. Marea, care ajunge
 //   până la orizont, primește deci ceața pixel cu pixel, cu culoarea cerului pe
 //   aceeași direcție (`GLSL_CER`, folosit de mare.js); restul scenei, care stă sub

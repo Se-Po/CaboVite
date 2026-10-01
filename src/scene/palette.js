@@ -1,12 +1,14 @@
-// Culorile scenei. Marea din tema deschisă e `--c-i` din pagina existentă
-// (CaboEspichel/index.html); cerul și ambele culori ale temei întunecate sunt
-// alese aici; terenul e măsurat la fața locului.
+// Culorile scenei. Cerul și marea sunt alese aici; terenul e măsurat la fața
+// locului.
+//
+// Pagina are o singură temă, întunecată. Până la v0.1.1 avea și una deschisă,
+// aleasă după `prefers-color-scheme`, cu marea `--c-i` din pagina existentă
+// (CaboEspichel/index.html, 0x2b5c7c) și cerul 0xdfe8ef.
 
 // O capcană de care m-am lovit: variabilele paginii vechi sunt culori de
 // INTERFAȚĂ. În tema întunecată `--c-i` devine #8cbcdb — albastru deschis,
-// potrivit pentru un marcaj de text pe fond negru, nepotrivit pentru apă. Apa
-// rămâne apă în ambele teme; doar lumina scade. Deci nu mapăm fiecare variabilă
-// CSS naiv pe un rol din scenă.
+// potrivit pentru un marcaj de text pe fond negru, nepotrivit pentru apă. Deci
+// nu mapăm fiecare variabilă CSS naiv pe un rol din scenă.
 //
 // Paleta de interfață avea și `platou`, `calcar`, `ocru`, `teracota`, `cerneala`.
 // Nu le citea nimic: stăteau pentru culoareTeren(), cât a fost goală. Terenul
@@ -14,28 +16,19 @@
 // `p.calcar` (culoarea hârtiei, 0xf7f3ea) și `p.masurat.calcar` (piatra, 0x9d958c)
 // stăteau pe același obiect, la o literă distanță.
 
-/** Paleta pentru lumină. */
-export const PALETA = {
-  mare: 0x2b5c7c,      // --c-i, albastrul adânc
-  cer: 0xdfe8ef,       // cerul atlantic — nu există în pagina veche
-};
-
 /**
- * Tema întunecată.
+ * Paleta scenei, pentru interfața întunecată.
  *
  * Nu e „noapte la Cabo Espichel": e doar interfața paginii care e întunecată.
  * Peisajul rămâne diurn — lumină de după-amiază târzie, mai caldă și mai joasă,
  * dar nu stinsă. Prima variantă cobora cerul la #4a5c6b și, trecută prin AgX,
  * marea ieșea aproape neagră și terenul părea să plutească în gol.
  */
-export const PALETA_NOAPTE = {
+export const PALETA = {
   mare: 0x27536e,      // albastru adânc, lizibil — NU --c-i din tema dark a paginii
   cer: 0x7d92a6,       // trebuie să rămână clar mai deschis decât marea,
                        // altfel orizontul dispare
 };
-
-export const esteNoapte = () =>
-  globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 
 /** Culoarea terenului când nu există măsurători: gri cald, neutru. */
 export const GRI_REZERVA = 0x8a8578;
@@ -123,7 +116,7 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
   return masurat;
 }
 
-export const paletaCurenta = () => ({ ...(esteNoapte() ? PALETA_NOAPTE : PALETA), masurat });
+export const paletaCurenta = () => ({ ...PALETA, masurat });
 
 /** Cele patru materiale de teren, fără de care regula întoarce GRI_REZERVA. */
 const MATERIALE_TEREN = ['poteca', 'calcar', 'vegetatie_uscata', 'tufaris'];
@@ -181,7 +174,7 @@ function canal(p, k, u, t, spreCalcar, spreTufaris, vegetatie) {
  * `panta` — 0 pentru o fațetă orizontală, 1 pentru una verticală: 1 − |n.y|.
  * `altitudine` — media celor trei vârfuri, în metri.
  * `p` — paleta curentă; regula citește NUMAI `p.masurat`, deci terenul nu
- *       depinde de temă și nu trebuie refăcut la schimbarea ei.
+ *       depinde de cerul și de marea paletei.
  * `ndvi` — indicele de vegetație al fațetei, din infraroșul ortofotoului: media
  *          nodurilor ei care au valoare. `undefined` dacă stratul lipsește.
  *

@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
 import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
-import { GRI_REZERVA, PALETA, PALETA_NOAPTE, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
+import { GRI_REZERVA, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
 import { aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
@@ -229,7 +229,7 @@ async function main() {
   const lang = { baza: fateteDeLaZero(sr.relief, sr.pastreaza), petic: fateteDeLaZero(sr.reliefPetic, undefined) };
   for (const care of ['baza', 'petic']) {
     const p = primite[care], L = lang[care];
-    let mal = 0, malAlt = 0, malSub = 0, faraStrat = 0, faraStratVizibil = 0, invalide = 0, tema = 0;
+    let mal = 0, malAlt = 0, malSub = 0, faraStrat = 0, faraStratVizibil = 0, invalide = 0;
     for (let i = 0; i < p.length; i++) {
       const [panta, alt, ndvi, c] = p[i];
       // Fațetele de la apă care ies deasupra mării. Cele care stau întregi sub ea nu
@@ -247,12 +247,10 @@ async function main() {
         const x = culoareTeren(panta, alt, pp, nn);
         if (!Number.isInteger(x) || x < 0 || x > 0xffffff) invalide++;
       }
-      if (culoareTeren(panta, alt, { ...PALETA, masurat }, ndvi) !== culoareTeren(panta, alt, { ...PALETA_NOAPTE, masurat }, ndvi)) tema++;
     }
     proba(malAlt === 0, `${care}: ${mal} fațete de la apă peste nivelul mării, ${malAlt} care nu ies calcar (${malSub} întregi sub mare)`);
     proba(faraStratVizibil === 0, `${care}: ${faraStrat} fațete pe calea fără strat, toate scufundate întregi (${faraStratVizibil} vizibile)`);
     proba(invalide === 0, `${care}: căile degradate (fără strat, fără măsurători, fără amândouă) — ${invalide} culori invalide`);
-    proba(tema === 0, `${care}: ${tema} fațete care se schimbă între tema de zi și cea de noapte`);
   }
 
   // Peticul față de ce ar picta baza sub el. Baza n-are fațete acolo — gaura —,
