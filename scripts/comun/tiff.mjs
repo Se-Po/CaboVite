@@ -129,7 +129,7 @@ export function citesteIfd(buf, off, le = true, baza = 0, big = false) {
  * Cheile din GeoKeyDirectory (tagul 34735) care au valoarea chiar în director.
  * Celelalte trimit la tagurile 34736/34737 și nu ne trebuie.
  */
-function cheiGeo(d) {
+export function cheiGeo(d) {
   const v = d.valori(34735);
   const chei = new Map();
   if (!v) return chei;

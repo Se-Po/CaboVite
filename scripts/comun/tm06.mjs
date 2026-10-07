@@ -81,3 +81,59 @@ export const arie = (p) => {
     s += (p[j].x + p[i].x) * (p[j].y - p[i].y);
   return Math.abs(s / 2);
 };
+
+/**
+ * Un Mercator transversal oarecare: originea, factorul de scară, deplasările
+ * false, elipsoidul. TM06 de mai sus e cazul k0 = 1, fără deplasări, pe GRS80;
+ * UTM 29N, proiecția fișierelor Sentinel-2, e k0 = 0,9996, λ0 = −9°, E0 = 500 000 m,
+ * pe WGS84. Aceleași serii ca `laTM06` / `dinTM06`; acelea rămân neatinse, ca
+ * niciun octet scris deja să nu se schimbe.
+ *
+ * Diferența dintre ETRS89 și WGS84 (~0,9 m aici, în 2025: placa eurasiatică merge
+ * cu ~2,5 cm pe an din 1989) nu se corectează: e sub un pixel Sentinel (10 m) și
+ * sub o celulă Copernicus (~30 m).
+ */
+export function creeazaTM({ lat0 = 0, lon0, k0 = 1, fe = 0, fn = 0, a = 6378137, f = 1 / 298.257223563 }) {
+  const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const L0 = (lon0 * Math.PI) / 180;
+  const M = (lat) =>
+    a * ((1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256) * lat
+       - ((3 * e2) / 8 + (3 * e2 ** 2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * lat)
+       + ((15 * e2 ** 2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * lat)
+       - ((35 * e2 ** 3) / 3072) * Math.sin(6 * lat));
+  const M0 = M((lat0 * Math.PI) / 180);
+  return {
+    /** Grade → metri. */
+    inainte(lonGrade, latGrade) {
+      const lat = (latGrade * Math.PI) / 180, lon = (lonGrade * Math.PI) / 180;
+      const N = a / Math.sqrt(1 - e2 * Math.sin(lat) ** 2);
+      const T = Math.tan(lat) ** 2, C = ep2 * Math.cos(lat) ** 2, A = (lon - L0) * Math.cos(lat);
+      return {
+        x: fe + k0 * N * (A + ((1 - T + C) * A ** 3) / 6 + ((5 - 18 * T + T ** 2 + 72 * C - 58 * ep2) * A ** 5) / 120),
+        y: fn + k0 * (M(lat) - M0 + N * Math.tan(lat) * (A ** 2 / 2 + ((5 - T + 9 * C + 4 * C ** 2) * A ** 4) / 24
+          + ((61 - 58 * T + T ** 2 + 600 * C - 330 * ep2) * A ** 6) / 720)),
+      };
+    },
+    /** Metri → grade, nerotunjite. */
+    inapoi(x, y) {
+      const mu = (M0 + (y - fn) / k0) / (a * (1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256));
+      const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+      const lat1 = mu + ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu)
+        + ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu)
+        + ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) + ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
+      const C1 = ep2 * Math.cos(lat1) ** 2, T1 = Math.tan(lat1) ** 2, s = 1 - e2 * Math.sin(lat1) ** 2;
+      const N1 = a / Math.sqrt(s), R1 = (a * (1 - e2)) / s ** 1.5, D = (x - fe) / (N1 * k0);
+      const lat = lat1 - ((N1 * Math.tan(lat1)) / R1) * (D ** 2 / 2
+        - ((5 + 3 * T1 + 10 * C1 - 4 * C1 ** 2 - 9 * ep2) * D ** 4) / 24
+        + ((61 + 90 * T1 + 298 * C1 + 45 * T1 ** 2 - 252 * ep2 - 3 * C1 ** 2) * D ** 6) / 720);
+      const lon = L0 + (D - ((1 + 2 * T1 + C1) * D ** 3) / 6
+        + ((5 - 2 * C1 + 28 * T1 - 3 * C1 ** 2 + 8 * ep2 + 24 * T1 ** 2) * D ** 5) / 120) / Math.cos(lat1);
+      return { lon: (lon * 180) / Math.PI, lat: (lat * 180) / Math.PI };
+    },
+  };
+}
+
+/** TM06 prin funcția generală — pentru probă: trebuie să dea exact `laTM06`. */
+export const TM06 = creeazaTM({ lat0: 39.6682583333333, lon0: -8.13310833333333, k0: 1, fe: 0, fn: 0, f: 1 / 298.257222101 });
+/** UTM 29N pe WGS84 (EPSG:32629), proiecția Sentinel-2 aici. */
+export const UTM29 = creeazaTM({ lat0: 0, lon0: -9, k0: 0.9996, fe: 500000, fn: 0 });

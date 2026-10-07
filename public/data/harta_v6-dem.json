@@ -1,0 +1,112 @@
+{
+  "nume": "harta_v6",
+  "rol": "imprejurimi",
+  "interior": "harta_v4",
+  "descriere": "Împrejurimile zonei alpha, banda de lângă marginile de nord și de est. LiDAR DGT 2024-2025, MDT 2 m, la 4 m. Uint16 little-endian, rând 0 = nord.",
+  "latime": 698,
+  "inaltime": 849,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "conventie": "noduri: bbox_tm06 dă primul și ultimul nod",
+  "bbox_tm06": {
+    "xMin": -95789,
+    "xMax": -93001,
+    "yMin": -139395,
+    "yMax": -136003
+  },
+  "pasX_m": 4,
+  "pasZ_m": 4,
+  "zMin_m": -8,
+  "zMax_m": 151.45,
+  "zScara": 0.002433111531752475,
+  "deplasare_scena": {
+    "x": 229,
+    "z": -200
+  },
+  "interior_noduri_tm06": {
+    "x0": -95787,
+    "x1": -93461,
+    "y0": -139391,
+    "y1": -136407
+  },
+  "interior_noduri_scena": {
+    "x0": -1163,
+    "x1": 1163,
+    "z0": -1492,
+    "z1": 1492
+  },
+  "acoperire": {
+    "noduri_uscat": 109248,
+    "regula_apa": "cota -8 m: apă sau fără date. Nodurile cu mai mult de un pas în interiorul găurii au și ele cota apei: acolo se vede harta_v4."
+  },
+  "prelucrare": {
+    "reducere": "filtru cort 1-2-1 pe 3 × 3 pixeli de 2 m, centrat pe nod, numai pe uscat; nodul e apă dacă pixelul lui e apă",
+    "noduri": "pe metri impari, ca harta_v4: pe muchiile de nord și de est ale lui alpha cad din doi în doi peste nodurile ei",
+    "dale_sarite": [
+      {
+        "dala": "MDT-2m-104161-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -139000) nu e cel al indicelui; dincolo de alpha numai apă"
+      },
+      {
+        "dala": "MDT-2m-104162-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -138000) nu e cel al indicelui; dincolo de alpha numai apă"
+      },
+      {
+        "dala": "MDT-2m-104163-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -137000) nu e cel al indicelui; dincolo de alpha numai apă"
+      }
+    ],
+    "patrate_fara_dala": {
+      "104164": {
+        "noduri": 20688,
+        "uscat_glo30": 0
+      },
+      "nota": "pătratele de 1 km din cutie fără dală în catalogul DGT; nodurile lor sunt apă, iar GLO-30 (WBM) nu vede uscat în ele"
+    },
+    "dale_fata_de_copernicus": {
+      "105164": {
+        "noduri": 489,
+        "mediana_m": 0.67
+      },
+      "106161": {
+        "noduri": 166,
+        "mediana_m": 0.89
+      },
+      "106162": {
+        "noduri": 17273,
+        "mediana_m": 0.27
+      },
+      "106163": {
+        "noduri": 22424,
+        "mediana_m": 0.28
+      },
+      "106164": {
+        "noduri": 27755,
+        "mediana_m": 0.43
+      },
+      "nota": "|DGT − (GLO-30 − decalaj)|, mediana pe nodurile de uscat cu panta sub 15%; o dală cu sub 50 de astfel de noduri e NEVERIFICATĂ de proba asta",
+      "neverificate": []
+    }
+  },
+  "sursa": {
+    "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 2 m",
+    "producator": "Direção-Geral do Território (DGT)",
+    "densitate": "10 puncte/m²",
+    "licenta": "CC BY 4.0",
+    "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
+    "portal": "https://cdd.dgterritorio.gov.pt/",
+    "dale": [
+      "MDT-2m-105161-06-2024_v01.tif",
+      "MDT-2m-105162-06-2024_v01.tif",
+      "MDT-2m-105163-06-2024_v01.tif",
+      "MDT-2m-105164-06-2024_v01.tif",
+      "MDT-2m-106161-06-2024_v01.tif",
+      "MDT-2m-106162-06-2024_v01.tif",
+      "MDT-2m-106163-06-2024_v01.tif",
+      "MDT-2m-106164-06-2024_v01.tif",
+      "MDT-2m-107161-06-2024_v01.tif",
+      "MDT-2m-107162-06-2024_v01.tif",
+      "MDT-2m-107163-06-2024_v01.tif",
+      "MDT-2m-107164-06-2024_v01.tif"
+    ]
+  }
+}

@@ -25,22 +25,21 @@
 // fără date (colțurile de vest) o primesc direct. Amestecul e copt în RGB, nu ținut
 // într-un canal alfa: mipurile ar media altfel culoarea și ponderea separat.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
-import { laOklab, linear, gama } from './comun/oklab.mjs';
-import { scriePngSrgb } from './comun/png.mjs';
+import { laOklab } from './comun/oklab.mjs';
 import { cereFisier } from './comun/cere.mjs';
+import {
+  KTX, LIN, LUCRU, NIVELURI_MIP as NIVELURI, codeazaKtx, dE, distanta, injumatateste, laOctet, multiplu, octeti, pierdere, scriePngNiveluri,
+} from './comun/textura.mjs';
 
 const VERSIUNE = 'orto_v1';
 const ORTO = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
 const ZBOR = 'date-sursa/derivate/zbor.json';
-const LUCRU = 'date-sursa/derivate/textura';
 const IESIRE = 'public/data';
-const NIVELURI = 5;
 const MARGINE_M = 4;          // în jurul cutiei hărții, ca filtrarea să nu citească dincolo de ea
 const PRAG_MB = 8;            // peste atât, pe fișier, scriptul se oprește și spune (autorul a acceptat +4–7 MB)
 
@@ -57,10 +56,6 @@ const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text
 const dxPx = Math.round(zbor.deplasare_sol.dx_m / o.pas), dyPx = Math.round(zbor.deplasare_sol.dy_m / o.pas);
 if (Math.abs(dxPx * o.pas - zbor.deplasare_sol.dx_m) > 1e-9 || Math.abs(dyPx * o.pas - zbor.deplasare_sol.dy_m) > 1e-9)
   throw new Error(`deplasarea (${zbor.deplasare_sol.dx_m}; ${zbor.deplasare_sol.dy_m}) m nu e un număr întreg de pixeli de ${o.pas} m`);
-
-const LIN = Float32Array.from({ length: 256 }, (_, v) => linear(v / 255));
-const laOctet = (v) => Math.max(0, Math.min(255, Math.round(gama(Math.max(0, Math.min(1, v))) * 255)));
-const multiplu = (v, m) => Math.ceil(v / m) * m;
 
 /** Cadrul texturii unei hărți: colțul NV, pasul și dimensiunile, multipli de 64. */
 function cadru(harta, pas) {
@@ -111,18 +106,6 @@ function citesteNivel0(c) {
   return { lin, date };
 }
 
-/** Nivelul următor: media 2 × 2, în liniar. */
-function injumatateste(lin, W, H) {
-  const w = W / 2, h = H / 2, out = new Float32Array(w * h * 3);
-  for (let r = 0; r < h; r++) for (let q = 0; q < w; q++) for (let k = 0; k < 3; k++) {
-    const a = (i, j) => lin[((2 * r + j) * W + 2 * q + i) * 3 + k];
-    out[(r * w + q) * 3 + k] = (a(0, 0) + a(1, 0) + a(0, 1) + a(1, 1)) / 4;
-  }
-  return out;
-}
-
-const octeti = (lin) => { const b = new Uint8Array(lin.length); for (let i = 0; i < lin.length; i++) b[i] = laOctet(lin[i]); return b; };
-
 /** Masca de uscat a bazei, pe texelii cadrului (nodul cel mai apropiat al hărții). */
 function uscatPeTexeli(harta, c) {
   const m = new Uint8Array(c.W * c.H);
@@ -137,27 +120,6 @@ function uscatPeTexeli(harta, c) {
   return m;
 }
 
-/** Distanța euclidiană (în texeli) până la cel mai apropiat texel de uscat — două treceri, 3-4 aproximat. */
-function distanta(m, W, H) {
-  const D = new Float32Array(W * H).fill(1e9);
-  for (let i = 0; i < W * H; i++) if (m[i]) D[i] = 0;
-  const d1 = 1, d2 = Math.SQRT2;
-  for (let r = 0; r < H; r++) for (let q = 0; q < W; q++) {
-    const i = r * W + q; let v = D[i];
-    if (q > 0) v = Math.min(v, D[i - 1] + d1);
-    if (r > 0) { v = Math.min(v, D[i - W] + d1); if (q > 0) v = Math.min(v, D[i - W - 1] + d2); if (q < W - 1) v = Math.min(v, D[i - W + 1] + d2); }
-    D[i] = v;
-  }
-  for (let r = H - 1; r >= 0; r--) for (let q = W - 1; q >= 0; q--) {
-    const i = r * W + q; let v = D[i];
-    if (q < W - 1) v = Math.min(v, D[i + 1] + d1);
-    if (r < H - 1) { v = Math.min(v, D[i + W] + d1); if (q < W - 1) v = Math.min(v, D[i + W + 1] + d2); if (q > 0) v = Math.min(v, D[i + W - 1] + d2); }
-    D[i] = v;
-  }
-  return D;
-}
-
-const dE = (a, b) => 100 * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const mediana = (v) => { const s = Float64Array.from(v).sort(); return s[Math.floor(s.length / 2)]; };
 
 /**
@@ -188,68 +150,6 @@ function masoaraMarea(lin, date, uscat, D, c) {
     return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
   })();
   return { deepLin: deep, deepOctet: deep.map(laOctet), d1, d0: d1 / 2, benzi: chei.map((k) => ({ de_la_m: k * 25, dE_fata_de_adanc: +dE(med(k), adanc).toFixed(2) })) };
-}
-
-function scriePngNiveluri(nume, niveluri) {
-  const dir = join(LUCRU, nume);
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  return niveluri.map((n, k) => {
-    const f = join(dir, `nivel-${k}.png`);
-    writeFileSync(f, scriePngSrgb(n.W, n.H, n.b));
-    return f;
-  });
-}
-
-/**
- * Unealta `ktx` (KTX-Software 4.4). Din PATH, din KTX_BIN, sau din locul în care o
- * pune installerul pe Windows — un shell pornit înainte de instalare nu vede PATH-ul nou.
- */
-const KTX = (() => {
-  for (const c of [process.env.KTX_BIN, 'ktx', 'C:/Program Files/KTX-Software/bin/ktx.exe'].filter(Boolean)) {
-    const v = spawnSync(c, ['--version'], { encoding: 'utf8' });
-    if (!v.error && v.status === 0) return { cale: c, versiune: v.stdout.trim() };
-  }
-  return null;
-})();
-
-/** KTX2 prin `ktx create`, cu nivelurile scrise de noi. */
-function codeazaKtx(pnguri, iesire, codare) {
-  if (!KTX)
-    throw new Error('lipsește `ktx` (KTX-Software 4.4, https://github.com/KhronosGroup/KTX-Software/releases). '
-      + `Nivelurile sunt scrise ca PNG în ${LUCRU}/; instalează-l și rulează din nou (sau dă-i calea în KTX_BIN).`);
-  // --threads 1 și --uastc-rdo-m: fără fire paralele, aceleași date dau același
-  // fișier, la octet, iar sha256-ul din sidecar se poate reface. Numai --uastc-rdo-m
-  // nu ajunge: peticul ieșea diferit de la o rulare la alta.
-  const arg = codare === 'uastc'
-    ? ['--encode', 'uastc', '--uastc-quality', '2', '--uastc-rdo', '--uastc-rdo-m', '--zstd', '18']
-    : ['--encode', 'basis-lz', '--qlevel', '255', '--clevel', '4'];
-  arg.push('--threads', '1');
-  const r = spawnSync(KTX.cale, ['create', '--format', 'R8G8B8_SRGB', '--levels', String(NIVELURI), ...arg, ...pnguri, iesire], { encoding: 'utf8' });
-  if (r.status !== 0) throw new Error(`ktx create a eșuat:\n${r.stderr || r.stdout}`);
-  const val = spawnSync(KTX.cale, ['validate', iesire], { encoding: 'utf8' });
-  if (val.status !== 0) throw new Error(`ktx validate:\n${val.stdout}${val.stderr}`);
-  return readFileSync(iesire);
-}
-
-/**
- * Cât s-a pierdut la codare: nivelul 0 decodat înapoi (`ktx extract --transcode
- * rgba8 --raw`) față de octeții din care s-a făcut, ΔE_OK×100 pe un pixel din 16.
- */
-function pierdere(ktx2, sursa, W, H) {
-  const raw = ktx2.replace(/\.ktx2$/, '.rgba');
-  const r = spawnSync(KTX.cale, ['extract', '--transcode', 'rgba8', '--raw', '--level', '0', ktx2, raw], { encoding: 'utf8' });
-  if (r.status !== 0) throw new Error(`ktx extract a eșuat:\n${r.stderr || r.stdout}`);
-  const d = readFileSync(raw);
-  if (d.length !== W * H * 4) throw new Error(`${raw}: ${d.length} octeți, aștept ${W * H * 4}`);
-  const v = [];
-  for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) {
-    const i = y * W + x;
-    v.push(dE(laOklab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]), laOklab(sursa[i * 3], sursa[i * 3 + 1], sursa[i * 3 + 2])));
-  }
-  rmSync(raw);
-  const s = Float64Array.from(v).sort();
-  return { medie: +(s.reduce((a, x) => a + x, 0) / s.length).toFixed(3), p99: +s[Math.floor(0.99 * s.length)].toFixed(3), max: +s[s.length - 1].toFixed(3) };
 }
 
 // ------------------------------------------------------------ main

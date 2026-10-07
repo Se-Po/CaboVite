@@ -1,0 +1,86 @@
+{
+ "nume": "harta_v8-orto_v1",
+ "harta": "harta_v8",
+ "versiune": "orto_v1",
+ "rol": "imprejurimi",
+ "format": "KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, 5 niveluri de mip",
+ "conventie": "muchii de pixel: texelul (q, r) acoperă [x0 + q·pas, x0 + (q + 1)·pas] × [y1 − (r + 1)·pas, y1 − r·pas]; rândul 0 e nordul",
+ "bbox_tm06": {
+  "xMin": -142896,
+  "xMax": -44592,
+  "yMin": -188050,
+  "yMax": -89746
+ },
+ "pas_m": 64,
+ "latime": 1536,
+ "inaltime": 1536,
+ "niveluri": 5,
+ "octeti": 619118,
+ "sha256": "081f01234b800e2605cbc7967b7f5078b01b16d8a1a47b7efef30666c4291b66",
+ "pierdere_dE": {
+  "medie": 0.102,
+  "p99": 1.361,
+  "max": 8.245
+ },
+ "culoare": {
+  "ortofoto": "nefolosit",
+  "sentinel": {
+   "varianta_tci": "liniar",
+   "transfer": {
+    "liniar": {
+     "antrenare": 4859,
+     "verificare": 4833,
+     "dE_medie": 3.93,
+     "dE_p90": 7.97,
+     "fara_transfer_dE_medie": 17.85
+    },
+    "sRGB": {
+     "antrenare": 4859,
+     "verificare": 4833,
+     "dE_medie": 4.01,
+     "dE_p90": 7.9,
+     "fara_transfer_dE_medie": 8.85
+    }
+   },
+   "amestec": "pe ultimii 300 m dinspre marginea ortofotoului"
+  },
+  "apa": {
+   "srgb": [
+    25,
+    54,
+    84
+   ],
+   "estompare_m": [
+    25,
+    50
+   ],
+   "sursa": "harta_v4-orto_v1.json"
+  },
+  "gaura": "texelii aflați la mai mult de 1024 m în interiorul lui harta_v7 au culoarea apei: acolo se vede harta_v7"
+ },
+ "unealta": "ktx version: v4.4.2",
+ "surse": [
+  {
+   "nume": "Sentinel-2 L2A, 2025-07-24",
+   "producator": "Agenția Spațială Europeană, programul Copernicus; COG-uri de la Element 84 / AWS Open Data",
+   "scurt": "Copernicus",
+   "lang": "en",
+   "licenta": "Copernicus Sentinel data licence (rev. 1)",
+   "licenta_url": "https://ewds.climate.copernicus.eu/licences/ec-sentinel",
+   "atributie": "Contains modified Copernicus Sentinel data 2025",
+   "portal": "https://registry.opendata.aws/sentinel-2-l2a-cogs/",
+   "scena": "20250724"
+  }
+ ],
+ "sursa": {
+  "nume": "Sentinel-2 L2A, 2025-07-24",
+  "producator": "Agenția Spațială Europeană, programul Copernicus; COG-uri de la Element 84 / AWS Open Data",
+  "scurt": "Copernicus",
+  "lang": "en",
+  "licenta": "Copernicus Sentinel data licence (rev. 1)",
+  "licenta_url": "https://ewds.climate.copernicus.eu/licences/ec-sentinel",
+  "atributie": "Contains modified Copernicus Sentinel data 2025",
+  "portal": "https://registry.opendata.aws/sentinel-2-l2a-cogs/",
+  "scena": "20250724"
+ }
+}

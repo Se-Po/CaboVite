@@ -29,7 +29,10 @@
     "masoara-faleza": "node scripts/masoara-faleza.mjs",
     "osm-cladiri": "node scripts/osm-cladiri.mjs",
     "build-cladiri": "node scripts/build-cladiri.mjs",
-    "verifica-cladiri": "node scripts/verifica-cladiri.mjs"
+    "verifica-cladiri": "node scripts/verifica-cladiri.mjs",
+    "surse-imprejurimi": "node scripts/surse-imprejurimi.mjs",
+    "build-imprejurimi": "node scripts/build-imprejurimi.mjs",
+    "textura-imprejurimi": "node scripts/textura-imprejurimi.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

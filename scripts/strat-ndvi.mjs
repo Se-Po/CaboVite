@@ -30,7 +30,7 @@ import { closeSync, existsSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { brotliCompressSync, constants as zlibC, gzipSync } from 'node:zlib';
-import { PRAG_NDVI, aliniaza, cuantila, deschideOrtofoto, fereastra, fereastraMedie, ndvi } from './comun/ortofoto.mjs';
+import { ORTOFOTO_ALPHA, PRAG_NDVI, aliniaza, cuantila, deschideOrtofoto, fereastra, fereastraMedie, ndvi } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { inPoligon as inPoligonTM, laTM06 } from './comun/tm06.mjs';
 import { cereDirector, cereFisier } from './comun/cere.mjs';
@@ -311,16 +311,20 @@ function scrie(harta, m, fisier, verificari) {
 const main = () => {
   cereDirector(DIR, 'dala de ortofoto DGT (.tif)',
     'Colecția ORTOS-2025 de la cdd.dgterritorio.gov.pt; descărcarea cere cont.');
-  const fisier = readdirSync(DIR).filter((f) => /\.tif{1,2}$/i.test(f))[0];
-  if (!fisier) throw new Error(`niciun .tif în ${DIR}`);
-  const cale = join(DIR, fisier);
+  // Dala lui alpha, numită: în director stau mai multe (vezi ORTOFOTO_ALPHA).
+  cereFisier(ORTOFOTO_ALPHA, 'dala de ortofoto ORTOS-2025 464-3', 'Colecția ORTOS-2025 de la cdd.dgterritorio.gov.pt; descărcarea cere cont.');
+  const cale = ORTOFOTO_ALPHA, fisier = cale.split('/').pop();
 
   const harta = incarcaHarta(process.argv[2] || 'harta_v5');
   const baza = harta.meta.baza ? incarcaHarta(harta.meta.baza) : null;
   const toate = baza ? [baza, harta] : [harta];
+  // Împrejurimile (harta_v6) n-au raport al ortofotoului: proba de clase leagă
+  // strat-ndvi de ortofoto.mjs pe harta lui alpha, nu pe decor. Se sare, spus limpede.
+  const imprejurimi = harta.meta.rol === 'imprejurimi';
   const RAPORT_ORTOFOTO = raportPentru((baza ?? harta).nume);
-  cereFisier(RAPORT_ORTOFOTO, 'raportul ortofotoului, pentru proba de control', `Rulează întâi: npm run ortofoto -- ${(baza ?? harta).nume}`);
-  const raport = JSON.parse(readFileSync(RAPORT_ORTOFOTO, 'utf8'));
+  if (!imprejurimi)
+    cereFisier(RAPORT_ORTOFOTO, 'raportul ortofotoului, pentru proba de control', `Rulează întâi: npm run ortofoto -- ${(baza ?? harta).nume}`);
+  const raport = imprejurimi ? { metoda: { harta: null } } : JSON.parse(readFileSync(RAPORT_ORTOFOTO, 'utf8'));
 
   const mas = new Map();
   for (const hh of toate) {
@@ -348,6 +352,8 @@ const main = () => {
     if (!p.bun) throw new Error(`clasele nu ies ca în ${RAPORT_ORTOFOTO}: ${JSON.stringify(p.acolo)}. Fereastra sau NDVI-ul diferă.`);
     console.log(`  identice cu ${RAPORT_ORTOFOTO}; pragul verde ${p.pragVerde}`);
     verificari.get(hc.nume).clase_ca_ortofoto = { ...p.aici, prag_verde: p.pragVerde };
+  } else if (imprejurimi) {
+    console.log(`\nPROBA DE CLASE SĂRITĂ: ${harta.nume} e o hartă a împrejurimilor, fără raport al ortofotoului`);
   } else {
     console.log(`\nPROBA DE CLASE SĂRITĂ: raportul ortofotoului e pe ${raport.metoda.harta}, iar ${harta.nume} n-are bază`);
   }

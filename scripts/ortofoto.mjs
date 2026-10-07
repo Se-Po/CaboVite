@@ -23,11 +23,11 @@
 
 import { closeSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PRAG_NDVI, aliniaza, cuantila, deschideOrtofoto, fereastra, ndvi } from './comun/ortofoto.mjs';
+import { ORTOFOTO_ALPHA, PRAG_NDVI, aliniaza, cuantila, deschideOrtofoto, fereastra, ndvi } from './comun/ortofoto.mjs';
 import { dinOklab, hex, laOklab } from './comun/oklab.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { inPoligon, laTM06 } from './comun/tm06.mjs';
-import { cereDirector } from './comun/cere.mjs';
+import { cereDirector, cereFisier } from './comun/cere.mjs';
 
 const DIR = 'date-sursa/ortofoto';
 // Două directoare, două înțelesuri, și nu se pot amesteca: `public/` e ce
@@ -48,14 +48,13 @@ const RAPORT = `ortofoto-culori.${HARTA}.json`;
 const main = () => {
   cereDirector(DIR, 'dala de ortofoto DGT (.tif)',
            'Colecția ORTOS-2025 de la cdd.dgterritorio.gov.pt; descărcarea cere cont.');
-  const fisiere = readdirSync(DIR).filter((f) => /\.tif{1,2}$/i.test(f));
-  if (!fisiere.length) throw new Error(`niciun .tif în ${DIR}`);
-  if (fisiere.length > 1) console.log(`${fisiere.length} fișiere, îl folosesc pe ${fisiere[0]}`);
+  // Dala lui alpha, numită: în director stau mai multe (vezi ORTOFOTO_ALPHA).
+  cereFisier(ORTOFOTO_ALPHA, 'dala de ortofoto ORTOS-2025 464-3', 'Colecția ORTOS-2025 de la cdd.dgterritorio.gov.pt; descărcarea cere cont.');
 
   const harta = incarcaHarta(HARTA);
-  const o = deschideOrtofoto(join(DIR, fisiere[0]), harta.pas);
+  const o = deschideOrtofoto(ORTOFOTO_ALPHA, harta.pas);
 
-  console.log(`ortofoto: ${fisiere[0]}`);
+  console.log(`ortofoto: ${ORTOFOTO_ALPHA.split('/').pop()}`);
   console.log(`  piramidă: ${o.niveluri.map((n) => n.pas.toFixed(2) + ' m').join(' · ')}`);
   console.log(`  ales nivelul ${o.nivel}, ${o.pas} m/px — pasul lui ${HARTA}`);
   console.log(`  colț TM06: ${o.x0}, ${o.y0}   dale ${o.tw}×${o.th}, ${o.benzi} benzi\n`);
@@ -218,7 +217,7 @@ const main = () => {
     generat: new Date().toISOString(),
     sursa: {
       nume: 'Ortofotomapa digital de Portugal Continental 2025, 25 cm',
-      fisier: fisiere[0],
+      fisier: ORTOFOTO_ALPHA.split('/').pop(),
       producator: 'Direção-Geral do Território (DGT)',
       licenta: 'CC BY 4.0',
       atributie: 'Ortofotos: © Direção-Geral do Território, ORTOS-2025, CC BY 4.0',

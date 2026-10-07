@@ -1,0 +1,584 @@
+{
+ "generat": "2026-10-07T09:04:46.208Z",
+ "copernicus": [
+  {
+   "dala": "N38_00_W010_00",
+   "strat": "DEM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W010_00_DEM/Copernicus_DSM_COG_10_N38_00_W010_00_DEM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 772,
+    "r0": 491,
+    "latime": 2828,
+    "inaltime": 3109
+   },
+   "octeti_dale": 6626728,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  },
+  {
+   "dala": "N38_00_W010_00",
+   "strat": "FLM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W010_00_DEM/AUXFILES/Copernicus_DSM_COG_10_N38_00_W010_00_FLM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 772,
+    "r0": 491,
+    "latime": 2828,
+    "inaltime": 3109
+   },
+   "octeti_dale": 112736,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  },
+  {
+   "dala": "N38_00_W010_00",
+   "strat": "WBM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W010_00_DEM/AUXFILES/Copernicus_DSM_COG_10_N38_00_W010_00_WBM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 772,
+    "r0": 491,
+    "latime": 2828,
+    "inaltime": 3109
+   },
+   "octeti_dale": 60360,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  },
+  {
+   "dala": "N38_00_W009_00",
+   "strat": "DEM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W009_00_DEM/Copernicus_DSM_COG_10_N38_00_W009_00_DEM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 0,
+    "r0": 491,
+    "latime": 1240,
+    "inaltime": 3109
+   },
+   "octeti_dale": 17021603,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  },
+  {
+   "dala": "N38_00_W009_00",
+   "strat": "FLM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W009_00_DEM/AUXFILES/Copernicus_DSM_COG_10_N38_00_W009_00_FLM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 0,
+    "r0": 491,
+    "latime": 1240,
+    "inaltime": 3109
+   },
+   "octeti_dale": 81559,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  },
+  {
+   "dala": "N38_00_W009_00",
+   "strat": "WBM",
+   "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N38_00_W009_00_DEM/AUXFILES/Copernicus_DSM_COG_10_N38_00_W009_00_WBM.tif",
+   "nivel": 0,
+   "pas": [
+    0.0002777777777777778,
+    0.0002777777777777778
+   ],
+   "fereastra": {
+    "c0": 0,
+    "r0": 491,
+    "latime": 1240,
+    "inaltime": 3109
+   },
+   "octeti_dale": 54002,
+   "octeti_adusi": 0,
+   "pixeli_in_afara": 0
+  }
+ ],
+ "sentinel": {
+  "scena": "20250724",
+  "dale": [
+   {
+    "id": "S2A_29SMC_20250724_0_L2A",
+    "datetime": "2025-07-24T11:31:06.443000Z",
+    "platforma": "sentinel-2a",
+    "nori_procent": 0.009927,
+    "baza_procesare": "05.11",
+    "decalaj_boa_aplicat": true,
+    "epsg": 32629,
+    "scara_offset_red": {
+     "nodata": 0,
+     "data_type": "uint16",
+     "spatial_resolution": 10,
+     "scale": 0.0001,
+     "offset": -0.1
+    },
+    "ferestre": [
+     {
+      "banda": "TCI",
+      "rost": "culoarea, harta_v7",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/TCI.tif",
+      "nivel": 0,
+      "pas": [
+       10,
+       10
+      ],
+      "fereastra": {
+       "c0": 7524,
+       "r0": 3838,
+       "latime": 1468,
+       "inaltime": 1426
+      },
+      "octeti_dale": 13125526,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B04",
+      "rost": "roșul, NDVI harta_v7",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/B04.tif",
+      "nivel": 1,
+      "pas": [
+       20,
+       20
+      ],
+      "fereastra": {
+       "c0": 3761,
+       "r0": 1918,
+       "latime": 736,
+       "inaltime": 715
+      },
+      "octeti_dale": 2202088,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B08",
+      "rost": "infraroșul, NDVI harta_v7",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/B08.tif",
+      "nivel": 1,
+      "pas": [
+       20,
+       20
+      ],
+      "fereastra": {
+       "c0": 3761,
+       "r0": 1918,
+       "latime": 736,
+       "inaltime": 715
+      },
+      "octeti_dale": 2186781,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "SCL",
+      "rost": "clasificarea, harta_v7",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/SCL.tif",
+      "nivel": 0,
+      "pas": [
+       20,
+       20
+      ],
+      "fereastra": {
+       "c0": 3761,
+       "r0": 1918,
+       "latime": 736,
+       "inaltime": 715
+      },
+      "octeti_dale": 56803,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "TCI",
+      "rost": "culoarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/TCI.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 0,
+       "latime": 976,
+       "inaltime": 1211
+      },
+      "octeti_dale": 2070118,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B04",
+      "rost": "roșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/B04.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 0,
+       "latime": 976,
+       "inaltime": 1211
+      },
+      "octeti_dale": 1866565,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B08",
+      "rost": "infraroșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/B08.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 0,
+       "latime": 976,
+       "inaltime": 1211
+      },
+      "octeti_dale": 1835252,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "SCL",
+      "rost": "clasificarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MC/2025/7/S2A_29SMC_20250724_0_L2A/SCL.tif",
+      "nivel": 2,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 0,
+       "latime": 976,
+       "inaltime": 1211
+      },
+      "octeti_dale": 39444,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     }
+    ]
+   },
+   {
+    "id": "S2A_29SMD_20250724_0_L2A",
+    "datetime": "2025-07-24T11:30:51.834000Z",
+    "platforma": "sentinel-2a",
+    "nori_procent": 0.037239,
+    "baza_procesare": "05.11",
+    "decalaj_boa_aplicat": true,
+    "epsg": 32629,
+    "scara_offset_red": {
+     "nodata": 0,
+     "data_type": "uint16",
+     "spatial_resolution": 10,
+     "scale": 0.0001,
+     "offset": -0.1
+    },
+    "ferestre": [
+     {
+      "banda": "TCI",
+      "rost": "culoarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MD/2025/7/S2A_29SMD_20250724_0_L2A/TCI.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 1229,
+       "latime": 976,
+       "inaltime": 144
+      },
+      "octeti_dale": 708147,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B04",
+      "rost": "roșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MD/2025/7/S2A_29SMD_20250724_0_L2A/B04.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 1229,
+       "latime": 976,
+       "inaltime": 144
+      },
+      "octeti_dale": 527433,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B08",
+      "rost": "infraroșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MD/2025/7/S2A_29SMD_20250724_0_L2A/B08.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 1229,
+       "latime": 976,
+       "inaltime": 144
+      },
+      "octeti_dale": 524803,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "SCL",
+      "rost": "clasificarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/MD/2025/7/S2A_29SMD_20250724_0_L2A/SCL.tif",
+      "nivel": 2,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 397,
+       "r0": 1229,
+       "latime": 976,
+       "inaltime": 144
+      },
+      "octeti_dale": 31309,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     }
+    ]
+   },
+   {
+    "id": "S2A_29SNC_20250724_0_L2A",
+    "datetime": "2025-07-24T11:31:02.942000Z",
+    "platforma": "sentinel-2a",
+    "nori_procent": 0.010209,
+    "baza_procesare": "05.11",
+    "decalaj_boa_aplicat": true,
+    "epsg": 32629,
+    "scara_offset_red": {
+     "nodata": 0,
+     "data_type": "uint16",
+     "spatial_resolution": 10,
+     "scale": 0.0001,
+     "offset": -0.1
+    },
+    "ferestre": [
+     {
+      "banda": "TCI",
+      "rost": "culoarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/NC/2025/7/S2A_29SNC_20250724_0_L2A/TCI.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 0,
+       "latime": 380,
+       "inaltime": 1211
+      },
+      "octeti_dale": 1435067,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B04",
+      "rost": "roșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/NC/2025/7/S2A_29SNC_20250724_0_L2A/B04.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 0,
+       "latime": 380,
+       "inaltime": 1211
+      },
+      "octeti_dale": 1014259,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B08",
+      "rost": "infraroșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/NC/2025/7/S2A_29SNC_20250724_0_L2A/B08.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 0,
+       "latime": 380,
+       "inaltime": 1211
+      },
+      "octeti_dale": 1009961,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "SCL",
+      "rost": "clasificarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/NC/2025/7/S2A_29SNC_20250724_0_L2A/SCL.tif",
+      "nivel": 2,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 0,
+       "latime": 380,
+       "inaltime": 1211
+      },
+      "octeti_dale": 67362,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     }
+    ]
+   },
+   {
+    "id": "S2A_29SND_20250724_0_L2A",
+    "datetime": "2025-07-24T11:30:48.427000Z",
+    "platforma": "sentinel-2a",
+    "nori_procent": 0.013378,
+    "baza_procesare": "05.11",
+    "decalaj_boa_aplicat": true,
+    "epsg": 32629,
+    "scara_offset_red": {
+     "nodata": 0,
+     "data_type": "uint16",
+     "spatial_resolution": 10,
+     "scale": 0.0001,
+     "offset": -0.1
+    },
+    "ferestre": [
+     {
+      "banda": "TCI",
+      "rost": "culoarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/ND/2025/7/S2A_29SND_20250724_0_L2A/TCI.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 1229,
+       "latime": 380,
+       "inaltime": 144
+      },
+      "octeti_dale": 407356,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B04",
+      "rost": "roșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/ND/2025/7/S2A_29SND_20250724_0_L2A/B04.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 1229,
+       "latime": 380,
+       "inaltime": 144
+      },
+      "octeti_dale": 272872,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "B08",
+      "rost": "infraroșul, NDVI harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/ND/2025/7/S2A_29SND_20250724_0_L2A/B08.tif",
+      "nivel": 3,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 1229,
+       "latime": 380,
+       "inaltime": 144
+      },
+      "octeti_dale": 276238,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     },
+     {
+      "banda": "SCL",
+      "rost": "clasificarea, harta_v8",
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/29/S/ND/2025/7/S2A_29SND_20250724_0_L2A/SCL.tif",
+      "nivel": 2,
+      "pas": [
+       79.97086671522214,
+       79.97086671522214
+      ],
+      "fereastra": {
+       "c0": 0,
+       "r0": 1229,
+       "latime": 380,
+       "inaltime": 144
+      },
+      "octeti_dale": 25890,
+      "octeti_adusi": 0,
+      "pixeli_in_afara": 0
+     }
+    ]
+   }
+  ]
+ },
+ "octeti_dale": 53640262,
+ "octeti_adusi_la_rularea_asta": 0,
+ "cereri_la_rularea_asta": 0,
+ "prima_descarcare": {
+  "data": "2026-10-07T08:03:40.562Z",
+  "octeti": 54623302,
+  "cereri": 208
+ }
+}

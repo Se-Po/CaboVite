@@ -19,7 +19,7 @@ import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
 import { GRI_REZERVA, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
-import { aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
+import { ORTOFOTO_ALPHA, aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 
 const TRIUNGHIURI = 1923948;          // bază 1 422 064 + petic 501 884 (harta_v4 + harta_v5)
@@ -271,11 +271,11 @@ async function main() {
   sub.dispose();
 
   // Față de ortofotoul însuși — numai dacă dala e pe disc; nu intră în depozit.
-  const DIR = 'date-sursa/ortofoto';
-  const tif = existsSync(DIR) && readdirSync(DIR).find((f) => /\.tif{1,2}$/i.test(f));
+  // Dala lui alpha, numită: în director stau mai multe (vezi ORTOFOTO_ALPHA).
+  const tif = existsSync(ORTOFOTO_ALPHA);
   if (tif) {
     const h = incarcaHarta(sr.relief.meta.nume);
-    const o = deschideOrtofoto(join(DIR, tif), h.pas);
+    const o = deschideOrtofoto(ORTOFOTO_ALPHA, h.pas);
     const { c0, r0 } = aliniaza(h, o);
     const benzi = [0, 1, 2].map((b) => fereastra(o, b, c0, r0, h.w, h.h));
     const lab = (i) => laOklab(benzi[0][i], benzi[1][i], benzi[2][i]);

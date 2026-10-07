@@ -1,4 +1,4 @@
-import { deflateSync } from 'node:zlib';
+import { deflateSync, inflateSync } from 'node:zlib';
 
 // Scrierea unui PNG, ca să putem arăta imagini fără încă o dependență.
 //
@@ -74,3 +74,32 @@ export function scriePngSrgb(w, h, rgb) {
 
 /** Același PNG, ca URI de date, pentru încorporat într-o pagină. */
 export const pngDataUri = (w, h, rgb) => `data:image/png;base64,${scriePng(w, h, rgb).toString('base64')}`;
+
+/**
+ * Citirea înapoi a unui PNG scris de `scriePng`: RGB pe 8 biți, fără filtrare.
+ * Numai atât — orice alt format aruncă, în loc să citească greșit. Îl cere proba
+ * texturilor împrejurimilor, care compară cu nivelurile PNG ale texturii bazei.
+ *
+ * @returns {{w: number, h: number, rgb: Uint8Array}}
+ */
+export function citestePngRgb(buf) {
+  if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error('nu e PNG');
+  let p = 8, w = 0, h = 0;
+  const idat = [];
+  while (p < buf.length) {
+    const n = buf.readUInt32BE(p), tip = buf.toString('latin1', p + 4, p + 8), d = buf.subarray(p + 8, p + 8 + n);
+    if (tip === 'IHDR') {
+      w = d.readUInt32BE(0); h = d.readUInt32BE(4);
+      if (d[8] !== 8 || d[9] !== 2 || d[12] !== 0) throw new Error('PNG care nu e RGB pe 8 biți, neîntrețesut');
+    } else if (tip === 'IDAT') idat.push(d);
+    p += 12 + n;
+  }
+  const brut = inflateSync(Buffer.concat(idat));
+  if (brut.length !== (w * 3 + 1) * h) throw new Error(`PNG: ${brut.length} octeți, aștept ${(w * 3 + 1) * h}`);
+  const rgb = new Uint8Array(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    if (brut[y * (w * 3 + 1)] !== 0) throw new Error('PNG cu filtre: se citesc numai cele scrise de scriePng');
+    rgb.set(brut.subarray(y * (w * 3 + 1) + 1, (y + 1) * (w * 3 + 1)), y * w * 3);
+  }
+  return { w, h, rgb };
+}

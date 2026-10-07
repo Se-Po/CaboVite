@@ -1,0 +1,100 @@
+{
+  "nume": "harta_v8",
+  "rol": "imprejurimi",
+  "interior": "harta_v7",
+  "descriere": "Împrejurimile zonei alpha, din Copernicus DEM GLO-30, la 256 m. Model de SUPRAFAȚĂ: cu coroanele copacilor și acoperișurile. Decor, nu măsurătoare. Uint16 little-endian, rând 0 = nord.",
+  "latime": 377,
+  "inaltime": 377,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "conventie": "noduri: bbox_tm06 dă primul și ultimul nod",
+  "bbox_tm06": {
+    "xMin": -142825,
+    "xMax": -46569,
+    "yMin": -186083,
+    "yMax": -89827
+  },
+  "pasX_m": 256,
+  "pasZ_m": 256,
+  "zMin_m": -8,
+  "zMax_m": 490.21,
+  "zScara": 0.0076021897180716886,
+  "deplasare_scena": {
+    "x": -73,
+    "z": 56
+  },
+  "interior_noduri_tm06": {
+    "x0": -99817,
+    "x1": -86505,
+    "y0": -142403,
+    "y1": -129507
+  },
+  "interior_noduri_scena": {
+    "x0": -5193,
+    "x1": 8119,
+    "z0": -8392,
+    "z1": 4504
+  },
+  "acoperire": {
+    "noduri_uscat": 30931,
+    "regula_apa": "cota -8 m: apă sau fără date. Nodurile cu mai mult de un pas în interiorul găurii au și ele cota apei: acolo se vede harta_v7."
+  },
+  "prelucrare": {
+    "esantionare": "media a 8 × 8 eșantioane biliniare pe amprenta nodului, numai pe uscat",
+    "apa": "oceanul din masca WBM (1); lacurile și râurile (2, 3) numai sub 1 m; nodul e apă dacă jumătate din eșantioane sunt apă. Coborâtă la −8 m, ca la alpha: artificiu de randare, nu batimetrie",
+    "decalaj_datum": {
+      "scazut_m": -0.778,
+      "pixeli": 632,
+      "iqr_m": [
+        -0.931,
+        -0.612
+      ],
+      "minim_inregistrare_pixeli": [
+        0,
+        0
+      ],
+      "nota": "mediana GLO-30 − DGT pe solul gol măsurat (FLM = 2, NDVI < 0,15, pantă mică) din alpha, cu DGT netezit la amprenta pixelului. Copernicus are altitudini EGM2008; DGT, PT-TM06 ortometric."
+    },
+    "cusatura": {
+      "banda_m": 512,
+      "laturi": [
+        {
+          "latura": "N",
+          "puncte": 322,
+          "mediana": -0.36,
+          "p90_abs": 3.55
+        },
+        {
+          "latura": "E",
+          "puncte": 449,
+          "mediana": 0.02,
+          "p90_abs": 6.39
+        }
+      ],
+      "nota": "diferența față de harta_v7, netezită cu mediana pe 150 m, adăugată nodurilor din bandă și scăzută liniar la zero spre exterior; numai unde amândouă nivelurile au uscat. Artificiu de îmbinare, nu date."
+    },
+    "model_de_suprafata": "GLO-30 e un MDS: coroanele copacilor și clădirile sunt în cote. Nu se corectează.",
+    "curbura": "pământul rămâne plat, ca planul mării: ~159 m la 45 km, sub ceața completă",
+    "fara_date": 693,
+    "disc": {
+      "raza_m": 50000,
+      "noduri_dincolo": 24156,
+      "nota": "dincolo de raza asta de centrul lui alpha nodurile sunt apă: ceața e completă, iar planul îndepărtat (60 km) nu le-ar mai prinde"
+    },
+    "noduri_cu_lac_sau_rau": 3411
+  },
+  "sursa": {
+    "nume": "Copernicus DEM GLO-30 (COP-DEM_GLO-30-DGED, din bucketul AWS copernicus-dem-30m)",
+    "producator": "DLR e.V. și Airbus Defence and Space GmbH, prin programul Copernicus (UE și ESA)",
+    "scurt": "Copernicus",
+    "lang": "en",
+    "licenta": "Copernicus DEM — licența pentru publicul larg (COPDEM-30)",
+    "atributie": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "raspundere": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "portal": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+    "licenta_url": "https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+    "dale": [
+      "N38_00_W010_00",
+      "N38_00_W009_00"
+    ]
+  }
+}

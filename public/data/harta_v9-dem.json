@@ -1,0 +1,207 @@
+{
+  "nume": "harta_v9",
+  "rol": "imprejurimi",
+  "interior": "harta_v6",
+  "descriere": "Împrejurimile zonei alpha, banda de ~2,4 km dincolo de harta_v6, spre nord și est. LiDAR DGT 2024-2025, MDT 2 m, la 12 m. Uint16 little-endian, rând 0 = nord.",
+  "latime": 400,
+  "inaltime": 450,
+  "crs": "ETRS89 / Portugal TM06 (EPSG:3763)",
+  "conventie": "noduri: bbox_tm06 dă primul și ultimul nod",
+  "bbox_tm06": {
+    "xMin": -95797,
+    "xMax": -91009,
+    "yMin": -139399,
+    "yMax": -134011
+  },
+  "pasX_m": 12,
+  "pasZ_m": 12,
+  "zMin_m": -8,
+  "zMax_m": 168.76,
+  "zScara": 0.0026971888176552843,
+  "deplasare_scena": {
+    "x": 1221,
+    "z": -1194
+  },
+  "interior_noduri_tm06": {
+    "x0": -95789,
+    "x1": -93001,
+    "y0": -139395,
+    "y1": -136003
+  },
+  "interior_noduri_scena": {
+    "x0": -1165,
+    "x1": 1623,
+    "z0": -1896,
+    "z1": 1496
+  },
+  "acoperire": {
+    "noduri_uscat": 69151,
+    "regula_apa": "cota -8 m: apă sau fără date. Nodurile cu mai mult de un pas în interiorul găurii au și ele cota apei: acolo se vede harta_v6."
+  },
+  "prelucrare": {
+    "reducere": "filtru cort 1-2-3-4-5-6-5-4-3-2-1 pe 11 × 11 pixeli de 2 m, centrat pe nod, numai pe uscat; nodul e apă dacă pixelul lui e apă",
+    "noduri": "pe metri impari, ancorate în colțul de nord-est al lui harta_v6; cad peste nodurile lui din 3 în 3",
+    "dale_sarite": [
+      {
+        "dala": "MDT-2m-104161-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -139000) nu e cel al indicelui; dincolo de alpha numai apă"
+      },
+      {
+        "dala": "MDT-2m-104162-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -138000) nu e cel al indicelui; dincolo de alpha numai apă"
+      },
+      {
+        "dala": "MDT-2m-104163-06-2024_v01.tif",
+        "motiv": "colțul (-95441, -137000) nu e cel al indicelui; dincolo de alpha numai apă"
+      }
+    ],
+    "patrate_fara_dala": {
+      "104164": {
+        "noduri": 298,
+        "uscat_glo30": 0
+      },
+      "104165": {
+        "noduri": 5561,
+        "uscat_glo30": 0
+      },
+      "104166": {
+        "noduri": 5561,
+        "uscat_glo30": 0
+      },
+      "105166": {
+        "noduri": 6889,
+        "uscat_glo30": 0
+      },
+      "108161": {
+        "noduri": 2822,
+        "uscat_glo30": 0
+      },
+      "nota": "pătratele de 1 km din cutie fără dală în catalogul DGT; nodurile lor sunt apă, iar GLO-30 (WBM) nu vede uscat în ele"
+    },
+    "dale_fata_de_copernicus": {
+      "105165": {
+        "noduri": 13,
+        "mediana_m": 1.85
+      },
+      "106161": {
+        "noduri": 10,
+        "mediana_m": 0.68
+      },
+      "106162": {
+        "noduri": 42,
+        "mediana_m": 0.38
+      },
+      "106163": {
+        "noduri": 77,
+        "mediana_m": 0.31
+      },
+      "106164": {
+        "noduri": 112,
+        "mediana_m": 0.44
+      },
+      "106165": {
+        "noduri": 4703,
+        "mediana_m": 0.65
+      },
+      "106166": {
+        "noduri": 764,
+        "mediana_m": 0.54
+      },
+      "107161": {
+        "noduri": 213,
+        "mediana_m": 0.49
+      },
+      "107162": {
+        "noduri": 2240,
+        "mediana_m": 0.34
+      },
+      "107163": {
+        "noduri": 6198,
+        "mediana_m": 0.3
+      },
+      "107164": {
+        "noduri": 4519,
+        "mediana_m": 0.72
+      },
+      "107165": {
+        "noduri": 5755,
+        "mediana_m": 1.34
+      },
+      "107166": {
+        "noduri": 5099,
+        "mediana_m": 0.64
+      },
+      "108163": {
+        "noduri": 3507,
+        "mediana_m": 0.3
+      },
+      "108164": {
+        "noduri": 5801,
+        "mediana_m": 0.31
+      },
+      "108165": {
+        "noduri": 3585,
+        "mediana_m": 1.34
+      },
+      "108166": {
+        "noduri": 5477,
+        "mediana_m": 1.07
+      },
+      "nota": "|DGT − (GLO-30 − decalaj)|, mediana pe nodurile de uscat cu panta sub 15%; o dală cu sub 50 de astfel de noduri e NEVERIFICATĂ de proba asta",
+      "neverificate": [
+        {
+          "dala": "105165",
+          "noduri_uscat": 54,
+          "noduri_plate": 13
+        },
+        {
+          "dala": "106161",
+          "noduri_uscat": 36,
+          "noduri_plate": 10
+        },
+        {
+          "dala": "106162",
+          "noduri_uscat": 166,
+          "noduri_plate": 42
+        },
+        {
+          "dala": "108162",
+          "noduri_uscat": 281,
+          "noduri_plate": 0
+        }
+      ]
+    }
+  },
+  "sursa": {
+    "nume": "Levantamento LiDAR de Portugal Continental 2024-2025 — Modelo Digital do Terreno 2 m",
+    "producator": "Direção-Geral do Território (DGT)",
+    "densitate": "10 puncte/m²",
+    "licenta": "CC BY 4.0",
+    "atributie": "Dados LiDAR: © Direção-Geral do Território, Levantamento LiDAR de Portugal Continental 2024-2025, CC BY 4.0",
+    "portal": "https://cdd.dgterritorio.gov.pt/",
+    "dale": [
+      "MDT-2m-105161-06-2024_v01.tif",
+      "MDT-2m-105162-06-2024_v01.tif",
+      "MDT-2m-105163-06-2024_v01.tif",
+      "MDT-2m-105164-06-2024_v01.tif",
+      "MDT-2m-105165-06-2024_v01.tif",
+      "MDT-2m-106161-06-2024_v01.tif",
+      "MDT-2m-106162-06-2024_v01.tif",
+      "MDT-2m-106163-06-2024_v01.tif",
+      "MDT-2m-106164-06-2024_v01.tif",
+      "MDT-2m-106165-06-2024_v01.tif",
+      "MDT-2m-106166-06-2024_v01.tif",
+      "MDT-2m-107161-06-2024_v01.tif",
+      "MDT-2m-107162-06-2024_v01.tif",
+      "MDT-2m-107163-06-2024_v01.tif",
+      "MDT-2m-107164-06-2024_v01.tif",
+      "MDT-2m-107165-06-2024_v01.tif",
+      "MDT-2m-107166-06-2024_v01.tif",
+      "MDT-2m-108162-06-2024_v01.tif",
+      "MDT-2m-108163-06-2024_v01.tif",
+      "MDT-2m-108164-06-2024_v01.tif",
+      "MDT-2m-108165-06-2024_v01.tif",
+      "MDT-2m-108166-06-2024_v01.tif"
+    ]
+  }
+}

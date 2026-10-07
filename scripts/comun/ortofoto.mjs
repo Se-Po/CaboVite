@@ -15,6 +15,13 @@ import jpeg from 'jpeg-js';
 import { citesteIfd, deschideTiff } from './tiff.mjs';
 
 /**
+ * Dala în care stă alpha. Se numește, nu se caută: din 2026-10-07 în director stă și
+ * 464-1, dala de la nord, adusă pentru împrejurimi, iar „primul .tif din director” ar fi
+ * fost ea — alfabetic, 464-1 vine înaintea lui 464-3.
+ */
+export const ORTOFOTO_ALPHA = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
+
+/**
  * Pragul de vegetație pe indicele de infraroșu. Ales după histograma datelor,
  * nu din literatură: `npm run ortofoto` tipărește histograma pe care s-a ales.
  */
@@ -69,6 +76,37 @@ export function deschideOrtofoto(cale, pasDorit) {
 }
 
 /**
+ * Mai multe dale ORTOS, la același nivel, ca un singur raster: dreptunghiul care le
+ * cuprinde pe toate. `fereastra()` îl citește ca pe o dală; unde nu e nicio dală, toate
+ * benzile dau 0 — și alfa, deci „fără date”, ca marginea unei dale.
+ *
+ * Dalele trebuie să aibă același pas și să cadă pe aceiași pixeli (colțurile la un
+ * număr întreg de pixeli unele de altele) și nu au voie să se suprapună: atunci n-ar
+ * fi clar a cui e un pixel.
+ */
+export function deschideMozaic(cai, pasDorit) {
+  const dale = cai.map((cale) => ({ cale, o: deschideOrtofoto(cale, pasDorit) }));
+  const pas = dale[0].o.pas;
+  if (dale.some((d) => Math.abs(d.o.pas - pas) > 1e-9)) throw new Error('dalele mozaicului au pași diferiți');
+  const X0 = Math.min(...dale.map((d) => d.o.x0)), Y0 = Math.max(...dale.map((d) => d.o.y0));
+  const X1 = Math.max(...dale.map((d) => d.o.x0 + d.o.w * pas)), Y1 = Math.min(...dale.map((d) => d.o.y0 - d.o.h * pas));
+  for (const d of dale) {
+    const c = (d.o.x0 - X0) / pas, r = (Y0 - d.o.y0) / pas;
+    if (Math.abs(c - Math.round(c)) > 1e-9 || Math.abs(r - Math.round(r)) > 1e-9)
+      throw new Error(`${d.cale}: colțul nu cade pe pixelii mozaicului`);
+    d.c = Math.round(c); d.r = Math.round(r);
+  }
+  for (const [i, a] of dale.entries()) for (const b of dale.slice(i + 1))
+    if (a.c < b.c + b.o.w && b.c < a.c + a.o.w && a.r < b.r + b.o.h && b.r < a.r + a.o.h)
+      throw new Error(`${a.cale} și ${b.cale} se suprapun`);
+  return {
+    x0: X0, y0: Y0, pas, nivel: dale[0].o.nivel,
+    w: Math.round((X1 - X0) / pas), h: Math.round((Y0 - Y1) / pas),
+    benzi: dale[0].o.benzi, dale, fisiere: cai.map((c) => c.split('/').pop()),
+  };
+}
+
+/**
  * O dală, decodată.
  *
  * Fiecare dală e un flux JPEG *prescurtat*: îi lipsește tabela de cuantizare,
@@ -108,6 +146,17 @@ export function fereastra(o, banda, c0, r0, lat, inalt) {
     throw new Error(`fereastra ${c0}…${c0 + lat - 1} × ${r0}…${r0 + inalt - 1} iese din nivelul de ${o.pas} m `
       + `(${o.w} × ${o.h} pixeli): harta nu încape în dala de ortofoto`);
   const out = new Uint8Array(lat * inalt);
+  // Un mozaic (deschideMozaic): fiecare dală își dă partea ei din fereastră.
+  if (o.dale) {
+    for (const d of o.dale) {
+      const x1 = Math.max(c0, d.c), x2 = Math.min(c0 + lat, d.c + d.o.w);
+      const y1 = Math.max(r0, d.r), y2 = Math.min(r0 + inalt, d.r + d.o.h);
+      if (x2 <= x1 || y2 <= y1) continue;
+      const p = fereastra(d.o, banda, x1 - d.c, y1 - d.r, x2 - x1, y2 - y1);
+      for (let y = y1; y < y2; y++) out.set(p.subarray((y - y1) * (x2 - x1), (y - y1 + 1) * (x2 - x1)), (y - r0) * lat + (x1 - c0));
+    }
+    return out;
+  }
   const txMin = Math.floor(c0 / o.tw), txMax = Math.floor((c0 + lat - 1) / o.tw);
   const tyMin = Math.floor(r0 / o.th), tyMax = Math.floor((r0 + inalt - 1) / o.th);
   for (let ty = tyMin; ty <= tyMax; ty++)
