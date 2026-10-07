@@ -47,6 +47,7 @@ se poartă în română.
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea |
+| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -415,7 +416,9 @@ Cu amortizare pornită acumulatorul nu se golește niciodată — se stinge doar
 amortizare (:808), iar `_sphericalDelta` e privat, deci aceea e toată calea
 publică spre el: amortizarea se stinge, `update()` se cheamă o dată, apoi se
 repune. Butonul rozetei nu e copil al canvasului, deci OrbitControls nu emite
-„start" la clicul pe el.
+„start" la clicul pe el. Tot acolo se golesc treptele rotiței care încă alunecă
+(vezi „Mouse-ul, degetele și cursorul”): sub reduced-motion zborul sare direct la
+capăt, iar treptele rămase l-ar fi împins de acolo — măsurat, 375,7 m.
 
 Cât greșea, măsurat pe vechiul zbor al busolei, care rotea numai theta: după o
 aruncare de 66° urmată imediat de clic, ateriza la **0,098°** de țintă; pe calea
@@ -447,7 +450,7 @@ panoul e text românesc și se citește, textul copiat pleacă în altă parte.
 clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeLa()`
 întoarce `null`; o apăsare începută înainte de minimizare nu mai culege nici ea.
 Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
-rămâne. Rotirea camerei nu depinde de el. Unde stă:
+rămâne. Mișcarea camerei nu depinde de el. Unde stă:
 - pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
 - pe telefon, pe rândul de jos, la stânga coloanei busolei și a lui Satelit;
@@ -469,14 +472,18 @@ neindexată costă **53 ms pe rază**, măsurat pe cele 2,56 milioane de triungh
 de atunci. Pe un câmp de înălțimi nu e nevoie: se merge pe rază cu pasul de
 8 m, se prinde schimbarea de semn față de `inaltimeLa`, apoi 22 de bisecții. Măsurat acum:
 **0,19 ms**. Și e *mai* exact — pe fiecare celulă testează chiar interpolarea pe
-care o citește `inaltimeLa`, nu triunghiurile plasei decupate.
+care o citește `inaltimeLa`, nu triunghiurile plasei decupate. Bucla stă în
+`src/scene/raza.js` (`marsPeTeren`), de când o folosesc și rotița, apucarea hărții și
+pivotul; mutată, dă aceleași rezultate, cu `Object.is`, pe 20 000 de raze.
 
-**Butonul stâng rămâne al lui OrbitControls.** Selectorul de altădată îl
-confisca; aici nu. Ce deosebește clicul de rotire e un prag de **5 px** între
+**Butonul stâng rămâne al controalelor** — mută harta. Selectorul de altădată îl
+confisca; aici nu. Ce deosebește clicul de mutare e un prag de **5 px** între
 apăsare și ridicare. Ridicarea se ascultă pe `globalThis`, nu pe canvas:
-OrbitControls mută `pointermove`/`pointerup` pe `ownerDocument` cât ține
+controalele mută `pointermove`/`pointerup` pe `ownerDocument` cât ține
 tragerea, deci o tragere care se termină în afara canvasului n-ar mai declanșa
-niciodată ridicarea pe el, iar apăsarea ar rămâne agățată.
+niciodată ridicarea pe el, iar apăsarea ar rămâne agățată. Pe telefon, o atingere
+măsoară; al doilea deget anulează clicul — înainte îl înlocuia pe primul, deci o
+ciupire cu un deget ținut pe loc ajungea să măsoare.
 
 **Se măsoară numai în zona alpha**, cum a cerut autorul. Un clic dincolo de ea — pe
 mare sau pe împrejurimi — scrie „În afara zonei alpha: aici nu se măsoară” și nimic
@@ -511,6 +518,139 @@ ancorate pe **centrul** lui `bbox_tm06` — vezi convenția de mai sus. Longitud
 și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
 mai multe ar fi precizie inventată peste o sursă rotunjită.
 
+## Mouse-ul, degetele și cursorul
+
+Harta se mânuiește ca o hartă, la cererea autorului (2026-10-07):
+
+| | desktop | telefon |
+|---|---|---|
+| mutare | butonul stâng | un deget |
+| unghiul (rotire și înclinare) | butonul drept; Shift, Ctrl sau Cmd + stâng | două degete trase împreună (punctul lor de mijloc, nu răsucire) |
+| zoom | rotița, spre cursor; butonul din mijloc tras | ciupire, spre punctul dintre degete |
+
+Așa fac ArcGIS SceneView, Mapbox/MapLibre și Potree EarthControls; model viewer-ele
+(Sketchfab, OrbitControls implicit) au stânga = rotire. Controalele sunt
+`ControaleHarta` din `camera.js`: `MapControls` din r186, care are deja așezarea asta și
+mutarea pe orizontală, cu patru lucruri în plus.
+
+**Rotița** (`src/scene/rotita.js`). OrbitControls schimbă distanța cu 0,95^(Δ · 0,01) pe
+eveniment: de la 80 m la 8 km erau ~90 de clicuri în Chrome (Δ = 100 px) și ~190 în
+Firefox (3 linii × 16). Acum un clic e o treaptă de ×1,4 — 14 clicuri pe tot drumul —
+oricum l-ar raporta browserul:
+- în linii sau în pagini;
+- pe macOS (Safari și Chrome), un multiplu exact de 4,000244140625 px, cum îl recunoaște
+  și MapLibre;
+- în pixeli, un eveniment de cel puțin 20 de pixeli de DISPOZITIV, singur (niciunul în
+  300 ms) sau egal cu cel dinainte. Chrome împarte delta la mărirea paginii — 100 px la
+  100%, 40 la 250%, 33 la 300% —, dar `devicePixelRatio` o conține; Windows cu „1 linie pe
+  clic” dă 33. Pragul de dinainte, 50 px CSS, nu mai vedea clicul de la 250% în sus, iar
+  pe macOS un clic ajungea 4% dintr-o treaptă (recenzia).
+
+Restul vine de la un touchpad — rafale cu valori care se schimbă — și merge proporțional
+(100 px, o treaptă) și pe loc, la fel ca ciupirea pe touchpad, pe care browserul o
+trimite ca rotiță cu Ctrl. Un eveniment aplicat pe loc nu golește treptele din coadă:
+înainte, 120, 120, apoi 30 px făceau 0,97 trepte în loc de 2,3. Fiecare treaptă
+alunecă ~0,2 s (`1 − e^(−dt/60 ms)`, iar restul sub 10⁻³ se aplică dintr-odată), în buclă,
+fără al doilea ceas; sub reduced-motion, pe loc. Coada ține cel mult patru trepte.
+`deltaMode` se citește înaintea lui `deltaY`: Firefox raportează în linii numai dacă e
+întrebat întâi de mod.
+
+**Spre cursor.** Camera merge pe raza cursorului — `C' = P + (C − P) · s` —, deci punctul de
+teren de sub cursor, P, rămâne pe același pixel, iar orientarea nu se schimbă. Ținta se
+pune apoi pe raza privirii, la înălțimea pe care o avea, între 80 m și 8 km și în cutia lui
+alpha (`intervalRaza`); imaginea nu depinde de unde stă ținta pe raza aceea. Dacă pasul
+întreg nu încape, `s` se înjumătățește geometric până încape. Gărzile:
+- camera nu ajunge la mai puțin de 80 m de P. Fără gardă, din vederea de pornire spre
+  platou, 40 de clicuri o duceau la 1 m de el, sub planul apropiat;
+- P e ce se VEDE sub cursor (`punctVazut` din raza.js): relieful, suprafața mării la
+  `COTA_MARE` — nu umplutura de −8 m de sub ea — sau o clădire (`loveste` al sanctuarului
+  și al celorlalte, ca la panoul punctului). Fără clădiri, garda se măsura față de terenul
+  din spatele farului: 14 clicuri spre lanternă duceau camera la 0,58 m de ea;
+- P se caută până la 3 · r: o treaptă spre un deal din împrejurimi, la 30 km, ar fi sărit
+  kilometri. Fără nimic sub cursor, P e un punct al razei, la distanța r;
+- zoomul înapoi n-are voie să se blocheze: ce n-a încăput spre P se face spre țintă —
+  camera se retrage pe raza privirii, ținta rămâne —, până la 8 km. Cu ținta lipită de o
+  muchie a cutiei (pe mare, la perete), raza privirii doar atinge cutia, iar din rotunjire
+  intervalul ieșea gol: recenzia a găsit rotița blocată în ambele sensuri, în 20% din
+  astfel de stări. `intervalRaza` are acum o toleranță de 10⁻⁹ · t.
+
+`zoomToCursor` din OrbitControls nu ajungea: cu mutarea pe orizontală și privirea la mai
+puțin de 20° sub orizont — vederea de pornire are 19,85° — el doar întoarce camera spre
+ținta veche, iar punctul de sub cursor fuge.
+
+**Apucarea.** Butonul stâng și un deget apucă punctul de **teren** de sub cursor și îl țin
+sub cursor, prin planul orizontal al lui, fără întârzierea amortizării — tot `punctVazut`,
+deci pe mare suprafața, nu umplutura (altfel marea aluneca sub cursor cu 11–23%). MapControls apucă
+planul prin țintă — la vederea de pornire, 60 m: plaja rămânea în urma cursorului cu ~22%,
+platoul o lua înainte cu ~50% —, iar o tragere pornită pe cer îi lăsa un punct de start
+vechi (`intersectPlane` nul nu-și scrie ținta). Pe cer, sau mai departe de 4 · r, mutarea
+rămâne cea obișnuită. Lângă orizont un pixel acoperă sute de metri, deci acolo harta se
+mută repede: așa face și apucarea din Google Earth.
+
+**Pivotul pe teren.** La începutul unei rotiri — butonul drept, sau două degete — și al
+zoomului cu butonul din mijloc, ținta coboară pe raza privirii până la ce se vede: teren,
+suprafața mării, o clădire. Raza e aceeași, deci imaginea nu se mișcă, iar camera se
+rotește în jurul locului privit, nu al unui punct care plutește la 60 m deasupra mării.
+Zoomul spre cursor lasă ținta la înălțimea ei, deci după câteva clicuri spre platou ea
+stă sub relief; butonul din mijloc, care apropie spre țintă, ducea atunci camera la 4,31 m
+sub teren.
+
+**Cursoarele**, numai pe desktop (`@media (hover: hover) and (pointer: fine)`), desenate ca
+SVG de 32 × 32 cu hotspotul în centru (`src/styles/cursoare/`; Vite le pune în CSS ca data
+URI), în culorile paginii:
+- în repaus, o sferă aurie mică; cât e deschis panoul „Coordonate”, sfera cu un punct
+  central (`data-culege` pe canvas, din punct.js);
+- cât ții butonul stâng, patru săgeți aurii în jurul sferei;
+- cât ții butonul drept, două arce cu săgeți în jurul ei — cursorul „orbită” al
+  programelor Autodesk.
+
+Gestul îl scrie `src/scene/gest.js` pe `<html>` (`data-gest`), din `controale.state` citit la
+`start` — după ce controalele au hotărât ce fac, deci și cu Shift. Pe `<html>` și cu
+`!important`, ca o tragere care trece peste text sau peste un panou să-și păstreze
+cursorul. Valorile stărilor sunt `_STATE`, privat în OrbitControls, scrise în `STARE`;
+proba le citește înapoi. `connect()` trece prin `disconnect()`, care scrie pe canvas
+`style.cursor = 'auto'` inline: `ControaleHarta` îl scoate la creare și la `dispose()`.
+
+**Pivotul rotirii** e o sferă aurie (`.pivot-rotire`) pe ținta camerei, cât ține rotirea —
+ca la Revit și Potree. Se proiectează pe cadrul care se desenează, după
+`camera.updateMatrixWorld()`, ca eticheta, și se stinge printr-o tranziție CSS de 250 ms,
+fără niciun cadru cerut. Clasa nu e `.pivot`: acela e cercul din mijlocul busolei, pe care
+l-ar fi făcut invizibil.
+
+**Probele** — `npm run verifica-controale`, cu codul paginii, pe 1600 × 900:
+- treptele, trecute prin `_customWheelEvent` al controalelor: 100 și 120 px, 3 linii, o
+  pagină, 4,000244 px pe macOS, 40 px la 250% și 33 px la 300%, 33 px cu „1 linie pe clic”
+  dau exact o treaptă; 12 × 8,33 px de touchpad, una ± 1%; o rafală 60, 75, 90 px, 2,25,
+  proporțional; control: prin normarea lui OrbitControls, 3 linii dau 0,48 trepte;
+- ce a găsit recenzia, fiecare cu controlul ei: 120, 120 și 30 px fac 2,3 trepte (cu coada
+  golită, 0,97); cu ținta în peretele de vest, pe mare, 45 de stări, 10 tangente, 0 clicuri
+  fără efect; spre lanterna farului camera rămâne la 80 m (fără clădiri, 0,58 m); butonul
+  din mijloc după un zoom spre platou o ține cu 68 m peste relief (fără pivot, −4,31 m);
+  marea apucată rămâne sub cursor la 10⁻¹³ px (umplutura de −8 m, la 4,6 px);
+- zoomul spre cursor, pe o grilă de 9 cursoare, din vederea de pornire și cu decalajul
+  fișei: punctul de sub cursor rămâne la 2·10⁻¹² px, azimutul și înclinarea la 2·10⁻¹⁶ rad;
+- spre platou, camera la cel puțin 80 m de punct (control fără gardă: 1 m); spre plajă,
+  camera cu cel puțin 3,2 m peste țintă, iar ținta deasupra mării; spre împrejurimi,
+  limita lui alpha n-are ce muta (control fără cutie: ținta iese de 6 ori din 12); 40 de
+  clicuri înapoi ajung exact la 8 000 m; de la 8 km la 80 m, 14 clicuri;
+- o treaptă: 22 de cadre, ln aplicat egal cu ln 1,4 la 10⁻¹⁵, apoi 0 cadre cerute;
+- rotiță, apoi zborul acasă: aterizarea la 10⁻¹³ m (control cu treptele lăsate în coadă:
+  375,7 m);
+- stările citite la `start`: drept → rotire, stâng → mutare, Shift + stâng → rotire,
+  mijloc → zoom, un deget → mutare, două → zoom și rotire, ridicat unul → mutare;
+- metodele și câmpurile private folosite există — dacă three se schimbă, aici pică.
+
+`verifica-sanctuar` construiește acum controalele zborului cu `creeazaCamera`, nu cu un
+OrbitControls copiat de mână, care n-avea nici `minPolarAngle`.
+
+În pagină, cu evenimente sintetice (panoul ascuns, deci bucla condusă de mână):
+- punctul apucat rămâne sub cursor, cu mouse-ul și cu un deget, la 0 px;
+- trasă în peretele lui alpha și înapoi 25 px, harta răspunde imediat;
+- la rotire, pivotul cade pe teren (la 14,62 m, pe relieful de acolo), imaginea nu se mișcă,
+  iar sfera stă pe ținta proiectată la 0 px;
+- un clic măsoară, o tragere de 40 px nu, o atingere da, două degete nu;
+- după `dispose()`: niciun `data-gest`, niciun pivot, niciun cursor inline, 0 geometrii.
+
 ## Cum se generează plasa terenului
 
 `src/scene/terrain.js` transformă grila de înălțimi într-un singur mesh cu
@@ -521,8 +661,10 @@ care le-a motivat.
 umplutură, nu batimetrie — o spune `regula_apa` din sidecar. Sunt 930 714 din
 cele 1 641 746 de celule păstrate ale bazei `harta_v4` (56,7%) și 122 858 din cele
 373 800 ale peticului (32,9%), iar marea e un plan **opac** de 120 km la `COTA_MARE`, pe
-sub care camera nu poate coborî: ținta stă la y = 60, `minDistance` e 80 și
-`maxPolarAngle` e π/2 − 0,04, deci camera rămâne peste 64,6 m. Erau desenate la
+sub care camera nu poate coborî: ținta nu coboară sub cota mării (cutia lui alpha),
+`minDistance` e 80 și `maxPolarAngle` e π/2 − 0,04, deci camera stă cu cel puțin
+80 · sin 0,04 = 3,2 m peste țintă. Cifra de dinainte, 64,6 m, era pentru ținta la
+y = 60 și ieșea greșit: 60 + 3,2 = 63,2. Erau desenate la
 fiecare cadru și nu se puteau vedea niciodată. Triunghiuri, pe `harta_v2`:
 2 562 454 → 1 362 122; pe `harta_v4`, cu uscatul din afara conturului, 1 923 948.
 
@@ -670,6 +812,11 @@ milimetru, pragul lui OrbitControls: amortizarea împinge ținta în perete sute
 cadre cu fracțiuni de milimetru, iar pe podeaua y = 0 resturile ajung denormale și
 țin ~8 900 de cadre — recenzia măsurase redesenări continue până la ~2,5 minute.
 Acum, după o panoramare împinsă în podea sau în perete, 0 cadre în 2 s după inerție.
+De când harta se mută ca o hartă, mutarea e orizontală: pe verticală ținta o mută
+numai zborurile, zoomul spre cursor și pivotul pus pe teren, iar zoomul o așază din
+capul locului în cutie (`intervalRaza`). Cât mutarea ține un punct apucat sub cursor,
+limita mută și punctul: altfel, după ce tragi harta în perete, înapoi n-ar răspunde
+nimic până când cursorul n-ar ajunge din nou unde e punctul.
 
 **Împrejurimile** sunt peisajul real de dincolo de marginile tăiate ale lui alpha,
 până unde ceața scenei îl acoperă de tot. Fără ele, din nord-est harta arăta ca o

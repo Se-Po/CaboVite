@@ -17,6 +17,8 @@ import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
 import { creeazaAlpha } from './alpha.js';
+import { creeazaGest } from './gest.js';
+import { reliefRandat } from './raza.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
 import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
 import { instantaneuMemorie } from './dispose.js';
@@ -161,9 +163,18 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // prefers-reduced-motion, când OrbitControls își cheamă singur `update()` din
   // evenimentele de pointer; restul pe care îl mai împinge amortizarea după ce
   // utilizatorul a dat drumul se prinde în buclă.
+  //
+  // Cât mutarea ține un punct de teren apucat sub cursor, punctul se mută odată cu
+  // ținta: altfel, după ce tragi harta în perete, înapoi n-ar răspunde nimic până
+  // când cursorul n-ar ajunge din nou unde e punctul.
   const alpha = creeazaAlpha(relief.meta);
+  const tineInAlpha = () => {
+    const t = controale.target, x = t.x, z = t.z;
+    const mutat = alpha.limiteaza(t, camera);
+    controale.mutaApucarea(t.x - x, t.z - z);
+    return mutat;
+  };
   if (alpha) {
-    const tineInAlpha = () => { alpha.limiteaza(controale.target, camera); };
     controale.addEventListener('change', tineInAlpha);
     deEliberat.push(() => controale.removeEventListener('change', tineInAlpha));
   }
@@ -433,14 +444,21 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // Relieful randat peste tot: alpha unde e alpha, împrejurimile în rest. Pe el merg
   // raza panoului punctului și ocluzia etichetei — un deal din împrejurimi ascunde ce
   // e în spatele lui. Măsurătorile rămân ale lui alpha (`inaltimeLa`).
-  const inaltimeRandata = imprejurimi
-    ? (x, z) => (alpha && !alpha.contine(x, z) ? imprejurimi.inaltimeLa(x, z) : inaltimeLa(x, z))
-    : inaltimeLa;
+  const inaltimeRandata = reliefRandat({ alpha, inaltimeLa, imprejurimi });
 
   // Conversiile se fac pe metadatele BAZEI, nu ale peticului: scena e centrată
   // pe ea, iar peticul e doar o plasă mai fină așezată înăuntru. Tot de acolo
   // vin și `colturi_geo`, pe care peticul nici nu le are.
   const geo = creeazaGeo(relief.meta);
+
+  // Clădirea cea mai apropiată de-a lungul razei, din oricare set.
+  const lovesteCladire = sanctuar || cladiri ? (raza) => {
+    const a = sanctuar?.loveste(raza) ?? null, c = cladiri?.loveste(raza) ?? null;
+    return !a ? c : !c ? a : a.t <= c.t ? a : c;
+  } : undefined;
+
+  // Pe același relief, cu clădirile, merg zoomul spre cursor, apucarea hărții și pivotul.
+  if (geo?.limite) controale.seteazaTeren({ inaltimeLa: inaltimeRandata, lim: imprejurimi?.limite ?? geo.limite, alpha, loveste: lovesteCladire });
 
   // Panoul punctului. Primește `inaltimeLa` COMPUS — cel care alege peticul de
   // 1 m acolo unde există — fiindcă e o unealtă de măsurat, iar diferența dintre
@@ -454,14 +472,14 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     limiteMars: imprejurimi?.limite,
     inAlpha: alpha?.contine,
     zMin: relief.meta?.zMin_m,
-    // Clădirea cea mai apropiată de-a lungul razei, din oricare set.
-    loveste: sanctuar || cladiri ? (raza) => {
-      const a = sanctuar?.loveste(raza) ?? null, c = cladiri?.loveste(raza) ?? null;
-      return !a ? c : !c ? a : a.t <= c.t ? a : c;
-    } : undefined,
+    loveste: lovesteCladire,
     numeElement: (cheie) => [...(continut?.sanctuar?.nume_elemente ?? []), ...(continut?.cladiri?.nume_elemente ?? [])].find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
   });
   if (punct) deEliberat.push(() => punct.dispose());
+
+  // Cursorul gestului și pivotul rotirii.
+  const gest = creeazaGest({ gazda: canvas.parentElement ?? document.body, canvas, camera, controale });
+  deEliberat.push(() => gest.dispose());
 
   // Zborul camerei, unul singur: spre sanctuar, de la etichetă, și înapoi la
   // vederea de pornire, de la busolă. Un zbor nou îl înlocuiește pe cel în curs.
@@ -519,10 +537,16 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     // doar dacă desenează — deci zborul camerei se agață aici, nu într-un al
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
     zbor.pas();
+    // Treptele rotiței care încă alunecă mută camera și ținta; `update()` de mai jos
+    // le aplică amortizarea și emite `change`.
+    if (controale.rotita.pas()) {
+      cerut = true;
+      if (!controale.enableDamping) controale.update();
+    }
     const seMisca = controale.enableDamping && controale.update();
     // Amortizarea mai împinge ținta după ce utilizatorul a dat drumul, cu pași tot
     // mai mici; sub pragul de `change` al lui OrbitControls ar scăpa de limită.
-    if (alpha?.limiteaza(controale.target, camera)) cerut = true;
+    if (alpha && tineInAlpha()) cerut = true;
     if (redimensioneaza(renderer)) {
       const c = renderer.domElement;
       camera.aspect = c.clientWidth / c.clientHeight;
@@ -540,6 +564,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     // cadru pinul stătea la 44 px de biserică.
     camera.updateMatrixWorld();
     eticheta?.pas();
+    gest.pas();
     // Camera s-a apropiat de alt grup de clădiri, sau s-a depărtat: harta de umbre se
     // strânge pe cutia potrivită, în cadrul acesta.
     umbreGrup?.pas();
@@ -570,7 +595,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo, alpha, acasa,
     // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
     get surse() { return surse; },
-    zbor, eticheta, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata,
+    zbor, eticheta, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are

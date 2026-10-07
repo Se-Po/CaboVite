@@ -16,8 +16,9 @@ import { geometriaGrilei } from './cusatura.js';
 // bazei harta_v4 (56,7%) și 122 858 din cele 373 800 ale peticului (32,9%).
 //
 // Marea e un plan OPAC de 120 km la −0,25 m, iar camera nu poate coborî sub el:
-// ținta stă la y = 60, `minDistance` e 80 și `maxPolarAngle` e π/2 − 0,04, deci
-// camera rămâne mereu peste 64,6 m. Triunghiurile acelea erau desenate la
+// ținta nu coboară sub cota mării (cutia lui alpha), `minDistance` e 80 și
+// `maxPolarAngle` e π/2 − 0,04, deci camera stă cu cel puțin 80 · sin 0,04 = 3,2 m
+// peste țintă, deasupra mării. Triunghiurile acelea erau desenate la
 // fiecare cadru și nu puteau fi văzute niciodată.
 //
 // Se taie numai celulele cu TOATE patru nodurile la cota de umplutură. Malul,

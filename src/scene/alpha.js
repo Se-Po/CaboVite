@@ -38,9 +38,9 @@ export function creeazaAlpha(meta) {
      * ținta să iasă cu ~730 m dincolo de marginile de est și vest și cu ~400 m dincolo
      * de cele de nord și sud. De aceea dreptunghiul se scrie aici.
      *
-     * `y` e limitat și el, la cota mării și la cea mai înaltă cotă a lui alpha:
-     * panoramarea în planul ecranului (`screenSpacePanning`) mută ținta și pe
-     * verticală.
+     * `y` e limitat și el, la cota mării și la cea mai înaltă cotă a lui alpha.
+     * Mutarea hărții e orizontală (camera.js), deci pe verticală ținta o mută numai
+     * zborurile, zoomul spre cursor (rotita.js) și reașezarea pivotului pe teren.
      *
      * Întoarce true numai pentru o mutare care se vede, peste un milimetru — pragul
      * lui OrbitControls (_EPS pe pătratul distanței). Amortizarea mai împinge ținta în
@@ -56,6 +56,30 @@ export function creeazaAlpha(meta) {
       tinta.x += dx; tinta.y += dy; tinta.z += dz;
       camera.position.x += dx; camera.position.y += dy; camera.position.z += dz;
       return dx * dx + dy * dy + dz * dz > 1e-6;
+    },
+
+    /**
+     * Pe ce interval de t stă raza `o + t·u` în cutia lui alpha — x, z și y între
+     * cota mării și cea mai înaltă cotă —, sau null dacă n-o atinge. Zoomul spre cursor
+     * și reașezarea pivotului pun ținta pe raza privirii numai în intervalul acesta,
+     * deci limita de mai sus nu mai are ce muta, iar punctul de sub cursor rămâne pe loc.
+     */
+    intervalRaza(o, u) {
+      let t0 = -Infinity, t1 = Infinity;
+      for (const [k, lo, hi] of [['x', a.xMin, a.xMax], ['y', a.yMin, a.yMax], ['z', a.zMin, a.zMax]]) {
+        if (Math.abs(u[k]) < 1e-12) {
+          if (o[k] < lo || o[k] > hi) return null;
+          continue;
+        }
+        const ta = (lo - o[k]) / u[k], tb = (hi - o[k]) / u[k];
+        t0 = Math.max(t0, Math.min(ta, tb));
+        t1 = Math.min(t1, Math.max(ta, tb));
+      }
+      // O rază care doar atinge cutia, pe o muchie — ținta lipită de perete, pe mare —
+      // iese din rotunjire cu t0 > t1 cu ~1e-13: e tot un punct, nu nimic. Fără
+      // toleranță, recenzia a găsit rotița blocată acolo în 20% din stări.
+      if (t0 > t1 && t0 - t1 <= 1e-9 * Math.max(1, Math.abs(t1))) return [t1, t1];
+      return t0 <= t1 ? [t0, t1] : null;
     },
   };
 }

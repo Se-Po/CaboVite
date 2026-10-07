@@ -19,13 +19,13 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
 import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
+import { creeazaCamera } from '../src/scene/camera.js';
 import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
@@ -341,12 +341,12 @@ console.log('\nZborul spre sanctuar');
   const faZbor = (inertie, faraMiscare = false, nZbor = n) => {
     // prefers-reduced-motion: zborul îl citește o dată, la creare
     globalThis.matchMedia = faraMiscare ? () => ({ matches: true, addEventListener() {} }) : undefined;
-    const camera = new THREE.PerspectiveCamera(45, 1.5, 10, 60000);
+    // Camera și controalele paginii (camera.js), nu o copie scrisă de mână: copia de
+    // dinainte n-avea nici `minPolarAngle`.
+    const { camera, controale } = creeazaCamera(null);
+    camera.aspect = 1.5; camera.updateProjectionMatrix();
     camera.position.set(500, 900, 1800);
-    const controale = new OrbitControls(camera, null);
     controale.target.set(144, 60, 581);
-    controale.minDistance = 80; controale.maxDistance = 8000; controale.maxPolarAngle = Math.PI / 2 - 0.04;
-    controale.enableDamping = true; controale.dampingFactor = 0.08;
     controale.update();
     // o aruncare a utilizatorului: acumulatorul intern plin, încă neaplicat
     if (inertie) controale.rotateLeft(inertie);
@@ -357,7 +357,7 @@ console.log('\nZborul spre sanctuar');
     zbor.spre(date.poi.zbor);
     const activDupaSpre = zbor.activ;
     let pasi = 0;
-    for (; pasi < 400 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    for (; pasi < 400 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.rotita.pas(); controale.update(); }
     performance.now = acum;
     const t = controale.target, p = camera.position;
     const dx = p.x - t.x, dy = p.y - t.y, dz = p.z - t.z, R = Math.hypot(dx, dy, dz);
@@ -390,26 +390,23 @@ console.log('\nZborul spre sanctuar');
     // prefers-reduced-motion citit la fiecare pas, ca să se poată schimba în zbor
     let redus = false;
     globalThis.matchMedia = () => ({ get matches() { return redus; }, addEventListener() {} });
-    const camera = new THREE.PerspectiveCamera(45, 1.5, 10, 60000);
+    const { camera, controale } = creeazaCamera(null);
+    camera.aspect = 1.5; camera.updateProjectionMatrix();
     camera.position.set(500, 900, 1800);
-    const controale = new OrbitControls(camera, null);
     controale.target.set(144, 60, 581);
-    controale.minDistance = 80; controale.maxDistance = 8000;
-    controale.maxPolarAngle = Math.PI / 2 - 0.04; controale.minPolarAngle = 0.15;
-    controale.enableDamping = true; controale.dampingFactor = 0.08;
     controale.update();
     let ceas = 0;
     const acum = performance.now;
     performance.now = () => ceas;
     const zbor = creeazaZbor({ camera, controale, cereRandare: () => {}, azimutNordAdevarat: nZbor });
     zbor.spre(date.poi.zbor);
-    for (let i = 0; i < 10; i++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    for (let i = 0; i < 10; i++) { ceas += 16.7; zbor.pas(); controale.rotita.pas(); controale.update(); }
     if (inertie) controale.rotateLeft(inertie);
     redus = redusLaClic;
     zbor.spre(VEDERE_START);
     const activDupaSpre = zbor.activ;
     let pasi = 0;
-    for (; pasi < 400 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    for (; pasi < 400 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.rotita.pas(); controale.update(); }
     // Încă un cadru: sub reduced-motion, zborul vechi spre sanctuar nu trebuie să mai
     // ia camera înapoi.
     ceas += 16.7; zbor.pas(); controale.update();

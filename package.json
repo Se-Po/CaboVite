@@ -33,7 +33,8 @@
     "surse-imprejurimi": "node scripts/surse-imprejurimi.mjs",
     "build-imprejurimi": "node scripts/build-imprejurimi.mjs",
     "textura-imprejurimi": "node scripts/textura-imprejurimi.mjs",
-    "verifica-imprejurimi": "node scripts/verifica-imprejurimi.mjs"
+    "verifica-imprejurimi": "node scripts/verifica-imprejurimi.mjs",
+    "verifica-controale": "node scripts/verifica-controale.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

@@ -41,6 +41,41 @@ html, body {
   z-index: 0;
 }
 
+/* Cursorul hărții, numai unde există un mouse (cu `hover` și `pointer: fine`): o
+   sferă aurie mică; cât e deschis panoul „Coordonate”, sfera cu punct, ca să
+   țintești locul măsurat. Cât ții un buton apăsat, gestul — scris de gest.js pe
+   <html>: săgeți în jurul sferei la mutare, două arce în jurul ei la rotire. Pe tot
+   documentul și cu !important, ca o tragere care trece peste text sau peste un
+   panou să-și păstreze cursorul. Fișierele, de 32 × 32 cu hotspot în centru, le
+   pune Vite în CSS; cuvântul de după e rezerva unui browser care nu le citește. */
+@media (hover: hover) and (pointer: fine) {
+  #scena { cursor: url("./cursoare/sfera.svg") 16 16, default; }
+  #scena[data-culege] { cursor: url("./cursoare/sfera-tinta.svg") 16 16, crosshair; }
+  html[data-gest="mutare"], html[data-gest="mutare"] * { cursor: url("./cursoare/mutare.svg") 16 16, move !important; }
+  html[data-gest="rotire"], html[data-gest="rotire"] * { cursor: url("./cursoare/rotire.svg") 16 16, grabbing !important; }
+}
+
+/* Pivotul rotirii: sfera aurie pe punctul în jurul căruia se rotește camera, cât
+   ține rotirea (gest.js). Decor: nu se citește și nu prinde clicuri. Apare pe loc
+   și se stinge în 250 ms; regula reduced-motion de mai jos o stinge pe loc. */
+.pivot-rotire {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: -0.375rem 0 0 -0.375rem;
+  border: 1px solid var(--bg);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #fff3cf, #e0bd68 45%, #8a6626);
+  box-shadow: 0 0 0 3px rgb(211 176 99 / 0.28);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+}
+.pivot-rotire.activ { opacity: 1; transition: none; }
+
 /* Textul capitolelor stă peste scenă. Cât `<main>` e gol — sau între paragrafe —,
    clicurile și tragerile trec la canvas: o cutie goală, cu padding, ar fi oprit
    invizibil rotirea camerei în banda de sus. Numai copiii lui le primesc. */
@@ -354,6 +389,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #busola .disc { fill: Canvas; stroke: CanvasText; }
   #busola .ac-nord { fill: Highlight; }
   #busola .ac-sud, #busola .eticheta, #busola .pivot { fill: CanvasText; }
+  .pivot-rotire { background: Highlight; border-color: Canvas; forced-color-adjust: none; }
 }
 
 /* ------------------------------------------------------------ versiunea

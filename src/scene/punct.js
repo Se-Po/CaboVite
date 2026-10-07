@@ -2,29 +2,24 @@
 //
 // ─────────────────────────────────────────────────────── cum se află punctul
 //
-// NU prin `raycaster.intersectObject()` pe plasă. Aceea e neindexată și are 2,75
-// milioane de triunghiuri: măsurat, 53 ms pe rază pe desktop. Pe un câmp de
-// înălțimi nu e nevoie să testezi triunghiuri — mergi pe rază și compari
-// înălțimea ei cu a terenului dedesubt; unde semnul se schimbă, ai trecut prin
-// suprafață, apoi bisectezi. Vreo 1400 de căutări biliniare în loc de 2,75
-// milioane de teste, adică 0,34 ms, și e MAI exact: pe fiecare celulă suprafața
-// testată e chiar interpolarea pe care o citește `inaltimeLa`, nu triunghiurile
-// plasei decupate.
+// NU prin `raycaster.intersectObject()` pe plasă, ci mergând pe rază peste câmpul
+// de înălțimi (`marsPeTeren`, în raza.js, cu motivele și cifrele ei).
 //
-// ──────────────────────────────────────────── clic față de rotire de cameră
+// ──────────────────────────────────────────── clic față de mutarea hărții
 //
-// Butonul stâng e al lui OrbitControls (MOUSE.ROTATE, implicitul r186) și NU se
-// confiscă: pagina trebuie să rămână o scenă care se rotește, nu o unealtă de
-// măsurat. OrbitControls nu cheamă `preventDefault()` la apăsare, deci
-// evenimentele native ajung oricum pe canvas. Ce le deosebește e un prag de
-// deplasare: peste câțiva pixeli, gestul a fost rotire.
+// Butonul stâng e al controalelor — mută harta, ca la o hartă (camera.js) — și NU
+// se confiscă: pagina trebuie să rămână o hartă care se mișcă, nu o unealtă de
+// măsurat. Controalele nu cheamă `preventDefault()` la apăsare, deci evenimentele
+// native ajung oricum pe canvas. Ce le deosebește e un prag de deplasare: peste
+// câțiva pixeli, gestul a fost o mutare. Pe telefon la fel, cu un deget; al doilea
+// deget anulează clicul — două degete înseamnă zoom sau rotire.
 //
 // ───────────────────────────────────────────────────────────── minimizat
 //
 // Panoul pornește minimizat: în dreapta-jos se vede numai butonul „Coordonate”,
 // iar clicul pe scenă nu culege nimic — nicio rază, niciun rând scris. Activat,
 // face tot ce e descris aici; minimizat din nou, se suspendă, dar ține ultimul
-// punct. Rotirea camerei nu depinde de el: e a lui OrbitControls în ambele stări.
+// punct. Mișcarea camerei nu depinde de el: e a controalelor în ambele stări.
 //
 // ────────────────────────────────────────────────── ce cifre au acoperire
 //
@@ -52,10 +47,9 @@
 
 import * as THREE from 'three';
 import { inPoligon } from './terrain.js';
+import { marsPeTeren } from './raza.js';
 
-const PAS_MARS = 8;    // metri; sub mărimea unei celule de teren văzută de sus
-const BISECTII = 22;   // 8 m / 2²² — mult sub un milimetru
-const PRAG_CLIC = 5;   // px între apăsare și ridicare; peste atât, a fost rotire
+const PRAG_CLIC = 5;   // px între apăsare și ridicare; peste atât, harta a fost mutată
 
 /**
  * Număr pentru CITIT, în română: virgulă zecimală, fără separator de mii.
@@ -123,35 +117,16 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   function punctSubCursor(ev) {
     razaDinEveniment(ev);
     const raza = raycaster.ray;
-    const inHarta = (p) => p.x >= lim.xMin && p.x <= lim.xMax
-                        && p.z >= lim.zMin && p.z <= lim.zMax;
-    const subTeren = (t) => {
-      raza.at(t, temp);
-      return inHarta(temp) ? temp.y - inaltimeLa(temp.x, temp.z) : null;
-    };
 
     // Cât de departe are rost să mergem: diagonala reliefului plus distanța până la
     // el. Dincolo, raza a ieșit demult din zonă.
     const diag = Math.hypot(lim.xMax - lim.xMin, lim.zMax - lim.zMin);
     const maxim = raza.origin.length() + diag * 1.5;
 
-    let tAnterior = null, semnAnterior = null;
-    for (let t = 0; t <= maxim; t += PAS_MARS) {
-      const d = subTeren(t);
-      // Pașii din afara hărții rup lanțul, ca reintrarea în ea să nu producă o
-      // falsă traversare.
-      if (d === null) { tAnterior = null; semnAnterior = null; continue; }
-      if (semnAnterior !== null && semnAnterior > 0 && d <= 0) {
-        let a = tAnterior, b = t;
-        for (let i = 0; i < BISECTII; i++) {
-          const m = (a + b) / 2;
-          const dm = subTeren(m);
-          if (dm === null || dm > 0) a = m; else b = m;
-        }
-        raza.at((a + b) / 2, temp);
-        return cuCladire({ x: temp.x, z: temp.z, t: (a + b) / 2 });
-      }
-      tAnterior = t; semnAnterior = d;
+    const t = marsPeTeren(raza, inaltimeLa, lim, maxim);
+    if (t !== null) {
+      raza.at(t, temp);
+      return cuCladire({ x: temp.x, z: temp.z, t });
     }
 
     // Dincolo de uscat, raza cade pe planul apei — ca să se poată arăta și marea.
@@ -346,6 +321,9 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const laApasare = (ev) => {
     // Pe atingere `button` e tot 0, deci un tap trece pe aceeași cale.
     if (!activ || ev.button !== 0) return;
+    // Al doilea deget: e zoom sau rotire, nu clic. Înainte îl înlocuia pe primul, iar o
+    // ciupire cu un deget ținut pe loc ajungea să măsoare la ridicare.
+    if (apasat && apasat.id !== ev.pointerId) { apasat = null; return; }
     apasat = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
   };
 
@@ -354,7 +332,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     if (!apasat || ev.pointerId !== apasat.id) return;
     const dist = Math.hypot(ev.clientX - apasat.x, ev.clientY - apasat.y);
     apasat = null;
-    if (dist > PRAG_CLIC) return;   // a fost rotire de cameră, nu clic
+    if (dist > PRAG_CLIC) return;   // a fost o mutare a hărții, nu clic
     const p = punctSubCursor(ev);
     if (p) arata(p);
   };
@@ -369,6 +347,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     if (!viu) return;
     activ = stare;
     apasat = null;   // o apăsare începută înainte nu mai culege
+    // Cursorul hărții devine sfera cu punct cât se măsoară (main.css).
+    canvas.toggleAttribute('data-culege', stare);
     cutie.hidden = !stare;
     activeazaBtn.hidden = stare;
     activeazaBtn.setAttribute('aria-expanded', String(stare));
@@ -378,7 +358,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const laMinimizare = () => seteaza(false, true);
 
   canvas.addEventListener('pointerdown', laApasare);
-  // Ridicarea se ascultă pe fereastră, nu pe canvas: OrbitControls mută
+  // Ridicarea se ascultă pe fereastră, nu pe canvas: controalele mută
   // `pointermove`/`pointerup` pe `ownerDocument` cât ține tragerea, iar o tragere
   // care iese din canvas și se termină afară n-ar mai declanșa niciodată
   // ridicarea pe el. `apasat` ar rămâne agățat, și primul clic de după ar fi
@@ -410,6 +390,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       activeazaBtn.removeEventListener('click', laActivare);
       minimizeazaBtn.removeEventListener('click', laMinimizare);
       clearTimeout(cronoCopiere);
+      canvas.removeAttribute('data-culege');
       apasat = null;
       ales = null;
       radacina.remove();
