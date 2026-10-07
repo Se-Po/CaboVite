@@ -288,7 +288,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #busola {
     top: auto;
     right: 0.75rem;
-    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    /* deasupra versiunii, care ține colțul */
+    bottom: calc(0.75rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
   }
   #busola .roza { width: 4.5rem; height: 4.5rem; }
   #busola svg   { width: 3.9rem; height: 3.9rem; }
@@ -305,7 +306,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #straturi {
   position: fixed;
   left: 1rem;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  /* pe aceeași linie cu „Coordonate", deasupra rândului versiunii */
+  bottom: calc(0.75rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   font-family: var(--sans);
 }
@@ -339,7 +341,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #straturi {
     left: auto;
     right: 0.75rem;
-    bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(7.6rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -352,6 +354,46 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #busola .disc { fill: Canvas; stroke: CanvasText; }
   #busola .ac-nord { fill: Highlight; }
   #busola .ac-sud, #busola .eticheta, #busola .pivot { fill: CanvasText; }
+}
+
+/* ------------------------------------------------------------ versiunea
+ *
+ * `v0.1.N`, mereu în colțul din dreapta-jos, la cererea autorului, oricum ar fi
+ * panoul punctului. O scrie build-ul în index.html, din subiectul ultimului commit
+ * (vite.config.js). Ce stă pe marginea de jos urcă deasupra ei cu `--versiune`: pe
+ * desktop „Coordonate" și Satelit, care rămân pe aceeași linie; pe telefon busola,
+ * Satelit și panoul. Fără versiune, coboară la loc. Text, nu buton: fără fundal,
+ * prin contur, ca rândul cu sursele, cu `--muted` pe inelul din `--bg` — 7,1:1.
+ * Clicurile trec la hartă.
+ */
+:root:has(#versiune) { --versiune: 1.15rem; }
+
+#versiune {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  pointer-events: none;
+  margin: 0;
+  color: var(--muted);
+  font: 600 0.85rem/1.2 var(--sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-shadow:
+    -1px -1px 0 var(--bg), 1px -1px 0 var(--bg), -1px 1px 0 var(--bg), 1px 1px 0 var(--bg),
+    0 -1.5px 0 var(--bg), 0 1.5px 0 var(--bg), -1.5px 0 0 var(--bg), 1.5px 0 0 var(--bg),
+    0 0 4px var(--bg), 0 0 8px var(--bg);
+}
+@media (max-width: 34rem) {
+  #versiune { right: 0.75rem; }   /* sub busolă, aliniată la marginea ei */
+}
+#versiune .ascuns {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------- punctul de sub clic
@@ -377,11 +419,15 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * etichete și pe rândurile mici, `--accent` pe altitudinea fără acoperire —
  * trebuie să sară în ochi că nu e o măsurătoare. `--gold` numai pe focus și
  * hover, unde 3:1 ajunge.
+ *
+ * Rândul de jos e al versiunii paginii (`#versiune`, mai sus): cât există, panoul
+ * urcă cu `--versiune`, iar înălțimile maxime scad cu tot atât.
  */
+
 #punct {
   position: fixed;
   right: 1rem;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(0.75rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   pointer-events: none;
   display: flex;
@@ -421,7 +467,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   pointer-events: auto;
   width: min(17rem, calc(100vw - 2rem));
   /* sub coloana busolei: 1rem + rozeta 6rem + citirea ~2rem, un gol și marginea de jos */
-  max-height: calc(100dvh - 10.75rem - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 10.75rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
   overflow: auto;
   overscroll-behavior: contain;   /* defilarea ajunsă la capăt nu trece la pagină */
   padding: 0.7rem 0.85rem;
@@ -556,7 +602,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 @media not all and (max-width: 34rem) {
   @media (max-height: 32rem) {
     #punct { right: 8rem; }
-    #punct .cutie { max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px)); }
+    #punct .cutie { max-height: calc(100dvh - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px)); }
   }
 }
 
@@ -567,7 +613,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #punct { right: 7.25rem; }
   #punct .cutie {
     width: min(14.5rem, calc(100vw - 8rem));
-    max-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
     padding: 0.55rem 0.7rem;
   }
   #punct .mari dd { font-size: 1rem; }
@@ -584,10 +630,10 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
-    bottom: calc(11rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(11rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
     width: auto;
     /* 11rem jos, 6,25rem sus: rândul cu sursele, care aici are două rânduri */
-    max-height: calc(100dvh - 17.25rem - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 17.25rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
   }
   #punct .mici { grid-template-columns: 1fr; }
   #punct .mici dd { text-align: left; white-space: normal; }
@@ -601,6 +647,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
     max-height: calc(100dvh - 7rem - env(safe-area-inset-bottom, 0px));
   }
+  /* versiunea, sub cutie, ar ieși cu o fâșie de 3 px de sub marginea ei */
+  :root:has(#punct .cutie:not([hidden])) #versiune { visibility: hidden; }
 }
 
 /* Sub 17rem butonul minimizat nu mai încape cu numele lângă coloana busolei:
@@ -632,7 +680,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #legenda {
   position: fixed;
   left: 1rem;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  bottom: calc(0.75rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
   z-index: 2;
   pointer-events: none;
   width: min(16rem, calc(100vw - 2rem));
@@ -653,7 +701,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #legenda .mostra { display: inline-block; width: 0.8rem; height: 0.8rem; margin-right: 0.35rem; vertical-align: -0.1rem; border-radius: 2px; }
 
 @media (max-width: 34rem) {
-  #legenda { left: auto; right: 0.75rem; bottom: calc(7.6rem + env(safe-area-inset-bottom, 0px)); }
+  #legenda { left: auto; right: 0.75rem; bottom: calc(7.6rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (forced-colors: active) {
@@ -756,17 +804,17 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
    la 10rem în jos, panoul de jos în sus. Deschise amândouă, nu se acoperă — fișa
    ar sta peste panou (z 3 peste 2), cu tot cu butonul de minimizare:
    - înalt: fișa se oprește deasupra panoului. Pe o clădire panoul ocupă de jos
-     21,64rem, măsurat la 700 × 800 (sacristia de sud); 24rem lasă loc și unui nume
-     pe două rânduri, plus un gol;
+     21,64rem, măsurat la 700 × 800 (sacristia de sud), plus rândul versiunii;
+     24rem lasă loc și unui nume pe două rânduri, plus un gol;
    - mai jos de ~56rem (900 px) nu mai rămâne destul pentru amândouă: își împart
      înălțimea dintre 10rem și marginea de jos, cu un gol de 1rem, și defilează
      fiecare. Antetul panoului și butonul „Închide" al fișei rămân la vedere. */
 @media not all and (max-width: 34rem) {
   body:has(#punct .cutie:not([hidden])) #sanctuar-fisa {
-    max-height: max(calc((100vh - 11.75rem) / 2), calc(100vh - 34rem));
+    max-height: max(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), calc(100vh - 34rem - var(--versiune, 0rem)));
   }
   body:has(#sanctuar-fisa:not([hidden])) #punct .cutie {
-    max-height: calc((100vh - 11.75rem) / 2);
+    max-height: calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2);
   }
 }
 

@@ -102,6 +102,13 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
   commit are un număr `0.1.N.xx`, scris ca prefix în subiect. Numărătoarea
   `0.1` pornește de la `v0.1.0` (2026-09-30), aceeași cifră ca `version` din
   `package.json`; până atunci etichetele au fost `v0.0.N`, până la `v0.0.11`.
+- Pagina își arată versiunea, `v0.1.N`, mereu în colțul din dreapta-jos (`#versiune`).
+  N-o scrie nimeni de mână: build-ul (`vite.config.js`) o ia din prefixul subiectului
+  ultimului commit — pe Vercel din `VERCEL_GIT_COMMIT_MESSAGE`, altfel din `git log` —,
+  deci prefixul `0.1.N.xx` e obligatoriu. Fără niciun subiect cu prefix, pagina nu scrie
+  nicio versiune. Pe serverul de dezvoltare e a ultimului commit, fără lucrul nesalvat.
+  Ce stă pe marginea de jos urcă deasupra ei cu `--versiune` (1,15rem): pe desktop
+  „Coordonate” și Satelit, pe aceeași linie; pe telefon busola, Satelit și panoul.
 
 ## Hărțile de relief
 
@@ -441,7 +448,7 @@ clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeL
 întoarce `null`; o apăsare începută înainte de minimizare nu mai culege nici ea.
 Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
 rămâne. Rotirea camerei nu depinde de el. Unde stă:
-- pe desktop, dreapta-jos, sub coloana busolei;
+- pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
 - pe telefon, pe rândul de jos, la stânga coloanei busolei și a lui Satelit;
 - sub 22,5rem, deschis, urcă deasupra lui Satelit, pe toată lățimea; sub 17rem

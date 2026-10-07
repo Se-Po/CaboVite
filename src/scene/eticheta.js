@@ -9,7 +9,7 @@ import * as THREE from 'three';
 //
 // Trei lucruri pe care nu le face o etichetă simplă:
 //   - OCOLEȘTE panourile: busola, butonul Satelit, panoul punctului, rândul cu
-//     sursele, legenda și fișa deschisă. Încearcă sus, dreapta, stânga, jos, și ia
+//     sursele, versiunea, legenda și fișa deschisă. Încearcă sus, dreapta, stânga, jos, și ia
 //     prima poziție liberă. Obstacolele se citesc din DOM, nu se presupun: panoul
 //     punctului se deschide, se minimizează și crește după un clic.
 //   - Când ancora iese din cadru sau e în spatele camerei, eticheta stă lipită de
@@ -23,7 +23,7 @@ import * as THREE from 'three';
 
 // Panoul punctului, pe cele două stări: butonul minimizat și cutia deschisă. Amândouă
 // există de la creare, deci observatorul de mai jos le vede; cea ascunsă se sare.
-const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .activeaza', '#punct .cutie', '#surse', '#legenda', '#straturi button'];
+const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .activeaza', '#punct .cutie', '#surse', '#legenda', '#straturi button', '#versiune'];
 const DIST_ETICHETA = 12; // px între ancoră și etichetă
 const MARGINE = 8;        // px de la marginea ecranului
 
