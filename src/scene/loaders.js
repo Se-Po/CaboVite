@@ -213,8 +213,8 @@ export async function creeazaIncarcatorKtx2(renderer) {
 }
 
 /** Sidecarul unei texturi Satelit: `<hartă>-orto_vN.json`. Aruncă numai pe greșeli de programare. */
-export async function incarcaSidecarOrto(nume) {
-  const r = await fetch(`/data/${nume}.json`);
+export async function incarcaSidecarOrto(nume, semnal = null) {
+  const r = await fetch(`/data/${nume}.json`, { signal: semnal });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   let m;
   try { m = await r.json(); } catch { throw new Error('sidecarul nu e JSON'); }
@@ -234,16 +234,20 @@ export async function incarcaSidecarOrto(nume) {
  * lățimea, înălțimea și numărul de niveluri —, fiindcă `parse()` mută bufferul în
  * workerul de transcodare: după el nu mai e nimic de verificat.
  *
+ * `semnal` (un AbortSignal) oprește cererile pornite și, dacă fișierul a sosit deja,
+ * transcodarea: întoarce `null` fără avertisment — nu lipsește nimic, scena a plecat.
+ *
  * @returns {Promise<{meta: object, textura: THREE.CompressedTexture}|null>}
  */
-export async function incarcaOrto(nume, ktx2, metaGata = null) {
+export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null) {
   const lipsa = (motiv) => {
+    if (semnal?.aborted) return null;
     console.warn(`textura Satelit ${nume} lipsește (${motiv})`);
     return null;
   };
   try {
-    const meta = metaGata ?? await incarcaSidecarOrto(nume);
-    const r = await fetch(`/data/${nume}.ktx2`);
+    const meta = metaGata ?? await incarcaSidecarOrto(nume, semnal);
+    const r = await fetch(`/data/${nume}.ktx2`, { signal: semnal });
     if (!r.ok) return lipsa(`HTTP ${r.status}`);
     const buf = await r.arrayBuffer();
     if (buf.byteLength !== meta.octeti) return lipsa(`${buf.byteLength} octeți, aștept ${meta.octeti}`);
@@ -262,6 +266,8 @@ export async function incarcaOrto(nume, ktx2, metaGata = null) {
     } else {
       console.info(`textura Satelit ${nume}: sha256 neverificat (pagina nu e într-un context securizat)`);
     }
+    // Abandonată cât se verifica: transcodorul nu se mai cere.
+    if (semnal?.aborted) return null;
     // parse() nu întoarce o promisiune; o eroare de transcodare vine pe onError.
     const textura = await new Promise((res, rej) => ktx2.parse(buf, res, rej));
     return { meta, textura };

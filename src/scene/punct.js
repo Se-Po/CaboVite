@@ -39,6 +39,16 @@
 // dar nenule, rămâne uscat". Prin construcție, uscatul măsurat e STRICT POZITIV.
 // Orice valoare negativă e fie umplutura, fie interpolarea dintre ea și mal —
 // niciuna nu e o cotă.
+//
+// ───────────────────────────────────────────────── numai în zona alpha
+//
+// Se măsoară numai în zona alpha — harta, nu împrejurimile din jurul ei —, cum a
+// cerut autorul. Un clic dincolo spune „în afara zonei alpha” și atât: împrejurimile
+// sunt decor — banda de lângă hartă e tot LiDAR DGT, dar la 4 m, iar de acolo încolo
+// un model de suprafață de 30 m —, iar `geo.js` ar extrapola coordonatele din
+// colțurile hărții. Raza merge totuși și peste împrejurimi (`limiteMars`), cu
+// relieful lor: un clic pe un deal din fața hărții se oprește pe deal, nu pe
+// alpha din spatele lui.
 
 import * as THREE from 'three';
 import { inPoligon } from './terrain.js';
@@ -75,13 +85,16 @@ const brut = (v, zec) => v.toFixed(zec);
  *   a fost 0,153 m, deci nu e o alegere cosmetică.
  * @param {object} o.geo — de la creeazaGeo()
  * @param {Array<{x,z}>} [o.limitaDatelor] — `poligon_scena` din sidecar
+ * @param {{xMin: number, xMax: number, zMin: number, zMax: number}} [o.limiteMars] — cât
+ *   de departe merge raza pe relief: harta cu împrejurimile ei. Implicit, numai harta.
+ * @param {(x: number, z: number) => boolean} [o.inAlpha] — zona în care se măsoară
  * @param {number} [o.zMin] — `zMin_m`, cota umpluturii, pentru explicație
  * @param {(raza: THREE.Ray) => ({t: number, cheie: string, x: number, y: number, z: number}|null)} [o.loveste]
  *   — clădirile sanctuarului: prima lovită de rază, dacă e una
  * @param {(cheie: string) => string} [o.numeElement] — numele de afișat al unui element
  * @returns {{dispose: () => void, culegeLa: Function, activeaza: Function, minimizeaza: Function, activ: boolean}|null}
  */
-export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, zMin, loveste, numeElement }) {
+export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, limiteMars, inAlpha, zMin, loveste, numeElement }) {
   // Proba e un apel adevărat, nu o verificare de chei: `laGeo` întoarce null
   // dacă lipsesc `colturi_geo` sau `bbox_tm06`, iar un panou care arată
   // longitudinea „null" e mai rău decât unul care lipsește.
@@ -91,7 +104,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     return null;
   }
 
-  const lim = geo.limite;
+  const lim = limiteMars ?? geo.limite;
   const raycaster = new THREE.Raycaster();
   const cursor = new THREE.Vector2();
   const planApa = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -117,8 +130,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       return inHarta(temp) ? temp.y - inaltimeLa(temp.x, temp.z) : null;
     };
 
-    // Cât de departe are rost să mergem: diagonala hărții plus distanța până la
-    // ea. Dincolo, raza a ieșit demult din zonă.
+    // Cât de departe are rost să mergem: diagonala reliefului plus distanța până la
+    // el. Dincolo, raza a ieșit demult din zonă.
     const diag = Math.hypot(lim.xMax - lim.xMin, lim.zMax - lim.zMin);
     const maxim = raza.origin.length() + diag * 1.5;
 
@@ -158,10 +171,12 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     return { x: c.x, z: c.z, t: c.t, cladire: { cheie: c.cheie, y: c.y } };
   }
 
+  /** Punctul e în zona în care se măsoară? */
+  const inZona = (x, z) => (inAlpha ? inAlpha(x, z) : true) && (!limitaDatelor || inPoligon(x, z, limitaDatelor));
+
   /** Ce se poate spune despre altitudinea într-un punct. Ordinea contează. */
   function altitudineaLa(x, z) {
-    if (limitaDatelor && !inPoligon(x, z, limitaDatelor))
-      return { h: null, eticheta: 'în afara hărții' };
+    if (!inZona(x, z)) return { h: null, eticheta: 'în afara zonei alpha' };
     const h = inaltimeLa(x, z);
     if (!(h > 0)) return { h: null, eticheta: 'apă' };
     return { h, eticheta: null };
@@ -233,6 +248,18 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   let cronoCopiere = 0;
 
   function arata(p) {
+    // În afara zonei alpha nu se scrie nicio cifră și nu rămâne nimic de copiat.
+    if (!p.cladire && !inZona(p.x, p.z)) {
+      for (const r of randuriCladire) r.hidden = true;
+      indemn.textContent = 'În afara zonei alpha: aici nu se măsoară. Dă clic pe hartă.';
+      indemn.hidden = false;
+      dlMari.hidden = true;
+      dlMici.hidden = true;
+      buton.hidden = true;
+      ales = null;
+      anunt.textContent = 'Punctul e în afara zonei alpha; acolo nu se măsoară.';
+      return;
+    }
     const teren = altitudineaLa(p.x, p.z);
     // Pe o clădire, altitudinea e a punctului de pe ea; solul de dedesubt se spune separat.
     const { h, eticheta } = p.cladire ? { h: p.cladire.y, eticheta: null } : teren;

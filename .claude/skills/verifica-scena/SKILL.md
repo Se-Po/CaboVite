@@ -18,7 +18,8 @@ ochii prind. Parcurge lista și raportează fiecare punct cu dovadă.
 3. **Consola** — citește mesajele. Avertismentele WebGL, texturile 404 și
    avertismentele de deprecare three.js contează toate.
 4. **Interacțiune** — mișcă camera. Se rotește lin? Controalele răspund?
-   Se blochează la limite?
+   Se blochează la limite? Ținta nu iese din zona alpha, iar busola și tasta
+   Home duc acasă? Dincolo de alpha, împrejurimile continuă fără crăpături?
 5. **Mobil** — redimensionează la 390px lățime. Vederea de pornire e aceeași pe
    orice ecran, cu lateralele tăiate: sanctuarul rămâne în cadru? Butoanele și
    panourile nu se ating între ele? Textul rămâne lizibil? Nu apare scroll

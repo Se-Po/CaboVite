@@ -16,6 +16,9 @@ import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './p
 import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
+import { creeazaAlpha } from './alpha.js';
+import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
+import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
 import { instantaneuMemorie } from './dispose.js';
 
 // Orchestrarea scenei și randarea la cerere.
@@ -82,6 +85,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   const sanctuarGata = incarcaSanctuar();
   // La fel clădirile din afara lui: farul, casele lui, Casa da Ronca.
   const cladiriGata = incarcaCladiri();
+  // Și împrejurimile — relieful de dincolo de marginile tăiate. Nu respinge nici ea.
+  // În previzualizare nu se încarcă: legenda de acolo e a NDVI-ului din ortofoto, iar
+  // împrejurimile îl au și din Sentinel.
+  const imprejurimiGata = modPrevizualizare() ? Promise.resolve(null) : incarcaImprejurimi();
 
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
@@ -149,6 +156,18 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   let cerut = true;
   const cereRandare = () => { cerut = true; };
 
+  // Zona alpha — baza cu peticul ei — e singurul spațiu de interacțiune: ținta
+  // camerei nu iese din ea. Se prinde la fiecare `change`, deci și sub
+  // prefers-reduced-motion, când OrbitControls își cheamă singur `update()` din
+  // evenimentele de pointer; restul pe care îl mai împinge amortizarea după ce
+  // utilizatorul a dat drumul se prinde în buclă.
+  const alpha = creeazaAlpha(relief.meta);
+  if (alpha) {
+    const tineInAlpha = () => { alpha.limiteaza(controale.target, camera); };
+    controale.addEventListener('change', tineInAlpha);
+    deEliberat.push(() => controale.removeEventListener('change', tineInAlpha));
+  }
+
   // Straturile NDVI, totul sau nimic, desprinse de pe relief ca să nu rămână vii
   // după coacerea culorii. `let`, și golit după ce ambele plase s-au construit.
   let ndvi = straturiNdvi(relief, reliefPetic);
@@ -194,6 +213,9 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     scena.add(petic.obiect);
     deEliberat.push(() => petic.dispose());
   }
+  // Marginea lui alpha, nod cu nod, cu NDVI-ul ei: împrejurimile se cos de ea. Se ia
+  // acum, cât stratul mai e viu — câteva mii de noduri, nu grila întreagă.
+  const margineAlpha = culoare ? null : buclaNoduri(relief, { x: 0, z: 0 }, ndvi.baza ?? null, dreptunghiGrila(relief));
   ndvi = null;
 
   // Un singur accesor al altitudinii randate: peticul de 1 m unde există, baza de
@@ -234,6 +256,30 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       ortofoto: 'materialul acoperișurilor din afara sanctuarului, după culoarea lor',
     };
     surse = unesteSurse(surse, cladiri.surse.map((s) => ({ ...s, prelucrare: PRELUCRARE[s.cheie] ?? 'geometria clădirilor' })));
+  }
+
+  // Împrejurimile: peisajul de dincolo de alpha, până la orizont. Separabile, ca
+  // cerul: dacă lipsesc datele sau construcția eșuează, harta rămâne cu marginile
+  // tăiate, cum era. Nu primesc umbre și nu intră în umbre — sunt decor.
+  let imprejurimi = null;
+  const niveluriImprejurimi = await imprejurimiGata;
+  if (niveluriImprejurimi && margineAlpha) {
+    try {
+      // Sursele straturilor se iau înainte de construcție: după ea straturile pleacă.
+      const surseNdvi = niveluriImprejurimi.flatMap((L) => L.ndvi?.meta?.surse ?? (L.ndvi?.meta?.sursa ? [L.ndvi.meta.sursa] : []));
+      imprejurimi = creeazaImprejurimi({ niveluri: niveluriImprejurimi, margineAlpha, paleta, cer });
+      for (const o of imprejurimi.obiecte) scena.add(o);
+      const imp = imprejurimi;
+      deEliberat.push(() => imp.dispose());
+      const RELIEF_IMP = 'relieful împrejurimilor, dincolo de marginile hărții, cusut de ea';
+      surse = unesteSurse(surse, [
+        ...niveluriImprejurimi.map((L) => L.meta.sursa).filter((q) => q?.atributie).map((q) => ({ ...q, prelucrare: RELIEF_IMP })),
+        ...(culoriMasurate ? surseNdvi.filter((q) => q?.atributie).map((q) => ({ ...q, prelucrare: 'indicele de vegetație al împrejurimilor, calibrat pe ortofoto' })) : []),
+      ]);
+    } catch (e) {
+      console.warn('împrejurimile sărite, harta rămâne cu marginile tăiate:', e.message);
+      imprejurimi = null;
+    }
   }
 
   // Umbrele clădirilor: o hartă strânsă pe complex, desenată la pornire și apoi
@@ -286,6 +332,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     if (!b) throw new Error('harta n-are bbox_tm06');
     satelit = creeazaSatelit({
       renderer, scena, camera, teren, petic, mare, soare: lumini.soare, cer, umbre,
+      imprejurimi: imprejurimi?.plase.map((p) => ({ nume: p.nume, obiect: p.teren.obiect })) ?? [],
       drapaj: sanctuar ? sanctuar.obiecte.slice(1) : [],
       centru: { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 },
       numeBaza: relief.meta.nume, numePetic: reliefPetic?.meta.nume ?? null,
@@ -333,23 +380,62 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // — peticul n-are `colturi_geo` — și de acolo își deduce nordul adevărat.
   // Întoarce null dacă nu-l poate deduce; atunci pagina rămâne fără ea.
   //
-  // Clicul pe ea readuce vederea de pornire. Fișa sanctuarului se închide întâi:
-  // închiderea șterge sincron decalajul de obiectiv, altfel zborul ar ateriza cu
-  // imaginea încă mutată. Focusul, rămas în fișa ascunsă, trece pe rozetă —
-  // Safari nu-l mută singur pe butonul apăsat.
+  // Clicul pe ea te duce acasă.
+  //
+  // Acasă e vederea de pornire, `VEDERE_START`: de acolo pornește pagina și acolo
+  // se întoarce, de la busolă sau de la tasta Home. Fișa sanctuarului se închide
+  // întâi: închiderea șterge sincron decalajul de obiectiv, altfel zborul ar
+  // ateriza cu imaginea încă mutată. Focusul, rămas în fișa ascunsă, trece pe
+  // rozetă — Safari nu-l mută singur pe butonul apăsat.
+  const acasa = () => {
+    if (eticheta?.stare.deschisa) {
+      eticheta.inchide();
+      document.querySelector('#busola .roza')?.focus();
+    }
+    zbor?.spre(VEDERE_START);
+  };
   const busola = creeazaBusola({
     gazda: canvas.parentElement ?? document.body,
     controale,
     colturi: relief.meta?.colturi_geo,
-    laClic: () => {
-      if (eticheta?.stare.deschisa) {
-        eticheta.inchide();
-        document.querySelector('#busola .roza')?.focus();
-      }
-      zbor?.spre(VEDERE_START);
-    },
+    laClic: acasa,
   });
   if (busola) deEliberat.push(() => busola.dispose());
+
+  // Tasta Home face același lucru, numai acolo unde nu are deja alt rost: într-un
+  // câmp de text, într-o fișă sau un panou care defilează, în textul capitolelor
+  // sau într-o modală deschisă ea mută cursorul ori duce sus — se lasă așa.
+  //
+  // „Acolo” nu e numai elementul cu focus. Un clic pe text care nu primește focus
+  // (un rând din fișă) lasă focusul pe <body>, deci tasta ar ajunge de pe <body>
+  // și ar închide fișa în loc s-o ducă sus. Atunci decide ultimul loc apăsat.
+  // Ținută apăsată, tasta se repetă de ~30 de ori pe secundă, iar fiecare zbor nou
+  // ar porni de la capăt: se ia numai prima apăsare.
+  const UNDE_NU = 'input, textarea, select, [contenteditable], dialog[open], #sanctuar-fisa, #punct .cutie, #continut';
+  let ultimaApasare = null;
+  const laApasareOriunde = (e) => { ultimaApasare = e.target; };
+  const laTastaAcasa = (e) => {
+    if (e.key !== 'Home' || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const pePagina = e.target === document.body || e.target === document.documentElement;
+    const unde = pePagina ? ultimaApasare : e.target;
+    if (unde?.closest?.(UNDE_NU)) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    acasa();
+  };
+  document.addEventListener('pointerdown', laApasareOriunde, true);
+  document.addEventListener('keydown', laTastaAcasa);
+  deEliberat.push(() => {
+    document.removeEventListener('pointerdown', laApasareOriunde, true);
+    document.removeEventListener('keydown', laTastaAcasa);
+  });
+
+  // Relieful randat peste tot: alpha unde e alpha, împrejurimile în rest. Pe el merg
+  // raza panoului punctului și ocluzia etichetei — un deal din împrejurimi ascunde ce
+  // e în spatele lui. Măsurătorile rămân ale lui alpha (`inaltimeLa`).
+  const inaltimeRandata = imprejurimi
+    ? (x, z) => (alpha && !alpha.contine(x, z) ? imprejurimi.inaltimeLa(x, z) : inaltimeLa(x, z))
+    : inaltimeLa;
 
   // Conversiile se fac pe metadatele BAZEI, nu ale peticului: scena e centrată
   // pe ea, iar peticul e doar o plasă mai fină așezată înăuntru. Tot de acolo
@@ -363,8 +449,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   const punct = creeazaPunct({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, geo,
-    inaltimeLa,
+    inaltimeLa: inaltimeRandata,
     limitaDatelor,
+    limiteMars: imprejurimi?.limite,
+    inAlpha: alpha?.contine,
     zMin: relief.meta?.zMin_m,
     // Clădirea cea mai apropiată de-a lungul razei, din oricare set.
     loveste: sanctuar || cladiri ? (raza) => {
@@ -418,7 +506,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   };
   eticheta = sanctuar?.poi?.zbor ? creeazaEticheta({
     gazda: canvas.parentElement ?? document.body,
-    canvas, camera, inaltimeLa, cereRandare,
+    canvas, camera, inaltimeLa: inaltimeRandata, cereRandare,
     ancora: sanctuar.poi.ancora,
     continut: continut?.sanctuar,
     laDeschidere: (fisa) => { potrivesteLaFisa(fisa); zbor.spre(zborLaFisa()); },
@@ -432,6 +520,9 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
     zbor.pas();
     const seMisca = controale.enableDamping && controale.update();
+    // Amortizarea mai împinge ținta după ce utilizatorul a dat drumul, cu pași tot
+    // mai mici; sub pragul de `change` al lui OrbitControls ar scăpa de limită.
+    if (alpha?.limiteaza(controale.target, camera)) cerut = true;
     if (redimensioneaza(renderer)) {
       const c = renderer.domElement;
       camera.aspect = c.clientWidth / c.clientHeight;
@@ -476,10 +567,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   let viu = true;
 
   return {
-    renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo,
+    renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo, alpha, acasa,
     // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
     get surse() { return surse; },
-    zbor, eticheta, umbre, umbreGrup, satelit,
+    zbor, eticheta, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are

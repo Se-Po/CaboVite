@@ -43,6 +43,10 @@ se poartă în română.
 | `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, înregistrate și măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
 | `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul |
+| `npm run surse-imprejurimi` | aduce o singură dată, prin HTTP pe intervale, ferestrele Copernicus DEM și Sentinel-2 ale împrejurimilor → `date-sursa/copernicus/`, `date-sursa/sentinel/`, cu manifestul `scripts/imprejurimi/surse.json` |
+| `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
+| `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
+| `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -109,6 +113,15 @@ nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`
 |---|---|---|
 | `harta_v5` | LiDAR DGT, MDT 50 cm mediat | petic de 534 × 700 m la 1 m, peste `harta_v4`; `harta_v3` cu inelul de cusătură refăcut pe baza nouă |
 | `harta_v4` | LiDAR DGT 2024-2025, MDT 2 m; fâșia 104162 din MDT 50 cm | toată cutia, 2328 × 2986 m, cu tot uscatul ei; `harta_v2` fără conturul ales în pagină și fără noduri tăiate |
+| `harta_v6` | LiDAR DGT, MDT 2 m, la 4 m | împrejurimi: banda de ~400 m de lângă marginile de nord și est ale lui alpha |
+| `harta_v9` | LiDAR DGT, MDT 2 m, la 12 m, cu cele 14 dale aduse de autor pe 2026-10-07 | împrejurimi: banda până la x −91 000 și y −134 000, ~2,4 km dincolo de alpha |
+| `harta_v7` | Copernicus DEM GLO-30, la 32 m | împrejurimi: ~4,5 km dincolo de `harta_v9` |
+| `harta_v8` | Copernicus DEM GLO-30, la 256 m | împrejurimi: ~48 km în jurul capului |
+
+`harta_v4` cu peticul ei sunt **zona alpha**, harta pe care se lucrează;
+`harta_v6`, `harta_v9`, `harta_v7` și `harta_v8`, în ordinea asta, din interior spre orizont, sunt
+decorul din jur. Numele nu urmează ordinea: `harta_v9` s-a adăugat ultima, între v6 și v7.
+Vezi „Zona alpha și împrejurimile”.
 
 O hartă poate avea cheia `baza`: atunci e un **petic** de rezoluție mai mare,
 iar `incarcaRelief()` încarcă și baza. Scena generează două plase — baza, cu o
@@ -116,12 +129,14 @@ gaură exact sub petic, și peticul deasupra. Nodurile peticului cad peste ale
 bazei din doi în doi, iar inelul lui exterior ia relieful bazei, așa că muchia
 comună e aceeași linie și nu rămâne nicio crăpătură.
 
-Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loaders.js`. Datele-sursă
+Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loaders.js`, plus cele patru
+niveluri ale împrejurimilor (`src/scene/imprejurimi.js`). Datele-sursă
 (`date-sursa/`) nu intră în depozit; hărțile produse, da — altfel pagina nu se
 poate încărca dintr-o clonă curată.
 
 Depozitul păstrează **exact** harta pe care o încarcă pagina, cu straturile ei, și
-nimic altceva: `harta_v5` plus baza ei, `harta_v4`, fiecare cu `-ndvi` alături. `harta_v0` și `harta_v1` au plecat odată
+nimic altceva: `harta_v5` plus baza ei, `harta_v4`, fiecare cu `-ndvi` alături, și împrejurimile
+`harta_v6`, `harta_v9`, `harta_v7` și `harta_v8`, cu straturile și texturile lor. `harta_v0` și `harta_v1` au plecat odată
 cu reparația dalei 104162 (vezi „Dalele 104xxx"), `harta_v2` și `harta_v3` odată cu
 lărgirea la toată cutia (vezi „Uscatul din afara conturului"). Hărțile de probă de dinainte — promontoriul
 întreg din Copernicus GLO-30 și golful Lagosteiros — au fost șterse împreună cu
@@ -161,7 +176,8 @@ Acceptarea, față de `harta_v2`, pe `.bin`-uri:
 
 Plasa crește la 1 923 948 de triunghiuri (bază 1 422 064), adică +561 826, și
 103 893 192 de octeți de atribute (+30,3 MB). Marginile de nord și de est ale cutiei
-taie uscat drept; relieful de dincolo ar cere dalele MDT 107xxx.
+taie uscat drept; dincolo de ele continuă împrejurimile (vezi „Zona alpha și
+împrejurimile”).
 
 `ortofoto.mjs` scrie acum un raport pe hartă, `ortofoto-culori.<hartă>.json`:
 `paleta.mjs` citește fix raportul lui `harta_v2`, ca albedourile vederii Relief să
@@ -366,12 +382,18 @@ imagine — rotunjirea la centimetru rotește privirea cu 0,0006° —, pivotul 
 cele înguste: așa a cerut autorul. `incadreazaLaAspect()`, care dădea camera
 înapoi pe ecranele înguste, a plecat.
 
-**Clicul readuce vederea de pornire**, cu ținta, distanța și înălțimea, nu numai
-azimutul: busola cheamă `zbor.spre(VEDERE_START)`, același zbor din `zbor.js` cu
+**Clicul duce acasă** — la vederea de pornire —, cu ținta, distanța și înălțimea, nu numai
+azimutul: busola cheamă `acasa()` din scenă, care cheamă `zbor.spre(VEDERE_START)`, același zbor din `zbor.js` cu
 care eticheta duce la sanctuar. Busola nu mai are zbor propriu. Dacă fișa
 sanctuarului e deschisă, se închide întâi — închiderea șterge sincron decalajul
 de obiectiv, altfel zborul ar ateriza cu imaginea mutată —, iar focusul trece pe
-rozetă. Un al doilea clic, cu camera deja acolo, nu mai zboară.
+rozetă. Un al doilea clic, cu camera deja acolo, nu mai zboară. Tasta **Home** face
+același lucru, numai unde nu are deja alt rost: nu într-un câmp, într-o fișă sau un
+panou care defilează, în textul capitolelor sau într-o modală deschisă. Decide
+elementul cu focus, iar când acela e `<body>` — după un clic pe text care nu ia
+focus, un rând din fișă —, locul ultimei apăsări: altfel Home închidea fișa în loc
+s-o ducă sus. Ținută apăsată, contează numai prima apăsare; repetările ar fi pornit
+zborul de la capăt la fiecare 33 ms.
 
 **Zborul pune poziția ABSOLUT**, nu cu `rotateLeft()`. Acela există și e public
 în r186, dar adaugă un *delta* într-un acumulator care se scurge exponențial;
@@ -449,14 +471,20 @@ OrbitControls mută `pointermove`/`pointerup` pe `ownerDocument` cât ține
 tragerea, deci o tragere care se termină în afara canvasului n-ar mai declanșa
 niciodată ridicarea pe el, iar apăsarea ar rămâne agățată.
 
-**Coordonatele au mereu acoperire, altitudinea nu.** Raza lovește un loc real
-chiar și pe apă, deci lon/lat, scena și TM06 se arată întotdeauna. Altitudinea
-primește etichetă, după două reguli verificabile:
+**Se măsoară numai în zona alpha**, cum a cerut autorul. Un clic dincolo de ea — pe
+mare sau pe împrejurimi — scrie „În afara zonei alpha: aici nu se măsoară” și nimic
+de copiat. Împrejurimile sunt decor: banda de lângă hartă (`harta_v6`) e tot LiDAR
+DGT, dar la 4 m, iar de acolo încolo un model de suprafață de 30 m; `geo.js` ar
+extrapola coordonatele din colțurile hărții, iar `inaltimeLa` al lui alpha prinde
+indicii la marginea grilei — la (1300, 0), la 136 m est de cutie, ar fi dat
+139,72 m, care pare măsurătoare și nu e. Raza merge totuși peste relieful
+împrejurimilor (`inaltimeRandata`, `limiteMars`): un clic pe un deal din fața hărții
+se oprește pe deal, nu pe alpha din spatele lui — măsurat: clicul țintit pe
+(2600; −3000), din nord-est, cade la (2600; −3000).
 
-- **„în afara hărții"** dacă punctul cade în afara lui `poligon_scena`. Contează:
-  `inaltimeLa` prinde indicii la marginea grilei, deci dincolo de ea întoarce cota
-  nodului de pe margine — la (1300, 0), la 136 m est de cutie, iese 139,72 m, care
-  pare măsurătoare și nu e.
+În alpha, raza lovește un loc real chiar și pe apă, deci lon/lat, scena și TM06 se
+arată întotdeauna. Altitudinea primește etichetă după o regulă verificabilă:
+
 - **„apă"** dacă altitudinea nu e strict pozitivă. Regula vine din sidecar, nu
   din ochi: `regula_apa` spune „exact 0.0 m sau NODATA (−999); plaja, care are
   valori mici dar nenule, rămâne uscat", iar celulele acelea sunt coborâte la
@@ -501,7 +529,9 @@ citește: sub `FLAT_SHADED` varianta `vNormal` nici nu se declară, iar
 `normal_fragment_begin` calculează `normalize(cross(dFdx, dFdy))` — planul
 fațetei, adică exact ce am fi scris. Pe geometrie neindexată cu normale de
 fațetă cele două sunt același plan. Scapă 92 248 344 de octeți din RAM și de pe
-placă, plus 127 ms de `computeVertexNormals()` la fiecare pornire.
+placă, plus 127 ms de `computeVertexNormals()` la fiecare pornire. Excepția sunt
+nivelurile de la 12 m încolo ale împrejurimilor, netezite (`neted`, `campNeted`): vezi
+„Zona alpha și împrejurimile”.
 
 **Culoarea stă pe `Uint16` normalizat**, 6 octeți pe vârf în loc de 12. `Uint8`
 NU merge: valorile din atribut sunt liniare, iar un pas de 1/255 în liniar
@@ -611,9 +641,276 @@ ori planul îndepărtat, deci marginea lui nu se vede niciodată.
 
 Cusătura orizontului, cu privirea orizontală din larg, rândul de cer față de marea
 de sub el: ΔE 0,50 / 0 / 0,53 opus soarelui / spre el / lateral; o ceață de culoare
-constantă ar da 2,85 / 4,54 / 0,59. Restul scenei stă sub 5 km și primește ceața
+constantă ar da 2,85 / 4,54 / 0,59. Alpha stă sub 5 km de cameră și primește ceața
 obișnuită, liniară, cu media orizontului ca culoare — aceeași lege ca înainte, deci
-terenul de aproape iese neschimbat. Cadre desenate în 2 s de repaus: 0.
+terenul de aproape iese neschimbat. Împrejurimile, până la 50 km, păstrează legea
+liniară, dar iau culoarea cerului de pe azimut — vezi „Zona alpha și împrejurimile”. Cadre desenate în 2 s de repaus: 0.
+
+## Zona alpha și împrejurimile
+
+**Zona alpha** e harta pe care se lucrează: `harta_v4` cu peticul `harta_v5`, numită
+așa de autor pe 2026-10-07. E singurul spațiu de interacțiune: pe ea se măsoară, pe
+ea stau etichetele, în jurul ei se rotește camera. `src/scene/alpha.js` îi dă
+cutia NODURILOR — x ∈ [−1163; 1163], z ∈ [−1492; 1492], nu ±1164 / ±1493 ale
+dreptunghiului de decupare — și ține ținta camerei în ea: dacă a ieșit, ținta și
+camera se mută înapoi cu ACELAȘI vector, deci orientarea și distanța rămân
+(măsurat: 1·10⁻¹³ m). Sfera din OrbitControls (`cursor` + `maxTargetRadius`) ar fi
+lăsat ținta cu ~730 m dincolo de marginile de est și vest și cu ~400 m dincolo de
+cele de nord și sud (raza ei e 1 892 m). Limita se prinde la `change` — și sub
+reduced-motion, când OrbitControls își cheamă singur `update()` — și în buclă, pentru
+restul pe care îl mai împinge amortizarea. Redesenare cere numai o mutare de peste un
+milimetru, pragul lui OrbitControls: amortizarea împinge ținta în perete sute de
+cadre cu fracțiuni de milimetru, iar pe podeaua y = 0 resturile ajung denormale și
+țin ~8 900 de cadre — recenzia măsurase redesenări continue până la ~2,5 minute.
+Acum, după o panoramare împinsă în podea sau în perete, 0 cadre în 2 s după inerție.
+
+**Împrejurimile** sunt peisajul real de dincolo de marginile tăiate ale lui alpha,
+până unde ceața scenei îl acoperă de tot. Fără ele, din nord-est harta arăta ca o
+foaie care plutește peste planul mării. Sunt decor: nu primesc umbre, nu au etichete,
+nu se măsoară pe ele.
+
+| nivel | sursă | pas | noduri de uscat | triunghiuri | textura Satelit |
+|---|---|---|---|---|---|
+| `harta_v6` | dalele DGT de 2 m, filtru cort 1-2-1 | 4 m | 109 248 | 216 105 | ortofoto, 2 m, 0,62 MB |
+| `harta_v9` | dalele DGT de 2 m, filtru cort 1-2-…-6-…-2-1 | 12 m | 69 151 | 138 203 | ortofoto, 2 m, 3,09 MB; la pornire 4 m, 0,79 MB |
+| `harta_v7` | Copernicus GLO-30 | 32 m | 37 853 | 75 834 | ortofoto unde acoperă, altfel Sentinel-2; 16 m, 0,22 MB |
+| `harta_v8` | Copernicus GLO-30, media a 8 × 8 eșantioane, pe un disc de 50 km | 256 m | 30 931 | 64 457 | Sentinel-2, 64 m, 0,59 MB |
+
+În total +494 599 de triunghiuri (+25,7%), 27,9 MB de atribute (cu normalele nivelurilor
+netezite), 7,93 MB de fișiere — din care 3,09 MB textura de 2 m a lui `harta_v9` și 0,79 MB
+varianta ei de 4 m, pentru pornire (vezi „În pagină”, mai jos). ETC1S ar fi
+dat 0,62 MB, cu ΔE_OK×100 1,35 după decodare față de 0,22 (p99 6,0 față de 1,6); s-a păstrat
+UASTC, alegerea autorului pentru alpha.
+De ce până la 50 km: ceața three e PLANĂ (`vFogDepth = −mvPosition.z`), camera poate
+sta la ~10 km de centru, iar colțurile unui ecran 16:9 văd până la ~30 km; la 25 km
+uscatul ar fi fost în ceață numai pe jumătate, lângă o mare deja ~78% în ceață. Și de
+ce nu mai departe: camera stă la cel mult ~9,6 km de centru, iar planul îndepărtat e la
+60 km; colțurile pătratului lui `harta_v8`, la 68 km, ar fi fost retezate drept de el.
+Dincolo de disc (`RAZA_V8`) nodurile sunt apă — 24 156 —, și tot de aceea lipsesc
+dalele GLO-30 N37: uscatul de la sud de 38°, lângă Sines, e la peste 50 km.
+
+**Sursele noi**, deschise, aduse o singură dată (`npm run surse-imprejurimi`, aprobat
+de autor: 52,1 MB în 208 cereri, plus 0,45 MB de antete citite întâi, la probă —
+Copernicus ~23 MB, Sentinel ~29,5 MB). Manifestul `scripts/imprejurimi/surse.json` ține
+prima descărcare și, pe fiecare fereastră, mărimea dalelor ei din antet (53,6 MB în
+total); o rulare de pe disc, care nu mai cere nimic — nici itemii STAC, ținuți și ei
+pe disc —, nu le rescrie. `scripts/comun/cog.mjs` citește COG-uri pe intervale de octeți și ține pe
+disc fiecare dală adusă; o construcție cere `descarca: false`, deci o dală lipsă e
+eroare, nu descărcare tăcută. Originea, pasul și felul pixelului se citesc din antet:
+- **Copernicus DEM GLO-30** (`copernicus-dem-30m` pe AWS), dalele N38 W010 și N38 W009,
+  cu măștile FLM și WBM. PixelIsPoint: centrul pixelului (0, 0) e exact la (−9°; 39°).
+  E un model de SUPRAFAȚĂ, cu coroane și acoperișuri, în EGM2008; nu se corectează.
+- **Sentinel-2 L2A**, scena din 24.07.2025 (S2A, aceeași trecere peste dalele MGRS
+  29SMC/SMD/SNC/SND, sub 0,04% nori), din fereastra zborului DGT. Decalajul BOA e deja
+  aplicat în fișiere: reflectanța e DN × 0,0001 — pe apă B08 are mediana 259, deci
+  0,026; cu încă −0,1 ar ieși negativă. Culoarea din TCI la 10 și 80 m, NDVI-ul din
+  B04/B08 la 20 și 80 m, norii din SCL.
+
+**Relieful.** `harta_v6` și `harta_v9` citesc dalele DGT numite în `NIVELURI`
+(`scripts/comun/imprejurimi.mjs`), nu directorul: toate cele din catalog care ating amprenta
+filtrului. Una numită care lipsește oprește construcția; una de pe disc, nenumită, care
+atinge amprenta, la fel — altfel o dală adusă mai târziu ar schimba tăcut nodurile de pe
+margine (recenzia: `harta_v6` s-ar fi schimbat pe coloana de est, cu până la 1,07 m, la o
+simplă rescriere). De aceea `harta_v6` citește acum și coloana 107: cortul nodurilor de la
+x −93001 ajunge la x −92999; refăcută, diferă exact acolo. Pătratele de 1 km din cutie fără
+dală — 104164–104166, 105166, 108161, care nu există în catalog — trebuie să fie numai mare,
+iar martorul e masca de apă GLO-30: 0 noduri de uscat în ele. Fără garda asta, `harta_v9`
+construită fără 107165 pierdea ~1 km² de deal și toate probele treceau. Pe muchiile de nord
+și est ale lui alpha, dalele dau exact `harta_v4` (1,21 mm, sub o cuantă de 2,41 mm; mutate cu
+un pixel, 19,9 m); dalele 104xxx se sar, n-au uscat dincolo de alpha. `harta_v9`: filtrul cort
+pe 11 × 11 pixeli, cât doi pași; fiecare dală stă pe GLO-30 minus decalaj la 0,30–1,85 m
+(mediana pe nodurile plate; citite cu 1 km alături, 34,8 m). Patru dale au sub 50 de noduri
+plate și sunt scrise în sidecar NEVERIFICATE de proba asta: 105165, 106161, 106162, 108162
+(aceasta, numai faleză). `harta_v7` și `harta_v8`: GLO-30 se
+înregistrează pe alpha — abaterea mediană minimă, 0,161 m, e exact la (0, 0); cu solul
+mutat un pixel, minimul se mută cu el (0,154 față de 0,537 m) — și se coboară cu
+decalajul măsurat, **−0,778 m** (IQR −0,931 … −0,612), pe 632 de pixeli de sol gol
+măsurat (FLM = 2, NDVI < 0,15, pantă mică), cu DGT netezit la amprenta pixelului.
+Pe o bandă de 300 m (512 la `harta_v8`) se adaugă diferența față de nivelul
+dinăuntru, netezită pe 150 m, scăzută liniar la zero; numai unde amândouă au uscat.
+Diferența se ia cu aceeași regulă ca nodurile — la `harta_v8` media 8 × 8, nu un
+eșantion punctual, care o anula —, iar un nod de pe marginea găurii ia latura cea mai
+apropiată. Înainte de bandă, p90 |Δ| e 3,82 / 3,77 m la `harta_v7` față de `harta_v9` (N / E) și
+3,55 / 6,39 m la `harta_v8`. Gaura fiecărui nivel trebuie să fie cutia nodurilor nivelului
+dinăuntru de pe disc: o verifică și construcția, și pagina (`incarcaImprejurimi`).
+Apa: oceanul din masca WBM, lacurile și râurile numai sub 1 m — un lac de baraj e
+relief —, coborâtă la −8 m ca la alpha. Nodurile din adâncul găurii au cota apei, ca
+fișierul să se comprime. Pământul rămâne plat (~159 m de curbură la 45 km, sub ceață).
+
+**Cusătura** (`src/scene/cusatura.js`). Nodurile lui alpha merg pe ±1163 și ±1492, iar
+1163 e prim: niciun pas mai mare de 2 m nu le prinde pe amândouă marginile, deci o
+muchie comună ar avea joncțiuni în T și crăpături. Fiecare nivel se oprește pe primul
+dreptunghi al grilei lui care cuprinde STRICT gaura, iar între cele două margini se
+coase un fermoar: vârfurile ambelor bucle, în sensul acelor de ceasornic, ordonate
+după proiecția lor pe dreptunghiul dinăuntru. Pozițiile vin din aceleași formule ca
+plasele (`geometriaGrilei`, folosită și de `terrain.js`), deci coincid la bit;
+fâșia intră în plasa nivelului din afară, cu NDVI-ul vârfurilor.
+
+**Ceața.** Împrejurimile au un material al lor, pe Relief și pe Satelit: ceața
+scenei, cu legea ei liniară, dar pe culoarea cerului de pe azimutul fiecărui pixel,
+ca marea (`ceataCer` din `mare.js`, cu `lege: 'scena'`). Cu media orizontului,
+uscatul de la 24–50 km ieșea o fâșie gri-albicioasă, cu ΔE 7–9 față de cerul de
+deasupra (măsurat de recenzie). Lângă alpha, sub 5 km, ceața e zero în ambele legi.
+
+**Culoarea.** Relief: aceeași regulă, cu NDVI-ul fiecărui nivel. `harta_v6` îl ia din
+ortofoto, ca alpha (`npm run strat-ndvi -- harta_v6`, nivelul de 1 m în blocuri de
+4 × 4; proba de clase se sare, e a lui alpha); `harta_v9` tot din ortofoto, în
+`textura-imprejurimi`, pe blocuri de 12 × 12 la 1 m. `harta_v7` și `harta_v8`: din ortofoto
+unde acoperă, altfel din Sentinel, calibrat liniar pe ortofoto și verificat pe blocuri
+ținute deoparte — `NDVI_orto ≈ −0,171 + 0,834 · NDVI_S2`, R² 0,934 la `harta_v7`;
+`−0,165 + 0,815 ·`, R² 0,961 la `harta_v8`. Ortofotoul e mozaicul dalelor 464-3 și 464-1
+(`deschideMozaic`), X −96 000 … −88 000, Y −140 000 … −130 000. Cusătura dintre ele nu se
+vede: |Δ| de luminozitate peste ea 6,14 niveluri, pe o margine de bloc JPEG din aceeași dală
+6,36, iar diferența medie cu semn pe R/G/B/infraroșu −0,06 / 0,01 / 0,02 / 0,04. Controale:
+mutată 1 m, 10,92; cu +2 niveluri pe roșu sau cu R și B inversate, proba cu semn pică.
+Deplasarea pe sol (+0,25 m spre est) e măsurată pe 464-3 și presupusă și pe 464-1 — o
+optime de texel la 2 m. Satelit: ortofotoul unde acoperă (`harta_v6` și `harta_v9` întregi,
+din `harta_v7` până la ~5,5 km spre est și ~6,4 km spre nord de marginea lui alpha), altfel
+Sentinel-2 adus la ortofoto printr-o matrice 3 × 3 plus decalaj, în lumină liniară: ΔE_OK×100
+3,24 la 10 m (TCI citit ca sRGB; ca liniar 3,75) și 3,93 la 80 m (TCI liniar; ca sRGB 4,01),
+pe jumătatea de verificare, față de 8,77 / 17,85 fără transfer. Varianta se alege pe nivel.
+Uscatul pe texeli se citește din tot lanțul, cu nivelurile din afară la urmă: texelii de
+dincolo de ultimul nod ieșeau înainte apă adâncă, iar mipurile întunecau marginea (ΔL_OK×100
+−5,3 la mipul 1 pe marginea de nord a lui `harta_v9`, −7 la `harta_v7`). Unde nu e nicio
+culoare — la est de `harta_v7`, cadrul trece cu ~1 km de grilă, dincolo de ferestrele
+Sentinel aduse —, uscatul ia culoarea vecinului colorat (7 291 de texeli). Proba: pe fiecare
+latură, texelul de margine față de vecinul lui are |ΔL| cât între doi vecini dinăuntru
+(`harta_v9` 3,61 față de 3,85), și niciun texel de uscat nu are culoarea mării. Pe ultimii 300 m dinspre
+marginea ortofotoului, cele două se amestecă. Pe marginea datelor ortofotoului, media
+urmează regula texturii lui alpha (sub jumătate de pixeli valizi, numai pe ei; altfel
+pe toți), iar uscatul se citește întâi din nivelul dinăuntru. Apa se topește în apa
+adâncă a lui alpha. Proba cusăturii texturii: unde `harta_v6` și baza se suprapun,
+54 726 din 54 727 de texeli de uscat sunt identici cu nivelul de 2 m al bazei, iar
+abaterea maximă e un nivel; citită cu un texel alături, baza mai are 164 identici.
+Funcțiile comune ale texturilor (mipuri, KTX2, pierdere) stau în `scripts/comun/textura.mjs`;
+`textura-ortofoto` refăcut după mutare dă aceleași fișiere, la sha256.
+
+**Netezirea.** `harta_v9`, `harta_v7` și `harta_v8` nu au fațete plate (`NIVELURI_NETEZITE`):
+fațetele de 32 m se vedeau pe Relief, de la ~2 km, ca pete — fiecare cu lumina și
+culoarea ei —, iar autorul a cerut relieful netezit (2026-10-07); cele de 12 m ale lui
+`harta_v9`, văzute de la 0,4–2,4 km, la fel. `harta_v6` rămâne cu fațete, ca alpha. Normala e pe nod, din diferențe centrale pe grilă, pe 8 biți cu semn
+(`normal` normalizat, 3 octeți pe vârf: +1,4 MB); culoarea, tot pe nod, din aceeași
+regulă, cu panta normalei și NDVI-ul nodului, iar GPU-ul le interpolează peste triunghi.
+Un nod de apă ia media culorilor uscatului de pe cel mai apropiat inel de noduri din
+jurul lui: o fațetă de 32 m care coboară de la 10 m la −8 m iese din mare abia la 57% din
+drum, deci culoarea apei s-ar fi întins pe mal. În grilă ajunge inelul 1 — o celulă
+păstrată are un colț de uscat —; în fâșia de cusătură, un nod de pe marginea grilei lui
+poate avea uscatul abia la lățimea fâșiei, deci se caută până la `INELE_APA` = 8 pași
+(un pas al nivelului din afară). Recenzia găsise 4 vârfuri ale fâșiei `harta_v6` |
+`harta_v7` colorate cu regula pe nodul însuși, la −8 m, ca un mal deschis la culoare.
+Fâșia de cusătură e în plasa nivelului din afară, deci e netezită odată cu el;
+vârfurile ei iau normala și culoarea nodului lor din nivelul căruia îi aparține nodul
+(`campNeted` din `terrain.js`, prin `buclaNoduri`), deci între două niveluri netezite
+plasa continuă fără linie. Pe Satelit nu schimbă nimic: materialul e
+neiluminat.
+
+**În pagină** (`src/scene/imprejurimi.js`): totul sau nimic, la relief și la
+straturi; fără date, pagina rămâne cu marginile tăiate și un avertisment. Pe un GPU fără
+niciun format comprimat, unde KTX2 iese RGBA, împrejurimile de 2 m pe texel (`harta_v6`,
+`harta_v9`) pierd primul mip, ca peticul care folosește atunci textura bazei: ~67 MB pe
+placă în loc de ~103 <!-- NEVERIFICAT: calea RGBA, pe un GPU fără compresie -->.
+
+**Textura lui `harta_v9` vine în două trepte** (`IN_DOUA_TREPTE` din `satelit.js`,
+`TEXTURA_MICA` din `textura-imprejurimi`), la cererea autorului: să fie descărcată de la
+pornire și la detaliul întreg, dar fără să întârzie Satelit. Întâi `harta_v9-orto_v1-mic`,
+nivelurile de mip 1–4 ale celei întregi (4 m pe texel, aceeași cutie, 0,79 MB), odată cu
+restul; textura de 2 m (3,09 MB) se cere abia după ce Satelit e pe ecran și ia locul celei
+mici în același material — programul nu se schimbă. Satelit apare astfel după ~12,1 MB
+descărcați, nu după 14,4; totalul crește cu 0,79 MB. Din vederea de pornire banda e o fâșie
+la orizont, în spatele capului: ~1% din ecran pe desktop, 0,1% pe telefon. Schimbul, măsurat
+acolo în țintă fixă (ieșire sRGB, fără MSAA; diferența unui pixel e maximul pe canal), față de
+varianta de 8 m pe texel (0,20 MB) — nivelurile 2–4 ale celei întregi; nivelurile 1–4 sunt,
+octet cu octet, fișierul mic:
+
+| ținta | textura mică | diferă cu ceva | peste 2 niveluri | peste 8 | maximum |
+|---|---|---|---|---|---|
+| 1600 × 900 | 4 m | 0,89% | 3 526 | 205 | 43 |
+| 1600 × 900 | 8 m | 0,96% | 7 333 | 1 259 | 61 |
+| 3200 × 1800 | 4 m | 0,95% | 21 101 | 1 809 | 35 |
+| 3200 × 1800 | 8 m | 0,98% | 36 172 | 8 831 | 71 |
+
+Banda ocupă 0,99% din ecran, deci „diferă cu ceva” e aproape toată banda. La ~4 km un pixel
+are ~3,7 m: 8 m se vedeau mai moi. Cifrele de dinainte (107 peste 8 la 4 m, 4 433 peste 2 la
+8 m) amestecau praguri și măsurători; recenzia le-a prins. Fără
+compresie, unde cea întreagă ar ieși oricum la 4 m, a doua treaptă se sare.
+Încărcătorul KTX2 al primei trepte trece la a doua: workerii primei se opresc, iar a doua își
+face unul singur, din transcodorul deja adus (`workerPool`); cu un încărcător nou,
+transcodorul se cerea de două ori. `dispose()` anulează cererile în zbor ale ambelor trepte
+(un `AbortController` până la `fetch`), iar un fișier sosit nu se mai transcodează: înainte,
+o eliberare chiar la `gata` mai aducea și transcoda cei 3,1 MB. Textura fină își trece și ea
+sursele prin `laSursa`, pentru calea în care cea mică lipsește. Compresia n-ar fi
+ajutat: setarea UASTC e deja cea implicită, iar cu RDO mai tare fișierul scade cu 5% (2,93
+MB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MB, cu ΔE de șase ori mai mare.
+Cine revine nu le mai descarcă: serverul răspunde la ETag (verificat pe sebastians.life). În
+`?previzualizare` nu se încarcă. Satelit le comută materialele cu ale lui alpha, pe
+același program. `inaltimeRandata` din scenă — alpha unde e alpha, împrejurimile în
+rest — e cea pe care merg raza panoului punctului și ocluzia etichetei; măsurătorile
+rămân pe `inaltimeLa` al lui alpha.
+
+**Acasă** e vederea de pornire, `VEDERE_START`: de acolo pornește pagina, acolo duc
+busola (`acasa()`) și tasta Home. Rozeta poartă eticheta „Acasă — vederea de pornire”.
+
+**Probele.** `npm run verifica-imprejurimi`:
+- încărcătorul: un nivel lipsă, un nivel cusut de alt interior → `null`; un strat lipsă
+  → niciun strat (totul sau nimic);
+- alpha rămâne la 1 923 948 de triunghiuri;
+- **0 crăpături** pe 749 971 de muchii: fiecare muchie de uscat e a două triunghiuri, în
+  afara marginii exterioare a lui `harta_v8`, și niciuna a trei; control: `harta_v6`
+  fără fâșie are 2 640;
+- o gaură care nu e cutia nodurilor nivelului dinăuntru (a lui `harta_v7`, mutată un pas)
+  → `null`;
+- culoarea Relief peste cusături, pe tronsoane de-a lungul laturilor de nord și de est (de
+  64 m, sau un pas al nivelului din afară), FĂRĂ triunghiurile fâșiei: ele fac 82% din banda
+  de lângă gaură, iar vârfurile lor dinăuntru au culoarea nivelului dinăuntru. Benzile au
+  16 m la alpha, altfel două rânduri ale nivelului din afară, cel puțin 64 m: una mai lată
+  măsoară variația terenului, nu cusătura (v9 → v7: 5,59 pe 64 m, 8,28 pe 192 m, fără nicio
+  treaptă). Două probe: ΔE_OK×100 al medianelor — 1,63 / 5,49 / 5,47 / 7,77 (alpha → v6 →
+  v9 → v7 → v8), praguri 2,5 / 8 / 8 / 10 — și mediana diferenței CU SEMN pe L, a, b, o
+  treaptă de culoare de-a lungul cusăturii: azi |ΔL| ≤ 1,63, prag 2,5. Controale: fiecare
+  nivel colorat cu NDVI ± 0,10 pică, cu |ΔL| de cel puțin 3,17;
+- netezirea: `harta_v9`, `harta_v7` și `harta_v8` au normală pe vârf și `flatShading` fals,
+  `harta_v6` nu; în plasele netezite, cu fâșiile lor, fiecare poziție de vârf are o singură
+  normală și o singură culoare — 141 482 de poziții, dintre care 840 pe cusăturile dintre ele;
+  control: o buclă a lui `harta_v7` colorată fără NDVI dă 387 de poziții diferite;
+- câmpul nodurilor, recalculat în probă, nu importat (diferențe centrale, `culoareTeren`,
+  `ndviNod`, inelele apei): pe toate vârfurile — 412 145 la `harta_v9`, 226 415 la `harta_v7`,
+  192 548 la `harta_v8` —, 0 culori diferite și normala la cel mult 0,38° (prag 0,5°:
+  cuantizarea pe 8 biți dă cel mult ~0,39°), 0 normale nule; la fel bucla dinăuntru a fiecărei
+  fâșii, recalculată pe nivelul ei — 2 464 de vârfuri pe `harta_v6`, 1 087 pe `harta_v9`, 823
+  pe `harta_v7`. Niciun nod de apă folosit fără uscat la 8 pași (cu 3 ar fi rămas unul).
+  Controale, pe `harta_v9`: NDVI-ul nodului de alături dă 267 343 de culori diferite; bucla
+  dinăuntru a fâșiei citită din grila lui `harta_v9` în loc de a lui `harta_v6`, 2 329 —
+  greșeala, încercată de recenzie pe `harta_v7`, trecea de toate probele de dinainte;
+- formula față de geometrie: normala scrisă față de media fațetelor din jur, ponderată cu
+  aria, pe vârfurile de uscat cu panta de peste 2° (sub ea, pe terenul aproape plat al lui
+  `harta_v8`, orice normală aproape verticală ar trece): mediană 0,42° / 0,56° / 0,56°, p99
+  4,32° / 3,30° / 3,42° (`harta_v9` / `harta_v7` / `harta_v8`), prag 1°; control: normala
+  nodului de la est dă 2,10° / 2,52° / 2,10°;
+- bugetul: 600 000 de triunghiuri, 8 MB de fișiere, cu texturile mici ale primei trepte (azi
+  7,93); textura mică are cutia celei întregi, pasul dublu și sha256-ul din sidecar.
+
+În pagină (panoul Browser, țintă fixă 640 × 400): alpha cu și fără împrejurimi dă
+**0 pixeli diferiți** în afara pixelilor în care se văd împrejurimile — scoși dintr-o
+randare a lor în magenta neiluminat —, în patru vederi (acasă, sanctuarul, farul, de
+la 8 km), pe Relief și pe Satelit; control: împrejurimile desenate fără test de
+adâncime ies peste alpha în toate patru (376, 419, 48, 1 231 de pixeli, pe Relief).
+Relief iese la octet după zece comutări Satelit; programele și texturile nu cresc;
+după `dispose()`, 0 geometrii și numai `DFG_LUT`; în repaus, 0 cadre.
+
+**Banda DGT, `harta_v9`** (2026-10-07). Textura de 16 m a lui `harta_v7` se vedea ca o
+trecere de la 2 m, la ~400 m dincolo de alpha; acum trecerea e la ~2,4 km. Autorul a adus din
+catalogul CDD (`MDT-2m`, câte 1 001 129 de octeți, sufixul `-06-2024`, versiunea 01;
+verificate pe API-ul STAC public al CDD, `https://cdd.dgterritorio.gov.pt/dgt-be/v1`) 14 dale:
+105165, 106165, 106166, 107161–107166, 108162–108166, plus ortofotoul
+`ortos2025_cog_25cm_rgbi_jpg_464-1_v02.tif` (464-1, colțul NV la (−96 000; −130 000);
+sferturile foii sunt 1 = NV, 2 = NE, 3 = SV, 4 = SE, câte 8 × 5 km). Celelalte patru pătrate
+din dreptunghi — 104165, 104166, 105166, 108161 — nu există în catalog. La 4 m, ca
+`harta_v6`, banda ar fi costat ~1,4 milioane de triunghiuri; la 12 m costă 138 203, iar
+pașii cresc 4 → 12 → 32 m. `harta_v7` s-a refăcut cu gaura mărită (`--suprascrie-lucru`,
+nefiind încă publicată); `harta_v8` a ieșit identică la octet. Pe Satelit se vede de departe
+o pată închisă pe malul de nord, la (−92 978; −134 120): o faleză spre vest, în umbră pe
+fotografia de dimineață — relieful DGT o prinde abruptă, Copernicus o netezea; fotografia
+rămâne, ca la falezele lui alpha.
 
 ## Vederea Satelit
 
@@ -1272,7 +1569,10 @@ La calcar, vegetație uscată și tufăriș e fals — vezi nota din `paleta-ter
 ### Ortofotoul, și de ce nu înlocuiește fotografiile
 
 `ORTOS-2025` de la DGT, dala `ORTOS-2025-cog-25cm-464-3` (283 MB, în
-`date-sursa/ortofoto/`, deci în afara depozitului). **BigTIFF**, nu TIFF clasic:
+`date-sursa/ortofoto/`, deci în afara depozitului). Lângă ea stă, din 2026-10-07, și
+464-1, dala de la nord (335 MB), pentru împrejurimi; scripturile lui alpha numesc dala
+lor (`ORTOFOTO_ALPHA` din `scripts/comun/ortofoto.mjs`), nu iau „primul .tif din
+director” — alfabetic, 464-1 vine înaintea lui 464-3, iar `verifica-teren` chiar a picat. **BigTIFF**, nu TIFF clasic:
 magic 43, numărul de intrări dintr-un IFD pe 8 octeți, intrări de 20 de octeți,
 valori inline până în 8 octeți. `citesteIfd(..., big)` din `scripts/comun/tiff.mjs`
 tratează ambele.
@@ -1283,8 +1583,12 @@ Território”. Îl scrie `scrieSurse()` din `src/main.js`, o singură dată, cu
 `lang="pt"`, ori de câte ori subsolul are o sursă DGT. Sidecarurile publicate nu
 s-au rescris pentru asta.
 
-În pagină rămâne un singur rând, fără fundal, sus-stânga: „© DGT · ©
-OpenStreetMap”. Se citește prin contur: opt umbre de 1–1,5 px fără estompare
+În pagină rămâne un singur rând, fără fundal, sus-stânga: „© DGT · © Copernicus ·
+© OpenStreetMap”. Copernicus vine cu împrejurimile — relieful GLO-30 și Sentinel-2;
+o sursă își poate scrie singură numele scurt (`scurt`), iar două surse cu același
+nume scurt apar o dată. Licențele fără adresă cunoscută iau `licenta_url` din sursă,
+iar clauza de răspundere a licenței Copernicus DEM (`raspundere`) intră în modală
+lângă atribuiri. Se citește prin contur: opt umbre de 1–1,5 px fără estompare
 desenează în jurul literelor un inel plin din culoarea fundalului, deci contrastul e
 al lui `--ink` pe `--bg`, peste 14:1. Numai cu umbre estompate, recenzia măsurase pe
 cerul de pornire, pe tema întunecată, mediana 3,47:1. Inelul de focus al rândului e

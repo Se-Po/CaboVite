@@ -1,8 +1,8 @@
 // Busola: o rozetă fixă în colțul paginii, cu acul spre nordul ADEVĂRAT.
 //
 // Trei lucruri face: arată unde e nordul, spune în cifre dinspre ce direcție
-// privești, și la clic cere scenei să readucă vederea de pornire. Zborul acela e
-// al lui zbor.js; busola doar îl pornește.
+// privești, și la clic cere scenei să te ducă acasă — la vederea de pornire.
+// Zborul acela e al lui zbor.js; busola doar îl pornește, prin `acasa()` din scenă.
 //
 // ─────────────────────────────────────────────────────────────────── nordul
 //
@@ -138,8 +138,8 @@ const ROZETA = `
  * @param {HTMLElement} o.gazda — unde se agață elementul
  * @param {object} o.controale — OrbitControls; de la ele vine unghiul și `change`
  * @param {object} [o.colturi] — `colturi_geo` din sidecarul hărții de BAZĂ
- * @param {() => void} [o.laClic] — clicul pe rozetă; scena readuce atunci
- *   vederea de pornire
+ * @param {() => void} [o.laClic] — clicul pe rozetă; scena te duce atunci acasă,
+ *   la vederea de pornire
  * @returns {{dispose, convergenta, azimutNordAdevarat}|null}
  *   null dacă nordul adevărat nu se poate afla din date.
  */
@@ -174,10 +174,10 @@ export function creeazaBusola({ gazda, controale, colturi, laClic }) {
 
   // Eticheta spune ce face clicul. Se pune cu setAttribute, ca innerHTML de mai
   // sus să rămână numai literaluri.
-  buton.setAttribute('aria-label', 'Readu camera la vederea de pornire');
+  buton.setAttribute('aria-label', 'Acasă — vederea de pornire');
   buton.setAttribute('title',
     'Dinspre ce direcție privești, față de nordul adevărat.'
-    + ' Apasă ca să revii la vederea de pornire.');
+    + ' Apasă (sau tasta Home) ca să revii acasă, la vederea de pornire.');
 
   gazda.appendChild(radacina);
 

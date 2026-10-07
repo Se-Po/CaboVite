@@ -31,8 +31,17 @@ const UNIFORME_CER = ['sunPosition', 'rayleigh', 'turbidity', 'mieCoefficient', 
  * Un material fără tone mapping (marea fotografiată a vederii Satelit) n-are
  * funcția AgX în shader; atunci se include de mână — culoarea cerului trebuie să
  * treacă prin ea, altfel ceața n-ar mai avea culoarea cerului de deasupra.
+ *
+ * `lege: 'scena'` păstrează legea ceții scenei — liniară, smoothstep între
+ * `fogNear` și `fogFar` — și schimbă numai culoarea. O folosesc împrejurimile: uscatul
+ * de la 24–48 km se topește atunci în cerul de pe azimutul lui, ca marea de lângă el,
+ * nu într-o singură culoare medie. Lângă alpha, sub 5 km, ceața e zero în ambele
+ * legi, deci cusătura nu se mută.
  */
-export function ceataCer(sh, cer) {
+export function ceataCer(sh, cer, { lege = 'mare' } = {}) {
+  const factor = lege === 'scena'
+    ? 'float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );'
+    : `float fogFactor = 1.0 - exp( - vFogDepth / ${LUNGIME_CEATA_MARE.toFixed(1)} );`;
   for (const k of UNIFORME_CER) sh.uniforms[k] = cer.uniforme[k];
   sh.vertexShader = sh.vertexShader
     .replace('void main() {', 'varying vec3 vPozLume;\nvoid main() {')
@@ -45,7 +54,7 @@ export function ceataCer(sh, cer) {
 ${GLSL_CER}
 void main() {`)
     .replace('#include <fog_fragment>', `#ifdef USE_FOG
-	float fogFactor = 1.0 - exp( - vFogDepth / ${LUNGIME_CEATA_MARE.toFixed(1)} );
+	${factor}
 	vec3 dirCer = vPozLume - cameraPosition;
 	dirCer = normalize( vec3( dirCer.x, 0.0, dirCer.z ) );
 	vec3 culCeata = AgXToneMapping( culoareCer( dirCer ) );

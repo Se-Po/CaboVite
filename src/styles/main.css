@@ -58,7 +58,7 @@ html, body {
 #continut > * { pointer-events: auto; }
 
 /* Atribuirea datelor: un singur rând, fără fundal, în colțul de sus-stânga —
-   „© DGT · © OpenStreetMap". Regulile OSM cer ca atribuirea să se vadă fără
+   „© DGT · © Copernicus · © OpenStreetMap". Regulile OSM cer ca atribuirea să se vadă fără
    interacțiune, iar colțul hărții e locul lor obișnuit; jos stau Satelit și
    panoul punctului. Tot restul stă în modală (`.surse-modala`, mai jos).
 

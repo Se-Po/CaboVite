@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { GRI_REZERVA, SPRE_LINIAR, culoareTeren, paletaCurenta } from './palette.js';
+import { geometriaGrilei } from './cusatura.js';
 
-// Terenul: din grila de înălțimi într-un singur mesh cu fațete plate.
+// Terenul: din grila de înălțimi într-un singur mesh cu fațete plate (sau netezit,
+// la nivelurile de la 12 m încolo ale împrejurimilor — vezi `campNeted`).
 //
 // Funcție pură — primește datele, întoarce mesh-ul. Nu încarcă nimic și nu atinge
 // rendererul, ca să rămână limpede cine cere randarea și cine tratează erorile.
@@ -51,6 +53,11 @@ let avertizat = false;
 // scria codul dinainte, e 0,0005–0,0011 dintr-un nivel de afișare din 255.
 const CUANTA = 65535;
 
+// Cât de departe caută un nod de apă din fâșia de cusătură uscatul de la care își ia
+// culoarea, în pași ai grilei lui: cât lățimea fâșiei, un pas al nivelului din afară,
+// adică 8 pași ai celui dinăuntru (4 → 32 m, 32 → 256 m).
+export const INELE_APA = 8;
+
 function culoareFateta(panta, altitudine, paleta, ndvi, culoare) {
   const c = culoare(panta, altitudine, paleta, ndvi);
   // `Math.floor`, ca `Color.setHex`: o culoare cu parte zecimală n-ar trebui să
@@ -61,6 +68,123 @@ function culoareFateta(panta, altitudine, paleta, ndvi, culoare) {
     console.warn(`regula de culoare a întors ${c}, nu o culoare — folosesc gri de rezervă.`);
   }
   return GRI_REZERVA;
+}
+
+/**
+ * Normala și culoarea fiecărui nod, pentru plasele NETEZITE — nivelurile de la 12 m
+ * încolo ale împrejurimilor (`NIVELURI_NETEZITE`). Restul hărții are fațete plate; vezi
+ * `neted` la creeazaTeren().
+ *
+ * Normala vine din diferențe centrale pe grilă (la margine, de o parte), deci nu
+ * depinde de ce celule păstrează plasa și nici de diagonala aleasă. Culoarea, din
+ * aceeași regulă ca fațetele, cu panta normalei și NDVI-ul nodului; un nod fără NDVI
+ * ia calea fără strat, ca o fațetă fără niciun nod cu valoare.
+ *
+ * Un nod de APĂ ia media culorilor uscatului celui mai apropiat (vezi `scrieApa`).
+ * Stă sub planul mării, dar culoarea lui se întinde pe partea vizibilă a
+ * triunghiurilor de la mal: o fațetă de 32 m care coboară de la 10 m la −8 m iese din
+ * mare abia la 57% din drum, deci acolo ar fi avut mai mult din culoarea apei decât a
+ * uscatului.
+ *
+ * Valorile se dau deja cuantizate — normala pe 8 biți cu semn, culoarea pe 16 —, iar
+ * calea leneșă (`nod`, pentru buclele cusăturii) și cea completă (`tot`, pentru
+ * plasă) dau aceleași numere pe orice nod pe care îl folosește plasa: fâșia de
+ * cusătură și plasa au aceleași vârfuri, deci aceeași normală și aceeași culoare în
+ * ele, la bit. Altfel s-ar vedea o linie.
+ */
+export function campNeted(relief, { paleta, ndvi, culoare } = {}) {
+  const { latime: w, inaltime: h, pasX, pasZ } = relief;
+  const Y = relief.inaltimi;
+  const cotaApa = relief.meta?.zMin_m;
+  const apa = (i) => Number.isFinite(cotaApa) && Y[i] <= cotaApa;
+  const pal = paleta ?? paletaCurenta();
+  const regula = culoare ?? culoareTeren;
+  const coduri = ndvi?.coduri ?? null, niveluri = ndvi?.niveluri ?? null;
+  const n = [0, 0, 0];
+
+  /** Normala nodului, unitară, în virgulă mobilă. */
+  const normala = (r, c) => {
+    const c0 = c > 0 ? c - 1 : c, c1 = c < w - 1 ? c + 1 : c;
+    const r0 = r > 0 ? r - 1 : r, r1 = r < h - 1 ? r + 1 : r;
+    // z crește spre sud, odată cu rândul; suprafața y = f(x, z) are normala (−fx, 1, −fz).
+    const gx = (Y[r * w + c1] - Y[r * w + c0]) / ((c1 - c0) * pasX);
+    const gz = (Y[r1 * w + c] - Y[r0 * w + c]) / ((r1 - r0) * pasZ);
+    const l = Math.hypot(gx, 1, gz);
+    n[0] = -gx / l; n[1] = 1 / l; n[2] = -gz / l;
+    return n;
+  };
+  const scrieNormala = (r, c, out, k) => {
+    const v = normala(r, c);
+    out[k] = Math.round(v[0] * 127); out[k + 1] = Math.round(v[1] * 127); out[k + 2] = Math.round(v[2] * 127);
+  };
+  /** Culoarea unui nod de uscat, ca trei valori liniare pe 16 biți. */
+  const scrieUscat = (r, c, out, k) => {
+    const i = r * w + c;
+    const v = normala(r, c);
+    let nd;
+    if (coduri) { const q = niveluri[(coduri[i >> 1] >> ((i & 1) << 2)) & 15]; nd = q === q ? q : undefined; }
+    const hex = culoareFateta(1 - Math.abs(v[1]), Y[i], pal, nd, regula);
+    out[k] = Math.round(SPRE_LINIAR[(hex >> 16) & 255] * CUANTA);
+    out[k + 1] = Math.round(SPRE_LINIAR[(hex >> 8) & 255] * CUANTA);
+    out[k + 2] = Math.round(SPRE_LINIAR[hex & 255] * CUANTA);
+  };
+  /**
+   * Culoarea unui nod de apă: media nodurilor de uscat de pe cel mai apropiat inel din
+   * jurul lui (inelul 1 sunt cei opt vecini, inelul 2 următorii 16, până la `inele`);
+   * `uscat(r, c, out, k)` dă culoarea lor. Întoarce false dacă n-a găsit uscat.
+   *
+   * Un nod de apă dintr-o celulă păstrată are mereu uscat pe inelul 1: celula are un
+   * colț de uscat, iar colțurile unei celule sunt vecine între ele. Inelele mai largi
+   * sunt pentru fâșia de cusătură, unde un nod de pe marginea grilei lui poate să nu
+   * aibă uscat în jur, dar să stea într-un triunghi care urcă la uscatul celuilalt nivel
+   * și iese din mare pe jumătate. Recenzia l-a găsit pe marginea de est a lui harta_v6:
+   * 4 vârfuri, colorate înainte cu regula pe nodul însuși, la −8 m, ca un mal deschis la
+   * culoare, cu ΔE ~10 față de uscatul de lângă.
+   */
+  const scrieApa = (r, c, out, k, uscat, inele) => {
+    const t = [0, 0, 0], s = [0, 0, 0];
+    for (let inel = 1; inel <= inele; inel++) {
+      let m = 0;
+      for (let dr = -inel; dr <= inel; dr++) for (let dc = -inel; dc <= inel; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== inel) continue;
+        const rr = r + dr, cc = c + dc;
+        if (rr < 0 || rr >= h || cc < 0 || cc >= w || apa(rr * w + cc)) continue;
+        uscat(rr, cc, t, 0);
+        s[0] += t[0]; s[1] += t[1]; s[2] += t[2]; m++;
+      }
+      if (m) { out[k] = Math.round(s[0] / m); out[k + 1] = Math.round(s[1] / m); out[k + 2] = Math.round(s[2] / m); return true; }
+    }
+    return false;
+  };
+
+  return {
+    /** Un nod: `{nrm, rgb}`, gata cuantizate. */
+    nod(r, c) {
+      const nrm = new Int8Array(3), rgb = new Uint16Array(3);
+      scrieNormala(r, c, nrm, 0);
+      // Niciun uscat nici la lățimea fâșiei: nodul stă în larg; ia regula, pe el însuși.
+      if (!apa(r * w + c)) scrieUscat(r, c, rgb, 0);
+      else if (!scrieApa(r, c, rgb, 0, scrieUscat, INELE_APA)) scrieUscat(r, c, rgb, 0);
+      return { nrm, rgb };
+    },
+    /**
+     * Toate nodurile pe care le poate folosi grila, trei valori pe nod. Uscatul întâi: apa
+     * ia media lui. Un nod de apă fără uscat pe inelul 1 n-ajunge în nicio celulă păstrată,
+     * deci rămâne cu zero — altfel marea întreagă și-ar căuta uscatul pe opt inele.
+     */
+    tot() {
+      const normale = new Int8Array(w * h * 3), culori = new Uint16Array(w * h * 3);
+      for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+        const i = r * w + c;
+        scrieNormala(r, c, normale, i * 3);
+        if (!apa(i)) scrieUscat(r, c, culori, i * 3);
+      }
+      const dinTablou = (rr, cc, out, k) => { const j = (rr * w + cc) * 3; out[k] = culori[j]; out[k + 1] = culori[j + 1]; out[k + 2] = culori[j + 2]; };
+      for (let r = 0; r < h; r++) for (let c = 0; c < w; c++)
+        if (apa(r * w + c)) scrieApa(r, c, culori, (r * w + c) * 3, dinTablou, 1);
+      return { normale, culori };
+    },
+  };
 }
 
 /**
@@ -128,7 +252,8 @@ export function mascaBazei(relief, reliefPetic) {
  * @param {{material?: THREE.Material, pastreaza?: (x: number, z: number) => boolean,
  *          deplasare?: {x: number, z: number}, paleta?: object,
  *          ndvi?: {coduri: Uint8Array, niveluri: Float64Array} | null,
- *          culoare?: Function}} optiuni
+ *          culoare?: Function,
+ *          cusatura?: {varfuri: Float32Array, ndvi: Float32Array, triunghiuri: Uint32Array}}} optiuni
  *   `pastreaza` primește centrul unei celule, în metri de scenă, și decide dacă
  *   ea intră în plasă. Așa capătă harta forma conturului cu care a fost extrasă
  *   (`poligon_scena` din sidecar) și așa se taie gaura de sub petic: celulele
@@ -138,6 +263,12 @@ export function mascaBazei(relief, reliefPetic) {
  *   regula de culoare primește `undefined` și merge pe calea fără strat.
  *   `culoare` înlocuiește regula — pentru previzualizarea datelor și pentru
  *   unealta care verifică ce primește regula. Implicit e culoareTeren().
+ *   `cusatura` adaugă fâșia care coase grila de nivelul dinăuntru (cusatura.js,
+ *   `fermoar`): triunghiuri gata făcute, colorate după aceeași regulă, cu NDVI-ul
+ *   din vârfurile lor.
+ *   `neted` face plasa NETEZITĂ în loc de fațete plate: normală și culoare pe nod
+ *   (`campNeted`), interpolate de GPU peste triunghi. Fâșia de cusătură trebuie
+ *   atunci să le aducă și ea, pe fiecare vârf (`normale`, `culori`).
  */
 export function creeazaTeren(relief, optiuni = {}) {
   const { latime: w, inaltime: h, pasX, pasZ } = relief;
@@ -157,9 +288,11 @@ export function creeazaTeren(relief, optiuni = {}) {
   // mijlocul scenei în loc de locul lui de pe hartă. Se calculează din diferența
   // dintre colțurile TM06 ale celor două seturi de date, deci e exactă, nu
   // potrivită din ochi.
-  const dep = optiuni.deplasare ?? { x: 0, z: 0 };
-  const X = (c) => (c - (w - 1) / 2) * pasX + dep.x;
-  const Z = (r) => (r - (h - 1) / 2) * pasZ + dep.z;
+  //
+  // Formulele stau în cusatura.js (`geometriaGrilei`), nu aici: fâșia care coase un
+  // nivel de altul își scrie vârfurile din ele, iar vârfurile acelea trebuie să cadă
+  // la bit pe ale plaselor.
+  const { X, Z, dep } = geometriaGrilei(relief, optiuni.deplasare);
   const Y = (r, c) => grila[r * w + c];
 
   // Paleta se primește, nu se ia singură din modul. Culorile se coc o singură
@@ -234,14 +367,25 @@ export function creeazaTeren(relief, optiuni = {}) {
   // altfel ar sta în contextul închiderilor lângă `inaltimeLa` și `dispose`, iar
   // după dispose() cei ~73 MB ai ambelor plase ar rămâne în RAM cât trăiește
   // `globalThis.__scena`. Aceeași capcană ca la `grila` și la strat.
-  let pozitii = new Float32Array(nrCelule * 2 * 9);
-  let culori = new Uint16Array(nrCelule * 2 * 9);
+  const cus = optiuni.cusatura ?? null;
+  const nrCusatura = cus ? cus.triunghiuri.length / 3 : 0;
+  const neted = !!optiuni.neted;
+  if (neted && cus && !(cus.normale && cus.culori))
+    throw new Error('plasă netezită cu o fâșie de cusătură fără normale și culori pe vârfuri');
+  let pozitii = new Float32Array((nrCelule * 2 + nrCusatura) * 9);
+  let culori = new Uint16Array((nrCelule * 2 + nrCusatura) * 9);
+  // Normala pe 8 biți cu semn, normalizați: 3 octeți pe vârf. Pentru lumina difuză
+  // ajunge — eroarea de unghi e sub 0,5°, iar GPU-ul o interpolează și o normalizează.
+  let normale = neted ? new Int8Array((nrCelule * 2 + nrCusatura) * 9) : null;
+  // Câmpul nodurilor, numai pentru o plasă netezită; golit după buclă, ca stratul.
+  let campN = null, campC = null;
+  if (neted) ({ normale: campN, culori: campC } = campNeted(relief, { paleta, ndvi: optiuni.ndvi, culoare }).tot());
 
   let p = 0;
   let yMin = Infinity, yMax = -Infinity;
   const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
 
-  const scrieTriunghi = (a, b, c, ia, ib, ic) => {
+  const scrieTriunghi = (a, b, c, ndviT) => {
     // Normala fațetei se calculează, dar NU se scrie nicăieri: îi trebuie doar
     // pantei, de unde iese culoarea. Vezi nota despre `flatShading` de mai jos.
     ab.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
@@ -250,7 +394,7 @@ export function creeazaTeren(relief, optiuni = {}) {
 
     const panta = 1 - Math.abs(n.y);
     const alt = (a[1] + b[1] + c[1]) / 3;
-    const hex = culoareFateta(panta, alt, paleta, ndviFateta(ia, ib, ic), culoare);
+    const hex = culoareFateta(panta, alt, paleta, ndviT, culoare);
     const cr = Math.round(SPRE_LINIAR[(hex >> 16) & 255] * CUANTA);
     const cg = Math.round(SPRE_LINIAR[(hex >> 8) & 255] * CUANTA);
     const cb = Math.round(SPRE_LINIAR[hex & 255] * CUANTA);
@@ -262,6 +406,20 @@ export function creeazaTeren(relief, optiuni = {}) {
       if (v[1] < yMin) yMin = v[1];
       if (v[1] > yMax) yMax = v[1];
     }
+  };
+
+  // Un vârf al plasei netezite: normala și culoarea vin din tablourile N și C, la
+  // indicele `i` — nodul grilei sau vârful fâșiei.
+  const scrieVarfNeted = (v, i, N, C) => {
+    pozitii[p] = v[0]; pozitii[p + 1] = v[1]; pozitii[p + 2] = v[2];
+    culori[p] = C[i * 3]; culori[p + 1] = C[i * 3 + 1]; culori[p + 2] = C[i * 3 + 2];
+    normale[p] = N[i * 3]; normale[p + 1] = N[i * 3 + 1]; normale[p + 2] = N[i * 3 + 2];
+    p += 3;
+    if (v[1] < yMin) yMin = v[1];
+    if (v[1] > yMax) yMax = v[1];
+  };
+  const scrieNeted = (a, b, c, ia, ib, ic, N, C) => {
+    scrieVarfNeted(a, ia, N, C); scrieVarfNeted(b, ib, N, C); scrieVarfNeted(c, ic, N, C);
   };
 
   for (let r = 0; r < h - 1; r++) {
@@ -278,16 +436,41 @@ export function creeazaTeren(relief, optiuni = {}) {
       // diagonală fixă ar tăia linia peretelui în zigzag și ar înclina o fațetă
       // peste treaptă, întinzând-o.
       if (Math.abs(A[1] - D[1]) <= Math.abs(B[1] - C[1])) {
-        scrieTriunghi(A, C, D, iA, iC, iD);
-        scrieTriunghi(A, D, B, iA, iD, iB);
+        if (neted) { scrieNeted(A, C, D, iA, iC, iD, campN, campC); scrieNeted(A, D, B, iA, iD, iB, campN, campC); continue; }
+        scrieTriunghi(A, C, D, ndviFateta(iA, iC, iD));
+        scrieTriunghi(A, D, B, ndviFateta(iA, iD, iB));
       } else {
-        scrieTriunghi(A, C, B, iA, iC, iB);
-        scrieTriunghi(C, D, B, iC, iD, iB);
+        if (neted) { scrieNeted(A, C, B, iA, iC, iB, campN, campC); scrieNeted(C, D, B, iC, iD, iB, campN, campC); continue; }
+        scrieTriunghi(A, C, B, ndviFateta(iA, iC, iB));
+        scrieTriunghi(C, D, B, ndviFateta(iC, iD, iB));
       }
     }
   }
   coduri = null;
   niveluri = null;
+  campN = null;
+  campC = null;
+
+  // Fâșia de cusătură, dacă a venit: aceleași fațete plate, aceeași regulă de
+  // culoare; NDVI-ul fațetei e media vârfurilor care au valoare, ca la grilă.
+  let xCusMin = Infinity, xCusMax = -Infinity, zCusMin = Infinity, zCusMax = -Infinity;
+  if (cus) {
+    const v = cus.varfuri, t = cus.triunghiuri, nd = cus.ndvi;
+    const P = (k) => [v[k * 3], v[k * 3 + 1], v[k * 3 + 2]];
+    for (let k = 0; k < t.length; k += 3) {
+      const a = t[k], b = t[k + 1], c = t[k + 2];
+      if (neted) { scrieNeted(P(a), P(b), P(c), a, b, c, cus.normale, cus.culori); continue; }
+      let s = 0, m = 0;
+      for (const q of [a, b, c]) if (nd[q] === nd[q]) { s += nd[q]; m++; }
+      scrieTriunghi(P(a), P(b), P(c), m ? s / m : undefined);
+    }
+    for (let k = 0; k < v.length; k += 3) {
+      if (v[k] < xCusMin) xCusMin = v[k];
+      if (v[k] > xCusMax) xCusMax = v[k];
+      if (v[k + 2] < zCusMin) zCusMin = v[k + 2];
+      if (v[k + 2] > zCusMax) zCusMax = v[k + 2];
+    }
+  }
 
   const nrTriunghiuri = p / 9;
   const geometrie = new THREE.BufferGeometry();
@@ -295,10 +478,12 @@ export function creeazaTeren(relief, optiuni = {}) {
   // Al treilea argument e `normalized`: GL împarte el însuși la 65535, deci în
   // shader ajung tot valori în [0, 1], exact ca înainte.
   geometrie.setAttribute('color', new THREE.BufferAttribute(culori, 3, true));
+  if (neted) geometrie.setAttribute('normal', new THREE.BufferAttribute(normale, 3, true));
   pozitii = null;
   culori = null;
+  normale = null;
 
-  // NU există atribut `normal`, și nu e o scăpare.
+  // NU există atribut `normal` — cu o excepție, plasele netezite (`neted`).
   //
   // Cu `flatShading: true`, shaderul lui r186 nu-l citește: sub `FLAT_SHADED`
   // varianta `vNormal` nici nu se declară, iar `normal_fragment_begin` calculează
@@ -315,6 +500,11 @@ export function creeazaTeren(relief, optiuni = {}) {
   // Prețul, ca să fie spus: normala se calculează acum pe fragment, nu pe vârf.
   // Aici nu se simte — terenul e opac, desenat o dată, cu randare la cerere —
   // dar pe o scenă cu multă suprapunere ar fi altă socoteală.
+  //
+  // Excepția: nivelurile netezite ale împrejurimilor (`NIVELURI_NETEZITE`), cu fațete de
+  // 12, 32 și 256 m. Plate, de la ~2 km se vedeau ca pete — fiecare fațetă cu lumina și
+  // culoarea ei —, iar autorul a cerut relieful netezit. Acolo normala e pe nod
+  // (`campNeted`), iar materialul are `flatShading: false`.
 
   // Sfera de încadrare se SCRIE, nu se calculează.
   //
@@ -324,10 +514,11 @@ export function creeazaTeren(relief, optiuni = {}) {
   // care e activă implicit, deci n-am fi economisit nimic, doar am fi mutat
   // costul în primul cadru. O punem noi, dintr-o cutie care cuprinde sigur tot
   // ce s-a scris.
-  if (nrCelule > 0) {
+  if (nrCelule > 0 || nrCusatura > 0) {
+    // Cutia celulelor, unită cu a fâșiei de cusătură.
     geometrie.boundingBox = new THREE.Box3(
-      new THREE.Vector3(X(cMin), yMin, Z(rMin)),
-      new THREE.Vector3(X(cMax + 1), yMax, Z(rMax + 1)),
+      new THREE.Vector3(Math.min(nrCelule ? X(cMin) : Infinity, xCusMin), yMin, Math.min(nrCelule ? Z(rMin) : Infinity, zCusMin)),
+      new THREE.Vector3(Math.max(nrCelule ? X(cMax + 1) : -Infinity, xCusMax), yMax, Math.max(nrCelule ? Z(rMax + 1) : -Infinity, zCusMax)),
     );
     geometrie.boundingSphere = geometrie.boundingBox.getBoundingSphere(new THREE.Sphere());
   } else {
@@ -338,7 +529,7 @@ export function creeazaTeren(relief, optiuni = {}) {
   const materialPropriu = !optiuni.material;
   const material =
     optiuni.material ??
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: true });
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: !neted });
 
   const obiect = new THREE.Mesh(geometrie, material);
   obiect.name = 'teren';
@@ -376,6 +567,7 @@ export function creeazaTeren(relief, optiuni = {}) {
       // găsi atributele ca să le elibereze bufferele.
       geometrie.deleteAttribute('position');
       geometrie.deleteAttribute('color');
+      if (neted) geometrie.deleteAttribute('normal');
       // Materialul se eliberează doar dacă l-am făcut noi; dacă a fost injectat,
       // e al apelantului. Fără texturi aici — culorile sunt pe vertecși.
       if (materialPropriu) material.dispose();

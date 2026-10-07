@@ -14,8 +14,9 @@ import { Sky } from 'three/addons/objects/Sky.js';
 //   rămâne la fel de luminoasă ca înainte de cerul Preetham.
 // - Ceața. Ceața three are o singură culoare, iar cerul nu. Marea, care ajunge
 //   până la orizont, primește deci ceața pixel cu pixel, cu culoarea cerului pe
-//   aceeași direcție (`GLSL_CER`, folosit de mare.js); restul scenei, care stă sub
-//   5 km, primește culoarea medie a orizontului.
+//   aceeași direcție (`GLSL_CER`, folosit de mare.js). La fel împrejurimile, care
+//   merg până la 50 km, dar cu legea liniară a scenei. Alpha, care stă sub 5 km,
+//   primește culoarea medie a orizontului.
 //
 // Culoarea cerului se calculează și în JS (`cerLiniar`, `agx`), cu exact aceleași
 // formule ca shaderul: așa se află expunerea și media orizontului fără să citim

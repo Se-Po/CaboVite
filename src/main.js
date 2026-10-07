@@ -17,7 +17,7 @@ const subsol = document.querySelector('#surse');
  * WebGL, pagina nu arată nimic din ele și n-are ce atribui.
  *
  * În pagină rămâne un singur rând, fără fundal, în colțul de sus-stânga:
- * „© DGT · © OpenStreetMap". E cât cer regulile OSM (OSMF, Attribution
+ * „© DGT · © Copernicus · © OpenStreetMap". E cât cer regulile OSM (OSMF, Attribution
  * Guidelines): atribuirea se vede fără niciun clic, iar „© OpenStreetMap" duce la
  * pagina lor de copyright. Tot restul — textul cerut de SNIG, atribuțiile
  * întregi, licențele, ce s-a prelucrat — stă într-o modală deschisă din „© DGT".
@@ -50,7 +50,10 @@ const el = (tag, text) => { const e = document.createElement(tag); if (text) e.t
 // Numele scurt al unui producător, pentru rândul vizibil: acronimul dintre
 // paranteze („Direção-Geral do Território (DGT)" → „DGT"), „OpenStreetMap" pentru
 // contribuitorii lui, altfel numele întreg.
-const numeScurt = (p) => p.match(/\(([^)]+)\)\s*$/)?.[1] ?? (/OpenStreetMap/.test(p) ? 'OpenStreetMap' : p);
+// Dacă sursa își scrie singură numele scurt (`scurt` — Copernicus, al cărui producător
+// e o frază întreagă), acela câștigă.
+const numeScurt = (p, surse = []) => surse.find((s) => s.producator === p && s.scurt)?.scurt
+  ?? p.match(/\(([^)]+)\)\s*$/)?.[1] ?? (/OpenStreetMap/.test(p) ? 'OpenStreetMap' : p);
 
 /**
  * Rândul și modala se fac o singură dată. Scrierile de după — sursa Satelit
@@ -114,8 +117,10 @@ function scrieSurse(surse) {
   // sursă are portalul acolo. Ceilalți producători sunt butonul care deschide modala.
   const portalOsm = (p) => surse.find((s) => s.producator === p && /openstreetmap\.org\/copyright/.test(s.portal ?? ''))?.portal;
   const producatori = unice('producator');
-  const altii = producatori.filter((p) => !portalOsm(p)).map((p) => `© ${numeScurt(p)}`);
-  dom.buton.textContent = altii.length ? altii.join(', ') : 'Sursele datelor';
+  // Două surse Copernicus — relieful și Sentinel-2 — au producători diferiți, dar
+  // același nume scurt: în rând apare o dată.
+  const altii = [...new Set(producatori.filter((p) => !portalOsm(p)).map((p) => `© ${numeScurt(p, surse)}`))];
+  dom.buton.textContent = altii.length ? altii.join(' · ') : 'Sursele datelor';
   dom.buton.setAttribute('aria-label', `${dom.buton.textContent} — sursele și licențele`);
   // Legăturile se actualizează pe loc când sunt tot atâtea — de obicei, fiindcă
   // Satelit aduce tot o sursă DGT: una recreată și-ar pierde focusul.
@@ -142,13 +147,24 @@ function scrieSurse(surse) {
     dgt.lang = 'pt';
     lista.append(dgt);
   }
-  for (const s of surse) lista.append(el('li', s.atributie));
-  const nota = el('p', `Prelucrate pentru această pagină: ${unice('prelucrare').join('; ')}. Licența: `);
+  // O atribuire în altă limbă își spune limba (`lang`): cele Copernicus sunt în
+  // engleză, iar o cititoare de ecran le-ar pronunța altfel românește.
+  const li = (text, lang) => { const e = el('li', text); if (lang) e.lang = lang; return e; };
+  for (const s of surse) lista.append(li(s.atributie, s.lang));
+  // Clauza de răspundere a licenței Copernicus DEM, cerută lângă atribuire.
+  for (const s of surse.filter((q, i) => q.raspundere && surse.findIndex((p) => p.raspundere === q.raspundere) === i))
+    lista.append(li(s.raspundere, s.lang));
+  // Aceeași prelucrare poate sta pe două surse — relieful împrejurimilor e și DGT,
+  // și Copernicus —, iar o sursă le ține lipite cu „; ”. Se desfac, ca fiecare frază
+  // să apară o dată.
+  const prelucrari = [...new Set(surse.flatMap((s) => s.prelucrare?.split('; ') ?? []))];
+  const nota = el('p', `Prelucrate pentru această pagină: ${prelucrari.join('; ')}. Licența: `);
   unice('licenta').forEach((l, i) => {
     if (i) nota.append(', ');
-    if (!LICENTE[l]) { nota.append(l); return; }
+    const href = LICENTE[l] ?? surse.find((s) => s.licenta === l && s.licenta_url)?.licenta_url;
+    if (!href) { nota.append(l); return; }
     const a = el('a', l);
-    a.href = LICENTE[l];
+    a.href = href;
     nota.append(a);
   });
   nota.append('.');
