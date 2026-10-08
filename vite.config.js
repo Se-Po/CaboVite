@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { execFileSync } from 'node:child_process';
+import { antetePentru, reguliVercel } from './scripts/comun/vercel.mjs';
 
 /**
  * Versiunea paginii, din prefixul `0.1.N.xx` al subiectului de commit: versiunea e
@@ -45,8 +46,37 @@ function scrieVersiunea() {
   };
 }
 
+/**
+ * `npm run preview` trimite antetele de securitate din vercel.json, ca build-ul încercat
+ * local să aibă aceeași politică (CSP) ca pagina publicată. Cu `--mode csp-impus` politica
+ * pleacă impusă în loc de Report-Only: așa se vede local, înainte de a o impune pe Vercel,
+ * ce ar bloca. Cache-Control NU se trimite local: un fișier în lucru, rescris sub același
+ * nume, ar rămâne un an vechi în browserul de probă. Serverul de dezvoltare nu primește
+ * nimic — Vite servește acolo scripturi inline și un websocket, pe care politica le oprește.
+ */
+function anteteVercel() {
+  return {
+    name: 'antete-vercel',
+    configurePreviewServer(server) {
+      const reguli = reguliVercel();
+      const impus = server.config.mode === 'csp-impus';
+      server.middlewares.use((req, res, next) => {
+        const cale = new URL(req.url, 'http://local').pathname;
+        for (const [k, v] of Object.entries(antetePentru(reguli, cale))) {
+          if (k === 'cache-control') continue;
+          res.setHeader(k === 'content-security-policy-report-only' && impus ? 'content-security-policy' : k, v);
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [scrieVersiunea()],
+  plugins: [scrieVersiunea(), anteteVercel()],
   server: { port: 5173 },
+  // Hărțile de cod se publică, dar Vercel le dă numai membrilor echipei autentificați
+  // („Protected Source Maps”); publicul primește 403. Rămân pentru depanarea paginii
+  // publicate, cu stivele arătate pe sursă (alegerea autorului, 2026-10-08).
   build: { target: 'es2022', sourcemap: true },
 });

@@ -72,6 +72,30 @@ export function scriePngSrgb(w, h, rgb) {
   return Buffer.concat([png.subarray(0, 33), srgb, png.subarray(33)]);
 }
 
+/**
+ * PNG RGBA pe 8 biți, fără filtrare: pentru iconițele paginii (`npm run iconite`), care
+ * au nevoie de transparență. Alfa nu e premultiplicat, cum cere formatul.
+ *
+ * @param {number} w @param {number} h
+ * @param {Uint8Array} rgba — w·h·4 octeți
+ */
+export function scriePngRgba(w, h, rgba) {
+  const brut = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++) {
+    brut[y * (w * 4 + 1)] = 0;
+    Buffer.from(rgba.buffer, rgba.byteOffset + y * w * 4, w * 4).copy(brut, y * (w * 4 + 1) + 1);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 6; // 8 biți pe canal, culoare adevărată cu alfa
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    bucata('IHDR', ihdr),
+    bucata('IDAT', deflateSync(brut, { level: 9 })),
+    bucata('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 /** Același PNG, ca URI de date, pentru încorporat într-o pagină. */
 export const pngDataUri = (w, h, rgb) => `data:image/png;base64,${scriePng(w, h, rgb).toString('base64')}`;
 

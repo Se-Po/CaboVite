@@ -23,6 +23,10 @@
 //
 // Apa se topește în apa adâncă măsurată pentru alpha (harta_v4-orto_v1.json), pe
 // aceeași distanță de la mal: planul mării din afara texturilor are culoarea ei.
+//
+// Texturile publicate se rescriu numai cu aceiași octeți (scripts/comun/publicat.mjs):
+// vercel.json le ține un an în cache-ul cititorilor, deci o textură nouă primește o
+// versiune nouă. Straturile NDVI nu: vercel.json le lasă pe revalidare.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,6 +38,7 @@ import { dinTM06, UTM29 } from './comun/tm06.mjs';
 import { deschideCog } from './comun/cog.mjs';
 import { cereFisier } from './comun/cere.mjs';
 import { citestePngRgb } from './comun/png.mjs';
+import { scrieNepublicat } from './comun/publicat.mjs';
 import { DALE_SENTINEL, NIVELURI as GRILE, SURSA_SENTINEL, dirSentinel, idSentinel, urlSentinel } from './comun/imprejurimi.mjs';
 import { KTX, LIN, NIVELURI_MIP, codeazaKtx, distanta, laOctet, lantMipuri, multiplu, octeti, pierdere, scriePngNiveluri } from './comun/textura.mjs';
 
@@ -604,7 +609,7 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
   const p = pierdere(f, niveluri[0].b, c.W, c.H);
   console.log(`  KTX2 UASTC: ${(b.length / 1048576).toFixed(2)} MB; după decodare ΔE medie ${p.medie}, p99 ${p.p99}`);
   proba(b.length <= PRAG_MB * 1048576, `${nume}: ${(b.length / 1048576).toFixed(2)} MB, sub pragul de ${PRAG_MB} MB`);
-  writeFileSync(join(IESIRE, `${nume}-${VERSIUNE}.ktx2`), b);
+  scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}.ktx2`), b);
   const surse = [...surseFolosite].map((s) => (s === 'orto'
     ? { nume: 'Ortofotomapa digital de Portugal Continental 2025, 25 cm', fisiere: daleCadru, producator: 'Direção-Geral do Território (DGT)', licenta: 'CC BY 4.0', atributie: 'Ortofotos: © Direção-Geral do Território, ORTOS-2025, CC BY 4.0', portal: 'https://cdd.dgterritorio.gov.pt/' }
     : { ...SURSA_SENTINEL, scena: manifest.sentinel.scena }));
@@ -626,8 +631,8 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
     surse,
     sursa: surse[0],
   };
-  writeFileSync(join(IESIRE, `${nume}-${VERSIUNE}.json`), JSON.stringify(sidecar, null, 1));
-  console.log(`  scris ${IESIRE}/${nume}-${VERSIUNE}.ktx2 + .json`);
+  scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}.json`), JSON.stringify(sidecar, null, 1));
+  console.log(`  ${IESIRE}/${nume}-${VERSIUNE}.ktx2 + .json, gata`);
 
   // Textura mică, pentru prima treaptă a paginii (IN_DOUA_TREPTE din satelit.js): aceleași
   // niveluri de mip, de la al TEXTURA_MICA[nume]-lea încolo, deci aceeași cutie și aceeași
@@ -638,8 +643,8 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
     const bm = codeazaKtx(pnguri.slice(k0), fm, 'uastc', nm);
     const pm = pierdere(fm, niveluri[k0].b, c.W >> k0, c.H >> k0);
     console.log(`  mică, la ${c.pas << k0} m: ${(bm.length / 1048576).toFixed(2)} MB, ${nm} niveluri; după decodare ΔE medie ${pm.medie}, p99 ${pm.p99}`);
-    writeFileSync(join(IESIRE, `${nume}-${VERSIUNE}-mic.ktx2`), bm);
-    writeFileSync(join(IESIRE, `${nume}-${VERSIUNE}-mic.json`), JSON.stringify({
+    scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}-mic.ktx2`), bm);
+    scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}-mic.json`), JSON.stringify({
       ...sidecar,
       nume: `${nume}-${VERSIUNE}-mic`,
       format: `KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, ${nm} niveluri de mip`,

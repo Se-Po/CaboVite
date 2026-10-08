@@ -5,7 +5,8 @@
 //
 // Scrie public/data/<bază>-orto_v1.ktx2 + .json și <petic>-orto_v1.ktx2 + .json.
 // Textura are versiune proprie: un retuș, alte setări de compresie înseamnă _v2,
-// fără ca harta să se schimbe.
+// fără ca harta să se schimbe. Un nume publicat se rescrie numai cu aceiași octeți
+// (scripts/comun/publicat.mjs): vercel.json îl ține un an în cache-ul cititorilor.
 //
 // Geometria. Marginile de pixel ale texturii sunt metri TM06 scriși în sidecar
 // (`conventie: muchii de pixel`); pagina calculează din ei coordonatele texturii,
@@ -25,13 +26,14 @@
 // fără date (colțurile de vest) o primesc direct. Amestecul e copt în RGB, nu ținut
 // într-un canal alfa: mipurile ar media altfel culoarea și ponderea separat.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { laOklab } from './comun/oklab.mjs';
 import { cereFisier } from './comun/cere.mjs';
+import { scrieNepublicat } from './comun/publicat.mjs';
 import {
   KTX, LIN, LUCRU, NIVELURI_MIP as NIVELURI, codeazaKtx, dE, distanta, injumatateste, laOctet, multiplu, octeti, pierdere, scriePngNiveluri,
 } from './comun/textura.mjs';
@@ -253,7 +255,7 @@ for (const [numeH, R] of Object.entries(rezultat)) {
   proba(variante.uastc.pierdere_dE.medie < variante.etc1s.pierdere_dE.medie, `${numeH}: UASTC pierde mai puțin decât ETC1S (${variante.uastc.pierdere_dE.medie} față de ${variante.etc1s.pierdere_dE.medie})`);
   if (ales.length > PRAG_MB * 1048576)
     throw new Error(`${numeH}: ${(ales.length / 1048576).toFixed(2)} MB peste pragul de ${PRAG_MB} MB — oprește-te și spune autorului`);
-  writeFileSync(iesire, ales);
+  const scris = scrieNepublicat(iesire, ales);
   const c = R.c;
   const refs = referinte.map((q) => {
     const q0 = Math.round((q.x - q.latura_m / 2 - c.x0) / c.pas), r0 = Math.round((c.y1 - (q.y + q.latura_m / 2)) / c.pas), n = Math.round(q.latura_m / c.pas);
@@ -287,8 +289,8 @@ for (const [numeH, R] of Object.entries(rezultat)) {
       portal: 'https://cdd.dgterritorio.gov.pt/',
     },
   };
-  writeFileSync(join(IESIRE, `${numeH}-${VERSIUNE}.json`), JSON.stringify(meta, null, 1));
-  console.log(`  scris ${iesire} (${(ales.length / 1048576).toFixed(2)} MB) + .json`);
+  const scrisJson = scrieNepublicat(join(IESIRE, `${numeH}-${VERSIUNE}.json`), JSON.stringify(meta, null, 1));
+  if (scris || scrisJson) console.log(`  scris ${iesire} (${(ales.length / 1048576).toFixed(2)} MB) + .json`);
 }
 console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
 process.exit(picate ? 1 : 0);

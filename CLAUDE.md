@@ -11,7 +11,7 @@ se poartă în română.
 ## Stack
 
 - three.js **0.186.0 (r186)**, versiune fixă în `package.json`, fără `^`
-- Vite 8 (dev server + build)
+- Vite 8.3.0 (dev server + build), tot fără `^`
 - JavaScript modern, module ES, fără framework. Nu introduce React, TypeScript
   sau alt strat fără să întrebi întâi.
 
@@ -22,7 +22,7 @@ se poartă în română.
 | `npm run dev` | dev server pe http://localhost:5173 |
 | `npm run build` | build de producție în `dist/` |
 | `npm run preview` | servește build-ul de producție |
-| `npm run copy-decoders` | copiază decodoarele Draco/KTX2 în `public/` |
+| `npm run copy-decoders` | copiază decodoarele Draco/KTX2 în `public/`; nu se rulează: nimic nu le cere, iar `verifica-livrare` pică pe un `dist/` care le are |
 | `npm run citeste-poze` | inventarul fotografiilor din `date-sursa/poze/` |
 | `npm run culori-poze` | grupează culorile din poze, scoate pagina de etichetat |
 | `npm run ortofoto` | culori din ortofotoul aerian DGT (RGB + infraroșu) |
@@ -48,6 +48,8 @@ se poartă în română.
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea |
 | `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor |
+| `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate; `-- --live` le compară cu sebastians.life |
+| `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
 nu sunt în depozit; vezi mai jos. La fel `ortofoto` și `strat-ndvi`, care citesc
@@ -91,8 +93,10 @@ când lucrezi în `src/scene/`.
 2. Deschide panoul Browser (Ctrl+Shift+B / Cmd+Shift+B), încarcă pagina,
    fă un screenshot și **uită-te la el**. O scenă 3D poate compila perfect și
    afișa un ecran negru.
-3. Citește consola browserului. Avertismentele WebGL contează.
+3. Citește consola browserului. Avertismentele WebGL contează, la fel încălcările CSP.
 4. Verifică la lățime de 390px, nu doar pe desktop.
+5. Dacă ai atins `vercel.json`, `index.html`, `public/` sau un script care scrie în
+   `public/data`: `npm run verifica-livrare`; după push, `-- --live`.
 
 Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta.
 
@@ -111,11 +115,109 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
   Ce stă pe marginea de jos urcă deasupra ei cu `--versiune` (1,15rem): pe desktop
   „Coordonate” și Satelit, pe aceeași linie; pe telefon busola, Satelit și panoul.
 
+## Livrarea: `vercel.json`
+
+Vercel servește `dist/` cu antetele din `vercel.json`. Până la v0.1.5 nu exista: totul
+venea cu `public, max-age=0, must-revalidate`, iar la fiecare revenire pe pagină se
+revalidau 45 de fișiere, în lanț — HTML, JS, apoi cele trei niveluri de date.
+
+**Cache-ul.**
+- `/assets/*.js|css|wasm`: imutabil un an. Vite pune în nume hash-ul conținutului.
+  Hărțile de cod NU: numele lor vine din hash-ul JS-ului, iar un commit numai cu comentarii
+  le schimbă conținutul fără să le schimbe numele. Un fișier nou în `/assets`, de alt tip,
+  pică proba până i se hotărăște regula.
+- `/data/`: imutabile un an numai numele cu versiune: `harta_vN-dem.*`,
+  `harta_vN-orto_vM[-mic].*`, `sanctuar_vN.json`, `cladiri_vN.json`. Cine a deschis
+  pagina o dată nu mai cere un nume publicat timp de un an, deci un conținut nou
+  primește un nume nou. Scripturile build-* refuzau deja un nume urmărit de git;
+  `textura-ortofoto` și `textura-imprejurimi` îl rescriu acum numai cu aceiași octeți
+  (`scrieNepublicat` din `scripts/comun/publicat.mjs`). Altfel aruncă, înainte de scriere.
+  Octeții se compară ca blob git (`hash-object --path`): cu `core.autocrlf`, un .json
+  poate avea pe disc alte capete de rând decât în depozit.
+- Rămân pe revalidare (ETag, 304) documentul, iconițele, `paleta-teren.json` și straturile
+  `-ndvi`. Paleta se reface sub același nume și are patru versiuni în istoric. Numele unui
+  strat NDVI vine din al hărții (`loaders.js`), deci un strat refăcut n-ar avea unde primi
+  alt nume. Paleta ține și după reparație un dus-întors pe drumul spre primul cadru
+  (`await incarcaPaleta()` din `scena.js`); un nume versionat l-ar scoate.
+
+**Securitatea.** `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`
+(cameră, microfon, geolocație oprite) și CSP-ul, deocamdată `Content-Security-Policy-Report-Only`:
+numai scrie în consolă. Fiecare sursă are un motiv:
+- `script-src 'self' 'unsafe-eval'`: transcodorul Basis al KTX2Loader face `new Function`
+  (embind) și compilează WebAssembly, în worker. Fără `'unsafe-eval'` workerul moare la
+  pornire, iar `ktx2.parse` nu se mai întoarce: Satelit nu apare și pagina nu spune nimic.
+  De aceea politica se impune abia după ce transcodorul are limită de timp.
+- `worker-src 'self' blob:`: workerul KTX2Loader e făcut dintr-un Blob. `child-src` repetă
+  sursele pentru browserele care nu citesc `worker-src` <!-- NEVERIFICAT: Safari vechi -->.
+- `img-src 'self' data:`: cursoarele, ca URI de date în CSS.
+- `style-src 'self'`, fără `'unsafe-inline'`: niciun atribut `style` în marcaj. Stilurile
+  puse din cod trec prin CSSOM (`el.style.x = …`), pe care CSP nu-l oprește. Așa face și
+  legenda din `?previzualizare=ndvi`.
+- Fără `frame-ancestors`: pagina se poate încadra în alta. E o alegere, nu o scăpare.
+
+**Local.** `npm run preview` trimite aceleași antete de securitate, dar nu și Cache-Control:
+un fișier în lucru rescris sub același nume ar rămâne un an vechi în browserul de probă.
+`npm run preview -- --mode csp-impus` (configurația `cabo-espichel-csp-impus`, portul 4174)
+trimite politica impusă. Proba din 2026-10-08, în Chromium, cu politica impusă:
+- Satelit cu ambele trepte, Relief, „Coordonate” cu Copiază, modala surselor și
+  `?previzualizare=ndvi` merg toate, cu 0 încălcări;
+- un worker din `blob:` cu `new Function` și `WebAssembly.compile` merge;
+- controlul, un atribut style pus din cod, e blocat.
+Cu Report-Only, aceleași căi nu dau niciun mesaj; controlul apare în consolă.
+
+**Hărțile de cod** se publică, dar Vercel le dă numai membrilor echipei autentificați
+(„Protected Source Maps”), iar publicul primește 403. Rămân pentru depanarea paginii
+publicate, la alegerea autorului.
+
+**Iconițele.** `npm run iconite` le desenează din sfera cursorului, din aceeași descriere:
+SVG-ul ca text, PNG-urile (16, 32 și 48 în ICO, 180 pentru iOS, pe fondul paginii) cu
+gradientul calculat ca în SVG. Față de SVG-ul desenat de Chromium, PNG-urile diferă cu
+0,8–1,5 niveluri în medie și cu 9–19 pe marginea cercului; mutat cu un pixel, SVG-ul
+diferă de el însuși cu 226. Fișierele ies identice la fiecare rulare. `og:image` lipsește
+până când autorul alege o imagine.
+
+**Proba: `npm run verifica-livrare`**, după `npm run build`:
+- politica de cache pe fiecare fișier publicat. Clasa fiecărui fel de fișier din `/data`
+  e scrisă în probă (`clasaData`), deci un fel nou pică până i se hotărăște politica;
+- un nume imutabil care a avut în istoric două conținuturi pică;
+- `dist/` local n-are voie să aibă fișiere din `public/` gitignorat. Vercel construiește
+  din commit, deci `public/draco`, rămas de la `copy-decoders`, făcea `npm run preview` să
+  servească 763 341 de octeți pe care pagina publicată nu-i are;
+- un fișier din `public/` încă neadăugat în git se spune, fără să pice: Vercel nu-l publică
+  până nu intră în commit;
+- antetele de securitate, CSP-ul față de ce face pagina, marcajul fără inline și garda.
+
+Controalele:
+- `/data/(.*)` imutabil pică pe paletă și pe NDVI;
+- `/assets/(.*)` imutabil pică pe hărțile de cod;
+- un max-age de un an fără `immutable`, pe paletă sau pe document, pică: revalidarea se cere
+  pozitiv (`no-cache` sau `max-age=0`), nu ca „nu e imutabil”;
+- fără regula de `/assets`, pică;
+- fără `'unsafe-eval'` sau fără `blob:`, pică;
+- legenda veche, cu `style=` în `innerHTML`, e prinsă;
+- un octet în plus pe un nume publicat aruncă; o copie locală care diferă de HEAD, cu
+  conținutul nou egal cu cel publicat, se reface (încercat într-un depozit de unică folosință);
+- paleta din HEAD, în forma de checkout (CRLF), comparată ca octeți bruți, ar fi părut
+  rescrisă.
+
+`-- --live` compară antetele de pe sebastians.life cu `vercel.json`. Înainte de primul
+deploy cu el, pe 2026-10-08, au picat toate cele 54 de căi.
+
+path-to-regexp, cu care citește Vercel `source`, nu e instalat. `scripts/comun/vercel.mjs`
+simulează numai subsetul folosit — text literal și grupuri `( … )` — și aruncă pe rest,
+inclusiv pe ce respinge path-to-regexp: un grup care capturează, unul gol sau care începe
+cu `?`.
+
+Report-Only n-are destinație pentru rapoarte, deci de la vizitatori nu vine nimic. Înainte
+de impunere, `cabo-espichel-csp-impus` se încearcă de mână și în Firefox și în Safari/iOS
+(`-- --host`, de pe telefon).
+
 ## Hărțile de relief
 
 Hărțile se numesc `harta_vN` și trăiesc în `public/data/<nume>-dem.bin` +
 `.json`. O hartă nouă — alt contur, altă rezoluție sau alt conținut — primește un nume nou;
-nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`.
+nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`. Regula nu e
+numai de ordine: un nume publicat stă un an în cache-ul cititorilor (vezi „Livrarea”).
 
 | hartă | sursă | acoperire |
 |---|---|---|
@@ -995,7 +1097,7 @@ o eliberare chiar la `gata` mai aducea și transcoda cei 3,1 MB. Textura fină �
 sursele prin `laSursa`, pentru calea în care cea mică lipsește. Compresia n-ar fi
 ajutat: setarea UASTC e deja cea implicită, iar cu RDO mai tare fișierul scade cu 5% (2,93
 MB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MB, cu ΔE de șase ori mai mare.
-Cine revine nu le mai descarcă: serverul răspunde la ETag (verificat pe sebastians.life). În
+Cine revine nu le mai cere deloc: `vercel.json` le ține un an în cache (vezi „Livrarea”). În
 `?previzualizare` nu se încarcă. Satelit le comută materialele cu ale lui alpha, pe
 același program. `inaltimeRandata` din scenă — alpha unde e alpha, împrejurimile în
 rest — e cea pe care merg raza panoului punctului și ocluzia etichetei; măsurătorile
@@ -1075,7 +1177,8 @@ Pornește pe Satelit; alegerea se ține în `localStorage`, în try/catch.
 ### Texturile: `npm run textura-ortofoto`
 
 Scrie `public/data/<hartă>-orto_v1.ktx2` + `.json`, pentru bază și petic. Textura are
-versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Cere KTX-Software 4.4
+versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Un nume publicat se rescrie numai
+cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”). Cere KTX-Software 4.4
 (`ktx`); scriptul îl caută și în `C:/Program Files/KTX-Software/bin` sau în
 `KTX_BIN`, fiindcă un shell pornit înainte de instalare nu vede PATH-ul nou.
 

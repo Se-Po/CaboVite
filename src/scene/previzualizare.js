@@ -65,11 +65,17 @@ export function creeazaLegenda(gazda, mod) {
   el.id = 'legenda';
   el.setAttribute('aria-label', 'Legenda previzualizării');
   const gradient = OPRIRI.map(([v, c]) => `${hex(c)} ${((v - OPRIRI[0][0]) / (OPRIRI.at(-1)[0] - OPRIRI[0][0]) * 100).toFixed(0)}%`).join(', ');
+  // Numai literaluri în innerHTML. Modul vine din adresă, deci intră ca text; culorile
+  // intră prin CSSOM, fiindcă politica de securitate din vercel.json nu lasă atribute
+  // `style` în marcaj.
   el.innerHTML = `
-    <p class="titlu">Previzualizare: ${mod === 'ndvi' ? 'NDVI din ortofoto' : mod}</p>
-    <div class="bara" style="background: linear-gradient(to right, ${gradient})"></div>
+    <p class="titlu"></p>
+    <div class="bara"></div>
     <div class="capete"><span>≤ −0,10 rocă</span><span>≥ 0,50 verde</span></div>
-    <p class="fara"><span class="mostra" style="background: ${hex(FARA)}"></span>fără NDVI (apă sau strat lipsă)</p>`;
+    <p class="fara"><span class="mostra"></span>fără NDVI (apă sau strat lipsă)</p>`;
+  el.querySelector('.titlu').textContent = `Previzualizare: ${mod === 'ndvi' ? 'NDVI din ortofoto' : mod}`;
+  el.querySelector('.bara').style.background = `linear-gradient(to right, ${gradient})`;
+  el.querySelector('.mostra').style.background = hex(FARA);
   gazda.appendChild(el);
   return { dispose() { el.remove(); } };
 }
