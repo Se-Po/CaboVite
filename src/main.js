@@ -6,6 +6,11 @@ import { porneste } from './scene/scena.js';
 import { SANCTUAR } from './content/sanctuar.js';
 import { CLADIRI } from './content/cladiri.js';
 
+// Semnul pentru plasa de siguranță (public/plasa.js): modulul a pornit. Prima instrucțiune —
+// ajunge aici numai dacă tot graful lui s-a parsat și s-a evaluat —, înaintea oricărei
+// așteptări. Fără el, la `load`, plasa trece pagina pe calea fără scenă.
+globalThis.__modulPornit = true;
+
 const canvas = document.querySelector('#scena');
 const continut = document.querySelector('#continut');
 const subsol = document.querySelector('#surse');
@@ -186,14 +191,26 @@ function scrieSurse(surse) {
 // Fără scenă, pagina n-ar avea nimic de arătat până vin capitolele. Un anunț
 // neutru: calea asta o iau WebGL-ul lipsă, o eroare la încărcare și bucla oprită
 // după cadre eșuate la rând.
-function faraScena(motiv) {
+//
+// `reincearca`: datele n-au mai sosit (garda pornirii, loaders.js). Atunci anunțul spune
+// asta, iar butonul reîncarcă pagina — o rețea care a tăcut poate merge la a doua încercare.
+function faraScena(motiv, { reincearca = false } = {}) {
   canvas?.remove();
   document.body.dataset.scena = 'indisponibila';
   // Pe ultima cale subsolul fusese scris, dar fără scenă n-are ce atribui. Modala se
   // închide întâi: altfel ar rămâne deschisă, modală, într-un subsol ascuns.
   if (dom?.dialog.open) dom.dialog.close();
   if (subsol) subsol.hidden = true;
-  if (continut && !continut.textContent.trim()) continut.append(el('p', 'Harta 3D nu a putut porni.'));
+  if (continut && !continut.textContent.trim()) {
+    continut.append(el('p', reincearca ? 'Harta 3D nu a putut porni: datele hărții n-au mai sosit.' : 'Harta 3D nu a putut porni.'));
+    if (reincearca) {
+      const b = el('button', 'Reîncearcă');
+      b.type = 'button';
+      b.className = 'reincearca';
+      b.addEventListener('click', () => location.reload());
+      continut.append(b);
+    }
+  }
   console.info('Pagina rulează fără scenă 3D:', motiv);
 }
 
@@ -230,5 +247,5 @@ try {
     globalThis.__scena = scena; // cârlig pentru verificare din consolă
   }
 } catch (e) {
-  faraScena(e.message);
+  faraScena(e.message, { reincearca: e?.name === 'TimeoutError' });
 }

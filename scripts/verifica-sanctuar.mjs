@@ -28,6 +28,7 @@ import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
 import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
+import { creeazaDrapaj } from '../src/scene/drapaj.js';
 import { creeazaScriitor, turn, yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
 import { creeazaCamera } from '../src/scene/camera.js';
@@ -47,6 +48,28 @@ const AMPRENTA = {
   color: '1c28d835408390bcfbfc0893f5db2cb20f003fb1544ab7ddf1c59ad7fb66987e',
   ocluzie: '5132591b4f8a24ccf918f9fc80de64e23419f47503000e3eed68ea04a39e5fbd',
 };
+// Amprenta drapajului, pe straturi, cu aceeași regulă de rescriere. Citită pe 2026-10-08
+// pe codul care cerceta toată cutia fiecărei suprafețe.
+const AMPRENTA_DRAPAJ = {
+  'drapaj-1': {
+    position: '7bf455303c667a64a175c515c3e17e1905be2860c78a792ad60083ac6d51d0b8',
+    color: 'dedd3e6ebc8a9cac9a38870d059d3f800363a2807e1b2d476409bf7665fdeb52',
+  },
+  'drapaj-2': {
+    position: 'e52997f494cb516b590ba091fe8de0e1cc6d86c59b6bccb1765752c1907b4a79',
+    color: 'a7004d34143091db806ef19a0e0c284f135a9063234fe5aa516e3d27ac12d1e3',
+  },
+  'drapaj-3': {
+    position: 'e621f3b20ffaecc64ad61602f672abd7505bfbaffbf8ef9148cd2aac8d4d4a6b',
+    color: '1cd3d16ced4e3cb324dcecbf4c1f28c1190a1f45eabbf1b8d7662b95984992cf',
+  },
+  'drapaj-4': {
+    position: '6284b58490a9a1b5c1bb8e703f1ad6a64332795f8986693b17d795d58758d944',
+    color: '11c659e699db16c7691e0c07fbb9c9e104a2cad521696abddfb9122995a8a947',
+  },
+};
+// Celulele pe care le cercetează drapajul. Azi 35 783; cu toată cutia, 151 750.
+const CELULE_DRAPAJ = 40000;
 
 let picate = 0;
 const proba = (bun, text) => {
@@ -266,6 +289,33 @@ console.log('\nSuprafețele de pe teren stau pe triunghiurile randate');
     for (let i = 0; i < q.length; i += 3) maxBiliniar = Math.max(maxBiliniar, Math.abs(q[i + 1] - inaltimeLa(q[i], q[i + 2])));
   }
   proba(maxBiliniar > 1e-3, `control negativ: față de relieful interpolat biliniar, abaterea maximă e ${(maxBiliniar * 1000).toFixed(1)} mm — un drapaj pe el ar pica`);
+}
+{
+  // Drapajul, la bit și pe numărătoare: pe fiecare rând numai coloanele pe care poligonul
+  // le atinge, nu toată cutia lui. Poligoanele se scriu în evantai (`poligon`), deci
+  // trebuie să fie convexe.
+  const convexa = (c) => { let semn = 0; for (let k = 0; k < c.length; k++) { const p = c[k], q = c[(k + 1) % c.length], r = c[(k + 2) % c.length]; const x = (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]); if (Math.abs(x) < 1e-9) continue; if (semn && Math.sign(x) !== semn) return false; semn = Math.sign(x); } return true; };
+  const neconvexe = date.suprafete.filter((s) => !convexa(s.contur)).length;
+  proba(neconvexe === 0, `toate cele ${date.suprafete.length} suprafețe au contur convex (${neconvexe} neconvexe)`);
+  const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+  const amprenta = (obiecte) => Object.fromEntries(obiecte.map((o) => [o.name,
+    { position: sha(o.geometry.attributes.position.array), color: sha(o.geometry.attributes.color.array) }]));
+  const citit = amprenta(sanctuar.obiecte.slice(1));
+  const diferite = [...new Set([...Object.keys(AMPRENTA_DRAPAJ), ...Object.keys(citit)])]
+    .filter((k) => JSON.stringify(citit[k]) !== JSON.stringify(AMPRENTA_DRAPAJ[k]));
+  proba(diferite.length === 0, `drapajul: sha256 pe position și color, pe ${Object.keys(citit).length} straturi, cât în AMPRENTA_DRAPAJ${diferite.length ? `; diferă ${diferite.join(', ')}` : ''}`);
+  const cul = Object.fromEntries(Object.entries(date.materiale).map(([k, m]) => [k, m.rgb]));
+  const d = creeazaDrapaj({ suprafete: date.suprafete, culori: cul, ...retea });
+  proba(d.numar?.celule <= CELULE_DRAPAJ,
+    `drapajul cercetează ${d.numar?.celule} celule și face ${d.numar?.taieri} tăieri (cel mult ${CELULE_DRAPAJ} celule; cu toată cutia fiecărei suprafețe, 151 750 și 247 090)`);
+  d.dispose();
+  // Control: o suprafață mutată cu 1 mm schimbă amprenta.
+  const mutat = structuredClone(date.suprafete);
+  mutat[0].contur = mutat[0].contur.map(([x, z]) => [x + 0.001, z]);
+  const dm = creeazaDrapaj({ suprafete: mutat, culori: cul, ...retea });
+  const cm = amprenta(dm.obiecte);
+  proba(Object.keys(cm).some((k) => cm[k].position !== AMPRENTA_DRAPAJ[k]?.position), `control negativ: o suprafață mutată cu 1 mm dă altă amprentă position`);
+  dm.dispose();
 }
 
 // ------------------------------------------------------------ 5. măsurătorile

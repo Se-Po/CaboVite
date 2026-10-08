@@ -5,8 +5,8 @@ import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { creeazaCer } from './cer.js';
-import { creeazaSatelit } from './satelit.js';
-import { incarcaCladiri, incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
+import { creeazaSatelit, descarcaSatelit } from './satelit.js';
+import { creeazaGardaPornirii, incarcaCladiri, incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
 import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
@@ -59,9 +59,20 @@ export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
     deEliberat.length = 0;
   };
 
+  // Garda pornirii (loaders.js): un ceas de inactivitate și un semnal de abandon pentru
+  // toate cererile de mai jos. După 20 s fără niciun octet pe nicio cerere, pornirea se
+  // abandonează și aruncă `garda.motiv` (TimeoutError), iar main.js trece pe calea fără
+  // scenă. Pe orice eșec, `curata()` oprește și cererile încă în zbor. Ceasul se oprește
+  // în `finally`: după pornire nu mai are ce păzi. Texturile Satelit nu sunt ale lui: pleacă
+  // după toate datele pornirii, cu abandonul și limita lor de transcodare.
+  const garda = creeazaGardaPornirii();
+  deEliberat.push(() => garda.abandoneaza());
+
   try {
-    return await construieste(canvas, renderer, deEliberat, curata, continut, laSurse, laEsec);
+    return await construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec);
   } catch (e) {
+    // Garda expirată e cauza, oricare ar fi excepția cu care a ieșit construcția.
+    if (garda.expirat) e = garda.motiv;
     curata();
     renderer.dispose();
     // Numai pe calea asta. `dispose()` nu dă drumul contextului, iar aici
@@ -71,10 +82,12 @@ export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
     // nou, iar acolo vrem să putem reporni scena pe același canvas.
     renderer.forceContextLoss();
     throw e;
+  } finally {
+    garda.opreste();
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata, continut, laSurse, laEsec) {
+async function construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
   // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
@@ -86,24 +99,29 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // respingere sosită în fereastra de până la `await` să nu iasă ca
   // `unhandledrejection`. Tratarea adevărată e mai jos, la `await`, de unde
   // excepția urcă în `porneste()` ca înainte.
-  const reliefGata = incarcaRelief();
+  const reliefGata = incarcaRelief(undefined, undefined, { garda });
   reliefGata.catch(() => {});
   // Sanctuarul pleacă odată cu relieful: n-au nimic de împărțit. Nu respinge
   // niciodată — întoarce null și spune de ce —, deci nici n-are nevoie de catch.
-  const sanctuarGata = incarcaSanctuar();
+  const sanctuarGata = incarcaSanctuar(undefined, { garda });
   // La fel clădirile din afara lui: farul, casele lui, Casa da Ronca.
-  const cladiriGata = incarcaCladiri();
+  const cladiriGata = incarcaCladiri(undefined, { garda });
   // Și împrejurimile — relieful de dincolo de marginile tăiate. Nu respinge nici ea.
   // În previzualizare nu se încarcă: legenda de acolo e a NDVI-ului din ortofoto, iar
   // împrejurimile îl au și din Sentinel.
-  const imprejurimiGata = modPrevizualizare() ? Promise.resolve(null) : incarcaImprejurimi();
+  const imprejurimiGata = modPrevizualizare() ? Promise.resolve(null) : incarcaImprejurimi(undefined, { garda });
+
+  // Fiecare așteptare a pornirii trece pe aici. Abandonate de gardă, încărcătoarele
+  // opționale întorc `null` fără avertisment; fără verificare, harta ar porni tăcut fără
+  // sanctuar, fără clădiri sau fără împrejurimi.
+  const asteapta = async (p) => { const v = await p; garda.verifica(); return v; };
 
   // Culorile măsurate trebuie să fie acolo înainte să se genereze plasa: culoarea
   // fiecărei fațete se coace în atributul de vârf, o singură dată, la construcție.
   // Dacă ar veni după, ar trebui regenerată toată geometria ca să se vadă. Deci
   // se așteaptă aici — dar acum așteptarea se suprapune peste descărcarea hărții,
   // nu stă înaintea ei.
-  await incarcaPaleta();
+  await asteapta(incarcaPaleta(undefined, { garda }));
 
   const paleta = paletaCurenta();
   const scena = new THREE.Scene();
@@ -145,7 +163,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   deEliberat.push(() => mare.dispose());
 
   // Aruncă la HTTP eșuat sau la fișier trunchiat — verificate amândouă în loaders.js.
-  const incarcat = await reliefGata;
+  const incarcat = await asteapta(reliefGata);
 
   // Fișierul cerut poate fi un petic de rezoluție mai mare, care își aduce baza
   // cu el. Terenul principal rămâne baza; peticul e o a doua plasă, așezată în
@@ -200,6 +218,26 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     deEliberat.push(() => legenda.dispose());
   }
 
+  // Vederea Satelit își cere prima treaptă ACUM, înaintea construcției, nu după ea
+  // (satelit.js, `descarcaSatelit`): construcția ține firul principal ~0,3–0,5 s pe desktop,
+  // iar rețeaua stătea în timpul ei degeaba. Abia după TOATE datele pornirii — de obicei
+  // relieful sosește ultimul —, ca texturile să nu le ia banda. Nimic cu `?previzualizare`
+  // sau cu preferința Relief. `curata()` oprește cererile pe orice eșec de mai jos; după
+  // `creeazaSatelit` sunt ale lui. Separabil: dacă nu se poate, Satelit le cere mai târziu.
+  const [, , niveluriImprejurimi] = await asteapta(Promise.all([sanctuarGata, cladiriGata, imprejurimiGata]));
+  const descarcareSatelit = (() => {
+    try {
+      return relief.meta?.bbox_tm06 ? descarcaSatelit({
+        renderer, numeBaza: relief.meta.nume, fortatRelief: Boolean(culoare),
+        imprejurimi: (niveluriImprejurimi ?? []).map((L) => L.meta.nume),
+      }) : null;
+    } catch (e) {
+      console.warn('texturile Satelit nu pot pleca devreme:', e.message);
+      return null;
+    }
+  })();
+  if (descarcareSatelit) deEliberat.push(() => descarcareSatelit.abandoneaza());
+
   // Atribuirile datelor care chiar ajung pe ecran, fără dubluri, fiecare cu ce
   // s-a făcut din ea. Licența lor, CC BY 4.0, le cere oriunde se afișează datele
   // și cere și mențiunea prelucrării. Se strâng ACUM, cât straturile mai sunt
@@ -246,7 +284,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // lipsește sau nu se poate construi, scena merge mai departe fără el.
   const b = relief.meta?.bbox_tm06;
   const sanctuar = creeazaSanctuar({
-    date: await sanctuarGata, inaltimeLa,
+    date: await asteapta(sanctuarGata), inaltimeLa,
     ancora: b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null,
     retea: { relief, reliefPetic, pastreaza, subPetic },
   });
@@ -263,7 +301,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
 
   // Farul și celelalte clădiri: același cod, alte date, fără suprafețe pe teren.
   const cladiri = creeazaSanctuar({
-    date: await cladiriGata, inaltimeLa, eticheta: 'clădiri',
+    date: await asteapta(cladiriGata), inaltimeLa, eticheta: 'clădiri',
     ancora: b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null,
   });
   if (cladiri) {
@@ -281,7 +319,6 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // cerul: dacă lipsesc datele sau construcția eșuează, harta rămâne cu marginile
   // tăiate, cum era. Nu primesc umbre și nu intră în umbre — sunt decor.
   let imprejurimi = null;
-  const niveluriImprejurimi = await imprejurimiGata;
   if (niveluriImprejurimi && margineAlpha) {
     try {
       // Sursele straturilor se iau înainte de construcție: după ea straturile pleacă.
@@ -360,6 +397,11 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   // pe Relief și trece singur pe Satelit când texturile sunt gata — dacă omul nu
   // și-a ales altfel data trecută. Separabil: fără textură, sau dacă nu se poate
   // crea deloc, rămâne Relief — ca la cer și la umbre.
+  //
+  // Texturile ei urcă pe placă abia după primul cadru (`primulCadru`, rezolvat în buclă):
+  // pornite înaintea construcției, pot sosi înaintea lui.
+  let laPrimulCadru = null;
+  const primulCadru = new Promise((r) => { laPrimulCadru = r; });
   let satelit = null;
   try {
     if (!b) throw new Error('harta n-are bbox_tm06');
@@ -380,11 +422,13 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       },
       laSursa: (s) => { surse = unesteSurse(surse, [s]); laSurse?.(surse); },
       fortatRelief: Boolean(culoare),
+      descarcare: descarcareSatelit, primulCadru,
     });
     const sat = satelit;
     deEliberat.push(() => sat.dispose());
   } catch (e) {
     console.warn('vederea Satelit sărită, rămâne Relief:', e.message);
+    descarcareSatelit?.abandoneaza();
   }
 
   // Declarate aici, fiindcă clicul pe busolă, creată înaintea lor, le folosește.
@@ -571,6 +615,26 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     return true;
   };
 
+  // Panourile hărții — busola, Satelit, „Coordonate” — sunt pe ecran de aici, înaintea primului
+  // cadru. Pe un ecran îngust sau scund, ori pe o pagină mărită, mesajul de încărcare din mijloc
+  // ar sta peste ele cât ține compilarea; main.css îl ascunde acolo după atributul ăsta, iar
+  // butonul Satelit ocupat rămâne semnul încărcării.
+  const radacinaDoc = canvas.ownerDocument.documentElement;
+  radacinaDoc.dataset.panouri = '';
+  deEliberat.push(() => { delete radacinaDoc.dataset.panouri; });
+
+  // Programele se leagă ÎNAINTEA primului cadru, nu în el. three le compilează la prima
+  // randare și așteaptă acolo, sincron, legarea fiecăruia, unul după altul. `compileAsync`
+  // le pornește pe toate și, cu KHR_parallel_shader_compile, așteaptă fără să blocheze; fără
+  // extensie programele trec drept gata (WebGLProgram.js:995), iar promisiunea se rezolvă
+  // după un temporizator de ~10 ms (WebGLRenderer.js:1567), cu legarea tot pe primul cadru,
+  // ca înainte — citit în cod, NEVERIFICAT într-un browser fără extensie. Programul umbrei
+  // rămâne pe primul cadru: `compile()` nu face trecerea de umbre. Satelit nu e atins: își compilează materialele
+  // abia după primul cadru (`primulCadru`). Toate datele pornirii au sosit deja, deci garda
+  // n-are ce păzi aici. Măsurat pe build, la prima vizită: primul cadru 370–383 → 99–109 ms,
+  // iar imaginea gata cu ~0,2 s mai devreme; la reveniri, cam la fel (CLAUDE.md).
+  try { await renderer.compileAsync(scena, camera); } catch { /* se compilează la prima randare */ }
+
   // Cadrele eșuate de la ultima randare reușită. three cere cadrul următor ÎNAINTEA
   // buclei (WebGLAnimation.js:10), deci o excepție nu oprește bucla, ci se repetă:
   // una persistentă în zbor, rotiță, controale sau limita alpha arunca la fiecare
@@ -587,7 +651,10 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   let esecuri = 0;
   renderer.setAnimationLoop(() => {
     try {
-      if (cadru()) esecuri = 0;
+      if (cadru()) {
+        esecuri = 0;
+        if (laPrimulCadru) { laPrimulCadru(); laPrimulCadru = null; }
+      }
     } catch (e) {
       // Un singur mesaj, cu excepția întreagă: repetările n-ar spune nimic nou.
       if (!esecuri++) console.error('cadrul scenei a eșuat:', e);

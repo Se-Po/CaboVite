@@ -235,8 +235,79 @@ html, body {
   .surse-modala .inchide { border-color: ButtonText; }
 }
 
+/* Mesajul de încărcare, până la primul cadru: în mijlocul ecranului, departe de colțurile
+   busolei, ale lui Satelit și ale panoului „Coordonate”. Panourile apar înaintea primului
+   cadru (`data-panouri` pe <html>, scena.js), iar pe un ecran îngust sau scund — și pe o
+   pagină mărită: 195 × 422, 320 × 256 — mesajul ar sta peste ele cât ține compilarea; acolo
+   pleacă odată cu ele, iar butonul Satelit ocupat rămâne semnul încărcării. Altfel
+   pleacă odată cu `data-scena` pe <body> — scena a pornit (main.js) sau nu poate porni
+   (main.js, plasa.js); pe calea activă, în aceeași actualizare a ecranului cu primul cadru:
+   bucla îl desenează în primul ei requestAnimationFrame, înaintea zugrăvirii.
+   `--ink` pe `--surface`, 13,7:1; roata `--gold`, 8,3:1. Roata se mișcă numai prin `transform`, iar sub
+   reduced-motion stă. Fără JavaScript n-ar avea cine să-l scoată: `scripting: none` îl
+   ascunde (browserele fără interogarea asta îl lasă). */
+#incarcare {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  /* `max-content`: cu `left: 50%`, lățimea disponibilă ar fi numai jumătatea din dreapta a
+     ecranului, iar la 390 px textul trecea pe două rânduri. */
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: 0.65rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
+  color: var(--ink);
+  font: 600 1.05rem/1.3 var(--sans);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+#incarcare::before {
+  content: "";
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--gold);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: roata 1s linear infinite;
+}
+@keyframes roata { to { transform: rotate(360deg); } }
+body[data-scena] #incarcare { display: none; }
+@media (max-width: 22.5rem), (max-height: 30rem) {
+  [data-panouri] #incarcare { display: none; }
+}
+@media (scripting: none) {
+  #incarcare { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #incarcare::before { animation: none; }
+}
+
 /* Fără scenă, pagina rămâne o pagină obișnuită. */
 body[data-scena="indisponibila"] #continut { background: var(--bg); }
+/* „Reîncearcă”, sub anunț, când datele n-au mai sosit (main.js). Ca butoanele hărții, dar
+   cu marginea --muted: pe fondul gol al paginii, --line abia se vedea. */
+#continut .reincearca {
+  min-height: 2.9rem;
+  padding: 0.45rem 1.2rem;
+  border: 1px solid var(--muted);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+#continut .reincearca:hover { border-color: var(--gold); }
 
 /* Un contur de focus vizibil, pentru linkurile din text. Fără el, pagina rămâne
    cu inelul implicit al browserului, care pe fond cald aproape nu se vede. */
@@ -395,7 +466,34 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #straturi button::before { content: "☐ "; color: var(--muted); }
 #straturi button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 #straturi button[aria-pressed="true"]::before { content: "☑ "; color: inherit; }
-#straturi button[aria-busy="true"] { cursor: progress; opacity: 0.75; }
+/* Cât se descarcă fotografia: roata în locul bifei și, pe al doilea rând, „se încarcă…”.
+   Butonul rămâne apăsabil — un clic înseamnă „rămân pe Relief” (satelit.js) —, deci nu se
+   mai estompează. Textul de sub etichetă e numai pentru ochi (`/ ""`, unde browserul știe
+   forma asta); cititoarele de ecran au anunțul. */
+#straturi button[aria-busy="true"] { cursor: progress; }
+#straturi button[aria-busy="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 0.45em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.08em;
+  animation: roata 1s linear infinite;
+}
+#straturi button[aria-busy="true"]::after {
+  content: "se încarcă…";
+  content: "se încarcă…" / "";
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+@media (prefers-reduced-motion: reduce) {
+  #straturi button[aria-busy="true"]::before { animation: none; }
+}
 #straturi button:hover { border-color: var(--gold); }
 #straturi .anunt {
   position: absolute;

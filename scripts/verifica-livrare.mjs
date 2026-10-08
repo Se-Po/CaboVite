@@ -219,6 +219,91 @@ const cuInline = surse.filter((p) => STIL_INLINE.test(readFileSync(p, 'utf8')));
 proba(cuInline.length === 0, `src/: niciun atribut style= sau on…= în marcajul scris din cod (${surse.length} fișiere)${cuInline.length ? `; îl au ${cuInline.join(', ')}` : ''}`);
 proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'control: legenda veche din previzualizare.js, cu style= în innerHTML, e prinsă');
 
+// ------------------------------------------------------------ browserele vechi și plasa
+
+// three r186 are șase blocuri `static {}`; Safari și iOS le parsează abia de la 16.4, iar un
+// modul care nu se parsează oprește tot graful: pagina rămânea goală, fără niciun mesaj. Ținta
+// din vite.config.js le coboară. Numărate cu parserul lui Vite, în JS-ul livrat.
+{
+  const { parseAst, transformWithOxc } = await import('vite');
+  const noduri = (src, tipuri) => {
+    const gasite = [];
+    const umbla = (o) => {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) { o.forEach(umbla); return; }
+      if (tipuri(o)) gasite.push(o.type === 'VariableDeclaration' ? `${o.type} ${o.kind}` : o.type);
+      for (const k in o) if (k !== 'type') umbla(o[k]);
+    };
+    umbla(parseAst(src));
+    return gasite;
+  };
+  const blocuri = (src) => noduri(src, (o) => o.type === 'StaticBlock').length;
+  const js = toate.filter((c) => c.startsWith('/assets/') && c.endsWith('.js'));
+  const cu = js.map((c) => [c, blocuri(readFileSync(`dist${c}`, 'utf8'))]).filter(([, n]) => n > 0);
+  proba(js.length > 0 && cu.length === 0, `blocuri \`static {}\` în dist/assets: ${cu.length ? cu.map(([c, n]) => `${n} în ${c}`).join(', ') : `0, în ${js.length} fișiere JS`}`);
+  const three = readFileSync('node_modules/three/build/three.core.js', 'utf8');
+  const vechi = blocuri((await transformWithOxc(three, 'three.core.js', { target: 'es2022' })).code);
+  proba(vechi > 0, `control, three.core trecut prin ținta de dinainte (es2022): ${vechi} blocuri — pică`);
+
+  // Plasa de siguranță (public/plasa.js): un script clasic, cu `defer`, care la `load` scrie
+  // „Harta 3D nu a putut porni.” dacă modulul n-a pornit. Trebuie să se parseze și unde
+  // modulul nu se parsează, deci fără sintaxă de după ES5. Listă de forme PERMISE, nu de
+  // interzise: un nod pe care lista nu-l știe pică, deci o formă nouă nu trece neobservată.
+  // Ce nu lasă urmă în arbore nu se vede: virgula de după ultimul parametru (ES2017).
+  const ES5 = new Set(['Program', 'ExpressionStatement', 'BlockStatement', 'EmptyStatement', 'DebuggerStatement',
+    'ReturnStatement', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'IfStatement', 'SwitchStatement',
+    'SwitchCase', 'ThrowStatement', 'TryStatement', 'CatchClause', 'WhileStatement', 'DoWhileStatement', 'ForStatement',
+    'ForInStatement', 'FunctionDeclaration', 'FunctionExpression', 'VariableDeclaration', 'VariableDeclarator',
+    'ThisExpression', 'ArrayExpression', 'ObjectExpression', 'Property', 'UnaryExpression', 'UpdateExpression',
+    'BinaryExpression', 'AssignmentExpression', 'LogicalExpression', 'MemberExpression', 'ConditionalExpression',
+    'CallExpression', 'NewExpression', 'SequenceExpression', 'Identifier', 'Literal']);
+  const ATRIBUIRI_ES5 = new Set(['=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '>>>=', '|=', '^=', '&=']);
+  const nuEsteES5 = (o) => {
+    if (typeof o.type !== 'string') return false;
+    if (!ES5.has(o.type)) return true;
+    switch (o.type) {
+      case 'VariableDeclaration': return o.kind !== 'var';
+      case 'FunctionDeclaration': case 'FunctionExpression': return Boolean(o.async || o.generator);
+      case 'Property': return Boolean(o.method || o.shorthand || o.computed) || !['init', 'get', 'set'].includes(o.kind);
+      case 'CatchClause': return !o.param;
+      case 'BinaryExpression': return o.operator === '**';
+      case 'AssignmentExpression': return !ATRIBUIRI_ES5.has(o.operator);
+      case 'LogicalExpression': return o.operator !== '&&' && o.operator !== '||';
+      case 'MemberExpression': case 'CallExpression': return Boolean(o.optional);
+      case 'Literal': return typeof o.value === 'bigint' || /[^gim]/.test(o.regex?.flags ?? '')
+        || (typeof o.value === 'number' && /_|^0[bBoO]/.test(o.raw ?? '')) || /\\u\{/.test(o.raw ?? '');
+      default: return false;
+    }
+  };
+  const moderne = (src) => { try { return noduri(src, nuEsteES5); } catch (e) { return [`neparsat: ${e.message}`]; } };
+  const plasa = existsSync('dist/plasa.js') ? readFileSync('dist/plasa.js', 'utf8') : '';
+  const m = moderne(plasa);
+  proba(plasa && m.length === 0, `plasa.js publicată și scrisă în ES5${m.length ? `; are ${[...new Set(m)].join(', ')}` : ''}`);
+  // Controalele: fiecare formă de după ES5 pică singură; o bucată de ES5 cu tot ce are el mai
+  // rar — getteri, for-in, etichete, regex /gim, hexazecimal, virgula ca operator — trece.
+  const NOI = ['const a = 1;', 'let a = 1;', 'var f = () => 1;', 'var s = `x`;', 'var t = tag`x`;', 'var a = b ?? c;',
+    'try {} catch {}', 'function f(a = 1) {}', 'function f(...a) {}', 'f(...a);', 'function* g() {}', 'async function h() {}',
+    'var o = { a };', 'var o = { b() {} };', 'var o = { [k]: 1 };', 'function F() { return new.target; }', 'class A {}',
+    'var r = /a/u;', 'var r = /a/y;', 'var r = /a/s;', 'var n = 0b101;', 'var n = 0o17;', 'var n = 1_000;', 'var n = 10n;',
+    'var s = "\\u{1F600}";', 'var x = 2 ** 3;', 'x **= 2;', 'x ??= 1;', 'x ||= 1;', 'var a = o?.b;', 'var a = f?.();',
+    'for (var x of y) {}', 'var [a] = b;', 'var { a } = b;', 'label: { await x; }'];
+  const scapate = NOI.filter((s) => moderne(s).length === 0);
+  proba(scapate.length === 0, `control, ${NOI.length - scapate.length} din ${NOI.length} forme de după ES5 prinse, fiecare singură${scapate.length ? `; SCAPĂ: ${scapate.join('  ')}` : ''}`);
+  const VECHI = "'use strict'; var o = { get a() { return 1; }, set a(v) {}, b: function () {}, 'c': 2, 3: 4 };\n"
+    + 'for (var k in o) { if (!o.hasOwnProperty(k)) continue; }\nlbl: for (var i = 0; i < 2; i++) { break lbl; }\n'
+    + "var r = /a+/gim, n = 0x1f + 1e3 + .5, s = 'x\\u00e9';\ntry { throw new Error('x'); } catch (e) { void e; } finally {}\n"
+    + 'switch (n) { case 1: break; default: }\ndo { i--; } while (i > 0);\n'
+    + "var f = function g(a, b) { return typeof a === 'undefined' ? b : (a, b); };\nx = y || z && !w; x += 1; x >>>= 1; delete o.a; new Date;";
+  const vechi5 = moderne(VECHI);
+  proba(vechi5.length === 0, `control, ES5 cu getteri, for-in, etichete, /gim și hexazecimal trece: ${vechi5.length ? `PRINS ${vechi5.join(', ')}` : '0 noduri prinse'}`);
+  const tag = /<script\b[^>]*\bsrc="\/plasa\.js"[^>]*>/.exec(html)?.[0] ?? '';
+  const intrare = /\/assets\/index-[\w-]+\.js/.exec(html)?.[0];
+  const semnal = intrare && readFileSync(`dist${intrare}`, 'utf8').includes('__modulPornit') && plasa.includes('window.__modulPornit');
+  const mesaj = /<p id="incarcare" role="status">[^<]+<\/p>/.test(html);
+  proba(tag && /\bdefer\b/.test(tag) && !/type=/.test(tag) && semnal && mesaj,
+    `index.html: plasa clasică, cu defer (${tag || 'LIPSĂ'}); semnul __modulPornit în ${intrare ?? 'intrare LIPSĂ'} și în plasă: ${semnal ? 'da' : 'NU'}; mesajul de încărcare cu role="status": ${mesaj ? 'da' : 'NU'}`);
+}
+
 // Simularea regulilor refuză ce nu înțelege, în loc să potrivească greșit.
 const arunca = (f) => { try { f(); return false; } catch { return true; } };
 proba(['/data/:fisier', '/data/(a(b))', '/data/(x)?', '/data/(?:x)', '/data/()'].every((s) => arunca(() => regexSursa(s))),

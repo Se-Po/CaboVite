@@ -29,6 +29,36 @@ import { gama } from './comun/oklab.mjs';
 
 const BUGET = { triunghiuri: 600000, octeti_fisiere: 8 * 1048576 };
 const TRIUNGHIURI_ALPHA = 1923948;
+// Amprenta plaselor împrejurimilor, cu fâșiile lor: sha256 pe fiecare atribut. Citită pe
+// 2026-10-08 pe codul de dinainte de bucla scalară și de câmpul calculat o dată
+// (`plasaPlata`, `campNeted`), deci o optimizare trebuie s-o lase la bit; o schimbare voită
+// a datelor, a paletei sau a regulii o rescrie aici, cu motivul în commit.
+const AMPRENTA = {
+  harta_v6: {
+    position: 'cc29f85f0a85710e75b98a0909a87e32a486ddde2e9ce0e2b6c0911af26d81d2',
+    color: 'bad5a6e2b235affdb12495a14f51cae0edb0d4b3559f84853630f9f6865f492e',
+  },
+  harta_v9: {
+    position: '604deda144c53abf22b53cd8e319f9658a55ee69d0601b485bca230a7e17cc60',
+    color: 'bbb248f56070e86a990bc054037126e3562b94246a1120fa54eade2009702ab3',
+    normal: '6829f1b241085e1ce08a63137778cf84e2aeab89c1cf7e59f5d79fb3754e2e38',
+  },
+  harta_v7: {
+    position: 'a95d1834bb4879ed3ae055b9714a7c83c37c67bbeb3f306ba8e307b426f19e12',
+    color: '9a1a44ade4a6f8a70a0b9e08d34ca35fcfe328c05e74c2256f44706d1186982b',
+    normal: 'dd7db658defa7439930ec47fbc57a1ab3dd0352818f371e87c67609c8504af41',
+  },
+  harta_v8: {
+    position: '30acdb3364adf3b3893b5a0b6fd6757b77273f6c870b864aebaaa185f46a1141',
+    color: '2c9fdc2c408bdb992aae4976c022dae61cc3a4903502e91a7a4269778c3c48c1',
+    normal: '6fb7460d0488931c5f9897e1e2b59dfa54cd915f273946de9daf28b18e6eb231',
+  },
+};
+// Normalele nodurilor (`Math.hypot` în campNeted) cerute la construcția împrejurimilor:
+// numai pe uscat și pe apa cu uscat pe inelul 1, o singură dată pe nod, plus buclele
+// cusăturii. Azi 158 789; pe codul de dinainte, pe toate nodurile și de două ori pe
+// uscat, 645 357.
+const NORMALE_MAXIM = 160000;
 
 let picate = 0;
 const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
@@ -546,6 +576,44 @@ console.log('\nÎmprejurimile, fără codul umbrelor');
   const c = umbre(shader(new THREE.MeshStandardMaterial({ vertexColors: true }), false));
   proba(c.length === 4, `control, MeshStandardMaterial fără onBeforeCompile: ${c.join(', ')} — rămân`);
   cuCer.dispose(); cer.dispose(); lumini.dispose();
+}
+
+// ------------------------------------------------------------ 8. la bit și pe numărătoare
+
+console.log('\nConstrucția împrejurimilor, la bit și pe numărătoare');
+{
+  const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+  const amprenta = (i) => Object.fromEntries(i.plase.map((p) => [p.nume,
+    Object.fromEntries(Object.entries(p.teren.obiect.geometry.attributes).map(([k, a]) => [k, sha(a.array)]))]));
+  const a = amprenta(imp);
+  for (const n of NIVELURI_IMPREJURIMI) {
+    const chei = [...new Set([...Object.keys(AMPRENTA[n]), ...Object.keys(a[n] ?? {})])];
+    const diferite = chei.filter((k) => a[n]?.[k] !== AMPRENTA[n][k]);
+    proba(diferite.length === 0, `${n}, cu fâșia: sha256 pe ${chei.join(', ')}, cât în AMPRENTA${diferite.length ? `; diferă ${diferite.map((k) => `${k} (${a[n]?.[k]?.slice(0, 16)})`).join(', ')}` : ''}`);
+  }
+  // Numărătoarea normalelor, pe o construcție nouă, cu straturile reîncărcate.
+  const hypot = Math.hypot;
+  let normale = 0;
+  Math.hypot = (...x) => { normale++; return hypot(...x); };
+  let i2;
+  try { i2 = creeazaImprejurimi({ niveluri: await incarcaImprejurimi(), margineAlpha, paleta }); } finally { Math.hypot = hypot; }
+  proba(normale > 0 && normale <= NORMALE_MAXIM, `${normale} normale de nod calculate la construcție (cel mult ${NORMALE_MAXIM}; pe codul de dinainte, 645 357)`);
+  i2.dispose();
+  // Control: un nod de uscat al lui harta_v8 ridicat cu 1 mm schimbă amprenta lui și numai a lui.
+  const niv = await incarcaImprejurimi(), L8 = niv.find((L) => L.meta.nume === 'harta_v8');
+  // Nodul, la est de dreptunghiul R (înăuntrul lui plasa nu are celule; la vest e marea).
+  const R8 = dreptunghiR(L8);
+  let kn = -1;
+  for (let k = 0; k < L8.inaltimi.length && kn < 0; k++) if (k % L8.latime > R8.c1 + 1 && L8.inaltimi[k] > 100) kn = k;
+  L8.inaltimi = L8.inaltimi.slice();
+  L8.inaltimi[kn] += 0.001;
+  const i3 = creeazaImprejurimi({ niveluri: niv, margineAlpha, paleta });
+  const b = amprenta(i3);
+  const schimbate = NIVELURI_IMPREJURIMI.filter((n) => JSON.stringify(b[n]) !== JSON.stringify(a[n]));
+  // (Normala pe 8 biți nu simte 1 mm pe 256 m; poziția, da.)
+  proba(schimbate.join() === 'harta_v8' && b.harta_v8.position !== a.harta_v8.position,
+    `control negativ: un nod al lui harta_v8 ridicat cu 1 mm schimbă amprenta position numai la el (${schimbate.join(', ') || 'niciuna'})`);
+  i3.dispose();
 }
 
 imp.dispose();

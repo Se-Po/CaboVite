@@ -31,6 +31,9 @@ function retea(relief, dep, pastreaza) {
   const cota = relief.meta?.zMin_m;
   const apa = (r, c) => Number.isFinite(cota) && Y(r, c) <= cota && Y(r, c + 1) <= cota && Y(r + 1, c) <= cota && Y(r + 1, c + 1) <= cota;
   return {
+    X, Z,
+    /** Coloana celulei în care cade x (fără limitare la grilă). */
+    col: (x) => Math.floor((x - dep.x) / pasX + (w - 1) / 2),
     /** Intervalul de celule care acoperă cutia [x0, x1] × [z0, z1]. */
     interval(x0, x1, z0, z1) {
       const c0 = Math.max(0, Math.floor((x0 - dep.x) / pasX + (w - 1) / 2)), c1 = Math.min(w - 2, Math.floor((x1 - dep.x) / pasX + (w - 1) / 2));
@@ -46,6 +49,30 @@ function retea(relief, dep, pastreaza) {
       return Math.abs(A[1] - D[1]) <= Math.abs(B[1] - C[1]) ? [[A, C, D], [A, D, B]] : [[A, C, B], [C, D, B]];
     },
   };
+}
+
+/**
+ * Cât acoperă conturul pe x în fâșia închisă z ∈ [za, zb]: din vârfurile aflate în
+ * fâșie și din intersecțiile laturilor cu cele două drepte. Exact așa e întinderea pe x
+ * a bucății de poligon din fâșie, oricare ar fi poligonul. null dacă nu atinge fâșia.
+ */
+function intervalX(contur, za, zb) {
+  let lo = Infinity, hi = -Infinity;
+  const n = contur.length;
+  for (let k = 0; k < n; k++) {
+    const [px, pz] = contur[k], [qx, qz] = contur[(k + 1) % n];
+    if (pz >= za && pz <= zb) { if (px < lo) lo = px; if (px > hi) hi = px; }
+    // Vârfurile de pe dreaptă sunt prinse mai sus; aici numai traversările stricte.
+    if ((pz < za && qz > za) || (pz > za && qz < za)) {
+      const x = px + ((qx - px) * (za - pz)) / (qz - pz);
+      if (x < lo) lo = x; if (x > hi) hi = x;
+    }
+    if ((pz < zb && qz > zb) || (pz > zb && qz < zb)) {
+      const x = px + ((qx - px) * (zb - pz)) / (qz - pz);
+      if (x < lo) lo = x; if (x > hi) hi = x;
+    }
+  }
+  return lo <= hi ? [lo, hi] : null;
 }
 
 /** Planul y = a·x + b·z + c prin trei puncte. */
@@ -78,6 +105,8 @@ export function creeazaDrapaj({ suprafete, culori, relief, reliefPetic, pastreaz
   const baza = retea(relief, { x: 0, z: 0 }, pastreaza);
   const petic = reliefPetic ? retea(reliefPetic, reliefPetic.meta?.deplasare_scena ?? { x: 0, z: 0 }, undefined) : null;
   const straturi = new Map();
+  // Câte celule cercetează și câte tăieri face: proba din `npm run verifica-sanctuar`.
+  const numar = { celule: 0, taieri: 0 };
   for (const sup of suprafete) {
     const rgb = culori[sup.material];
     if (!rgb) continue;
@@ -88,16 +117,31 @@ export function creeazaDrapaj({ suprafete, culori, relief, reliefPetic, pastreaz
     for (const [plasa, sub] of [[petic, true], [baza, false]]) {
       if (!plasa) continue;
       const { c0, c1, r0, r1 } = plasa.interval(...cutie);
-      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
-        const tt = plasa.triunghiuri(r, c);
-        if (!tt) continue;
-        // Peticul acoperă numai gaura; în afara ei celulele lui nu sunt randate.
-        if (sub && subPetic && !subPetic(tt[0][0][0] + 0.25, tt[0][0][2] + 0.25)) continue;
-        for (const t of tt) {
-          const q = taieCuTriunghi(sup.contur, t);
-          if (q.length < 3) continue;
-          const pl = plan(t);
-          s.poligon(q.map(([x, z]) => [x, pl[0] * x + pl[1] * z + pl[2], z]), rgb, [0, 1, 0]);
+      for (let r = r0; r <= r1; r++) {
+        // Pe fiecare rând, numai coloanele pe care poligonul le atinge în fâșia
+        // rândului, nu toată cutia lui: suprafețele acoperă 26 807 m², iar cutiile lor
+        // 156 953. Cu o celulă de margine de fiecare parte:
+        // o celulă cu poligonul doar pe muchie poate da tot un poligon degenerat, iar
+        // una mai departe stă la cel puțin un pas de el, deci nu dă nimic. Ordinea
+        // celulelor rămâne aceeași, deci și ce se scrie, la octet.
+        const iv = intervalX(sup.contur, plasa.Z(r), plasa.Z(r + 1));
+        if (!iv) continue;
+        const ca = Math.max(c0, plasa.col(iv[0]) - 1), cb = Math.min(c1, plasa.col(iv[1]) + 1);
+        for (let c = ca; c <= cb; c++) {
+          numar.celule++;
+          // Peticul acoperă numai gaura; în afara ei celulele lui nu sunt randate. Colțul
+          // (X(c), Z(r)) e primul vârf al ambelor triunghiuri, deci testul de dinainte,
+          // pe triunghiul gata făcut, dădea același răspuns.
+          if (sub && subPetic && !subPetic(plasa.X(c) + 0.25, plasa.Z(r) + 0.25)) continue;
+          const tt = plasa.triunghiuri(r, c);
+          if (!tt) continue;
+          for (const t of tt) {
+            numar.taieri++;
+            const q = taieCuTriunghi(sup.contur, t);
+            if (q.length < 3) continue;
+            const pl = plan(t);
+            s.poligon(q.map(([x, z]) => [x, pl[0] * x + pl[1] * z + pl[2], z]), rgb, [0, 1, 0]);
+          }
         }
       }
     }
@@ -126,7 +170,7 @@ export function creeazaDrapaj({ suprafete, culori, relief, reliefPetic, pastreaz
     nrTriunghiuri += pozitii.length / 9;
   }
   return {
-    obiecte, nrTriunghiuri,
+    obiecte, nrTriunghiuri, numar,
     dispose() {
       for (const [g, m] of resurse) {
         g.dispose(); g.deleteAttribute('position'); g.deleteAttribute('color'); m.dispose();

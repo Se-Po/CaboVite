@@ -38,11 +38,16 @@ export const NIVELURI_NETEZITE = new Set(['harta_v9', 'harta_v7', 'harta_v8']);
  * Totul sau nimic, și la relief, și la straturi. Un nivel lipsă ar lăsa un inel de
  * mare între două uscaturi; un strat lipsă ar colora un inel după altă regulă.
  *
+ * `garda`: garda pornirii (loaders.js); abandonată, `null` fără avertisment.
+ *
  * @returns {Promise<object[]|null>}
  */
-export async function incarcaImprejurimi(nume = NIVELURI_IMPREJURIMI) {
+export async function incarcaImprejurimi(nume = NIVELURI_IMPREJURIMI, { garda = null } = {}) {
   try {
-    const niveluri = await Promise.all(nume.map((n) => incarcaRelief(`/data/${n}-dem.bin`, `/data/${n}-dem.json`)));
+    const niveluri = await Promise.all(nume.map((n) => incarcaRelief(`/data/${n}-dem.bin`, `/data/${n}-dem.json`, { garda })));
+    // Abandonată cât mai sosea un strat: straturile au ieșit `null` tăcut, deci n-are rost
+    // nici avertismentul „numai X din Y”.
+    if (garda?.semnal.aborted) return null;
     let interior = 'harta_v4';
     for (const [k, L] of niveluri.entries()) {
       const m = L.meta;
@@ -68,7 +73,7 @@ export async function incarcaImprejurimi(nume = NIVELURI_IMPREJURIMI) {
     }
     return niveluri;
   } catch (e) {
-    console.warn(`împrejurimile lipsesc (${e.message}) — harta rămâne cu marginile tăiate`);
+    if (!garda?.semnal.aborted) console.warn(`împrejurimile lipsesc (${e.message}) — harta rămâne cu marginile tăiate`);
     return null;
   }
 }
@@ -137,6 +142,7 @@ export function creeazaImprejurimi({ niveluri, margineAlpha, paleta, culoare, ce
       const pastreaza = (x, z) => !(x > R.x0 && x < R.x1 && z > R.z0 && z < R.z1);
       const teren = creeazaTeren(L, {
         deplasare: dep, pastreaza, paleta, ndvi: strat, culoare, cusatura: cus, neted,
+        camp: camp?.tot(),   // același câmp, nu încă unul făcut în creeazaTeren
         material: neted ? materiale.neted : materiale.plat,
       });
       teren.obiect.name = m.nume;

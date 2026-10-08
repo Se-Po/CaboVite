@@ -2,6 +2,136 @@
 // Satelit (KTX2). Loaderele grele stau aici, câte o singură instanță.
 
 /**
+ * Cât poate tăcea rețeaua în timpul pornirii: atâta vreme fără NICIUN octet pe NICIO
+ * cerere a pornirii, iar pornirea se abandonează. 20 s e o alegere, nu o măsurătoare.
+ */
+export const INACTIVITATE_PORNIRE_MS = 20_000;
+
+/**
+ * Garda pornirii: un singur ceas de inactivitate și un singur semnal de abandon pentru
+ * toate cererile pornirii — relieful cu straturile lui, paleta, sanctuarul, clădirile,
+ * împrejurimile.
+ *
+ * Fără ea, un corp de răspuns care începe și apoi tace — o rețea mobilă care nu se rupe,
+ * un proxy — ținea pagina pe ecranul gol fără niciun mesaj, oricât, și chiar pe un fișier
+ * opțional: pornirea le așteaptă pe toate. Un termen pe fiecare cerere ar fi oprit una
+ * sănătoasă, pusă la coadă în spatele celorlalte pe o legătură lentă; de aceea ceasul e
+ * unul singur și se rearmează la orice octet primit de oricare (`progres`). Abia după
+ * `inactivitateMs` fără niciun progres nicăieri abandonează totul, cu `motiv` — o eroare
+ * `TimeoutError` —, iar `expirat` devine true.
+ *
+ * Ca `inCursa`, mai jos: un termen în care pagina a fost ascunsă măcar o clipă nu se
+ * numără, iar un temporizator care sună cu peste o secundă întârziere nici el. Într-o filă
+ * înghețată, bucățile sosite între timp încă așteaptă la coadă; după ultima dată a pornirii,
+ * o construcție care trece de termen, cu ceasul încă armat, ar fi dat altfel un `expirat`
+ * fals. Ceasul pornește atunci din nou, întreg.
+ *
+ * `opreste()` oprește numai ceasul: pornirea s-a terminat. `abandoneaza()` oprește și
+ * cererile; e idempotent. `acum` se schimbă numai în probe.
+ */
+export function creeazaGardaPornirii({ inactivitateMs = INACTIVITATE_PORNIRE_MS, acum = () => performance.now() } = {}) {
+  const oprire = new AbortController();
+  const doc = globalThis.document;
+  let ceas = null, ascuns = false, oprit = false, expirat = false, motiv = null;
+  const laVizibilitate = () => { if (doc.hidden) ascuns = true; };
+  const opreste = () => {
+    oprit = true;
+    clearTimeout(ceas);
+    doc?.removeEventListener?.('visibilitychange', laVizibilitate);
+  };
+  const abandoneaza = (m) => {
+    opreste();
+    if (oprire.signal.aborted) return;
+    motiv = m ?? new DOMException('pornirea s-a abandonat', 'AbortError');
+    oprire.abort(motiv);
+  };
+  const arma = () => {
+    if (oprit) return;
+    clearTimeout(ceas);
+    ascuns = !!doc?.hidden;
+    const termen = acum() + inactivitateMs;
+    ceas = setTimeout(() => {
+      if (ascuns || acum() - termen > 1000) return arma();
+      const e = new Error(`nicio cerere a pornirii n-a primit vreun octet în ${inactivitateMs / 1000} s`);
+      e.name = 'TimeoutError';
+      expirat = true;
+      abandoneaza(e);
+    }, inactivitateMs);
+  };
+  doc?.addEventListener?.('visibilitychange', laVizibilitate);
+  arma();
+  return {
+    semnal: oprire.signal,
+    progres: arma,
+    opreste,
+    abandoneaza,
+    get expirat() { return expirat; },
+    get motiv() { return motiv; },
+    /** Aruncă dacă pornirea a fost abandonată: încărcătoarele opționale întorc atunci `null` tăcut. */
+    verifica() { if (motiv) throw motiv; },
+  };
+}
+
+/**
+ * `fetch` pentru o cerere a pornirii: cu semnalul gărzii (sau cu `semnal`, al cererii), iar
+ * antetul sosit e progres. Abandonată de gardă, aruncă `garda.motiv`, nu AbortError-ul
+ * browserului — mesajul spune de ce. Fără gardă, e `fetch(url)` de dinainte.
+ */
+export async function cere(url, garda = null, semnal = garda?.semnal) {
+  try {
+    const r = await fetch(url, semnal ? { signal: semnal } : undefined);
+    garda?.progres();
+    return r;
+  } catch (e) {
+    throw garda?.semnal.aborted ? garda.motiv : e;
+  }
+}
+
+/**
+ * Corpul unui răspuns, ca ArrayBuffer. Cu o gardă, citit pe bucăți: fiecare bucată sosită
+ * rearmează ceasul, iar abandonul oprește citirea și aruncă `garda.motiv`. Fără gardă,
+ * `arrayBuffer()` ca înainte.
+ */
+export async function citesteOcteti(r, garda = null) {
+  const cititor = garda ? r.body?.getReader?.() : null;
+  if (!cititor) return r.arrayBuffer();
+  if (garda.semnal.aborted) {
+    cititor.cancel().catch(() => {});
+    throw garda.motiv;
+  }
+  // Un corp care nu ascultă de semnal — în probe — se oprește de aici. `cancel()` termină
+  // citirea în curs cu `done`, deci abandonul se judecă după buclă.
+  const laAbandon = () => { cititor.cancel().catch(() => {}); };
+  garda.semnal.addEventListener('abort', laAbandon, { once: true });
+  const bucati = [];
+  let n = 0;
+  try {
+    for (;;) {
+      const { done, value } = await cititor.read();
+      if (done || garda.semnal.aborted) break;
+      bucati.push(value);
+      n += value.byteLength;
+      garda.progres();
+    }
+  } catch (e) {
+    throw garda.semnal.aborted ? garda.motiv : e;
+  } finally {
+    garda.semnal.removeEventListener('abort', laAbandon);
+  }
+  if (garda.semnal.aborted) throw garda.motiv;
+  const tot = new Uint8Array(n);
+  let o = 0;
+  for (const b of bucati) { tot.set(b, o); o += b.byteLength; }
+  return tot.buffer;
+}
+
+/** Corpul unui răspuns, ca JSON — `citesteOcteti`, apoi decodat ca `Response.json()`. */
+export async function citesteJson(r, garda = null) {
+  if (!garda) return r.json();
+  return JSON.parse(new TextDecoder().decode(await citesteOcteti(r, garda)));
+}
+
+/**
  * Încarcă heightmap-ul produs de `npm run build-petic`, împreună cu baza lui,
  * produsă de `npm run build-zona`.
  *
@@ -14,22 +144,46 @@
  *
  * `adancime` oprește lanțul de baze. O hartă care s-ar referi la ea însăși — o
  * greșeală de tastare în sidecar — ar încărca la nesfârșit altfel.
+ *
+ * `garda`: garda pornirii (`creeazaGardaPornirii`), pentru toate cererile hărții, ale
+ * bazei și ale straturilor. Abandonată, `incarcaRelief` aruncă `garda.motiv`.
  */
 export async function incarcaRelief(
   urlBin = '/data/harta_v5-dem.bin',
   urlMeta = '/data/harta_v5-dem.json',
-  adancime = 0,
+  { adancime = 0, garda = null } = {},
 ) {
-  const [rMeta, rBin] = await Promise.all([fetch(urlMeta), fetch(urlBin)]);
-  if (!rMeta.ok) throw new Error(`metadatele reliefului: HTTP ${rMeta.status} la ${urlMeta}`);
-  if (!rBin.ok) throw new Error(`relieful: HTTP ${rBin.status} la ${urlBin}`);
+  const cereri = Promise.all([cere(urlMeta, garda), cere(urlBin, garda)]);
+  // Stratul NDVI pleacă ODATĂ cu relieful, nu după sidecar: numele lui e al hărții, iar
+  // al hărții stă deja în URL (`/data/<nume>-dem.json`). Lățimea și înălțimea se verifică
+  // după ce sosește sidecarul (`incarcaStrat`). Așteptând sidecarul, lanțul alpha avea
+  // trei dus-întorsuri până la date — peticul, stratul lui și baza, stratul bazei —; acum
+  // are două, iar împrejurimile unul.
+  const numeUrl = /([^/]+)-dem\.json$/.exec(urlMeta)?.[1] ?? null;
+  const strat = numeUrl ? cereStrat(numeUrl, garda) : null;
 
-  const meta = await rMeta.json();
+  // Până la predarea lui către `incarcaStrat`, stratul e al nostru: o hartă căzută îl oprește,
+  // altfel cererile lui ar rămâne fără stăpân — pe un nivel al împrejurimilor pornirea merge
+  // mai departe, iar garda se oprește fără să le abandoneze.
+  let rMeta, rBin, meta;
+  try {
+    [rMeta, rBin] = await cereri;
+    if (!rMeta.ok) throw new Error(`metadatele reliefului: HTTP ${rMeta.status} la ${urlMeta}`);
+    if (!rBin.ok) throw new Error(`relieful: HTTP ${rBin.status} la ${urlBin}`);
+    meta = await citesteJson(rMeta, garda);
+  } catch (e) {
+    strat?.opreste();
+    throw e;
+  }
 
-  // Stratul NDVI pleacă și el acum, din același motiv ca baza de mai jos: numele
-  // hărții abia a sosit, iar descărcarea lui n-are de ce să aștepte relieful.
-  // Nu aruncă niciodată — vezi `incarcaStrat`.
-  const stratGata = incarcaStrat(meta.nume, meta.latime, meta.inaltime);
+  // Un sidecar cu alt nume decât URL-ul: cererea pornită se oprește, iar stratul se cere
+  // după numele din sidecar, ca înainte. Nu aruncă niciodată — vezi `incarcaStrat`.
+  let stratGata;
+  if (strat && meta.nume === numeUrl) stratGata = incarcaStrat(meta.nume, meta.latime, meta.inaltime, { cereri: strat.cereri, garda });
+  else {
+    strat?.opreste();
+    stratGata = incarcaStrat(meta.nume, meta.latime, meta.inaltime, { garda });
+  }
 
   // Baza pleacă ACUM, nu după ce peticul a ajuns întreg și a fost convertit.
   //
@@ -39,11 +193,11 @@ export async function incarcaRelief(
   // reliefului și straturilor trebuie duși oricum. Se scoate din serie
   // așteptarea, nu octeții.
   const bazaGata = (meta.baza && adancime < 1)
-    ? incarcaRelief(`/data/${meta.baza}-dem.bin`, `/data/${meta.baza}-dem.json`, adancime + 1)
+    ? incarcaRelief(`/data/${meta.baza}-dem.bin`, `/data/${meta.baza}-dem.json`, { adancime: adancime + 1, garda })
     : null;
   bazaGata?.catch(() => {});   // tratarea adevărată e la `await`, mai jos
 
-  const buf = await rBin.arrayBuffer();
+  const buf = await citesteOcteti(rBin, garda);
   const asteptat = meta.latime * meta.inaltime * 2;
   if (buf.byteLength !== asteptat)
     throw new Error(`relief trunchiat: ${buf.byteLength} octeți, așteptat ${asteptat}`);
@@ -85,29 +239,32 @@ export async function incarcaRelief(
  * și pagina index (text/html), în dev și în preview deopotrivă. Un `r.ok` ar
  * trece; sidecarul pică la `json()`, iar binarul la verificarea lungimii.
  *
+ * `cereri`: cele două cereri ale stratului, pornite dinainte de `cereStrat` (vezi
+ * `incarcaRelief`); fără ele, le pornește aici. `garda`: garda pornirii; abandonată,
+ * `null` fără avertisment — nu lipsește nimic, pornirea s-a oprit.
+ *
  * @returns {Promise<{coduri: Uint8Array, niveluri: Float64Array, meta: object} | null>}
  */
-export async function incarcaStrat(nume, latime, inaltime) {
+export async function incarcaStrat(nume, latime, inaltime, { cereri = null, garda = null } = {}) {
   const lipsa = (motiv) => {
+    if (garda?.semnal.aborted) return null;
     console.warn(`stratul NDVI ${nume ?? '?'} lipsește (${motiv}) — terenul se colorează fără el`);
     return null;
   };
   try {
     if (!nume) return lipsa('sidecarul hărții n-are `nume`');
-    const [rMeta, rBin] = await Promise.all([
-      fetch(`/data/${nume}-ndvi.json`), fetch(`/data/${nume}-ndvi.bin`),
-    ]);
+    const [rMeta, rBin] = await (cereri ?? cereStrat(nume, garda).cereri);
     if (!rMeta.ok || !rBin.ok) return lipsa(`HTTP ${rMeta.status} / ${rBin.status}`);
 
     let meta;
-    try { meta = await rMeta.json(); } catch { return lipsa('sidecarul nu e JSON'); }
+    try { meta = await citesteJson(rMeta, garda); } catch { return lipsa('sidecarul nu e JSON'); }
     if (meta?.harta !== nume) return lipsa(`sidecarul e al hărții ${meta?.harta}`);
     if (meta.latime !== latime || meta.inaltime !== inaltime)
       return lipsa(`${meta.latime} × ${meta.inaltime}, harta are ${latime} × ${inaltime}`);
     if (meta.codare?.biti !== 4 || !Array.isArray(meta.niveluri) || meta.niveluri.length !== 16)
       return lipsa('codare necunoscută');
 
-    const buf = await rBin.arrayBuffer();
+    const buf = await citesteOcteti(rBin, garda);
     const asteptat = Math.ceil((latime * inaltime) / 2);
     if (buf.byteLength !== asteptat) return lipsa(`${buf.byteLength} octeți, așteptat ${asteptat}`);
 
@@ -121,6 +278,24 @@ export async function incarcaStrat(nume, latime, inaltime) {
   } catch (e) {
     return lipsa(e.message);
   }
+}
+
+/**
+ * Pornește cele două cereri ale stratului NDVI al hărții `nume`, fără să le aștepte.
+ * Le judecă `incarcaStrat`; o cerere oprită sau căzută pe care n-o mai primește nimeni
+ * nu iese ca `unhandledrejection`. Le oprește și garda pornirii — cu un ascultător, nu cu
+ * `AbortSignal.any`, pe care Firefox 115 ESR nu-l are.
+ */
+function cereStrat(nume, garda = null) {
+  const oprire = new AbortController();
+  if (garda?.semnal.aborted) oprire.abort();
+  else garda?.semnal.addEventListener('abort', () => oprire.abort(), { once: true });
+  const cereri = Promise.all([
+    cere(`/data/${nume}-ndvi.json`, garda, oprire.signal),
+    cere(`/data/${nume}-ndvi.bin`, garda, oprire.signal),
+  ]);
+  cereri.catch(() => {});
+  return { cereri, opreste: () => oprire.abort() };
 }
 
 /**
@@ -158,10 +333,12 @@ export function straturiNdvi(relief, reliefPetic) {
  * aici: încărcarea pleacă în paralel cu relieful, deci harta încă nu e aici. O
  * verifică `creeazaSanctuar()`.
  *
+ * `garda`: garda pornirii; abandonată, `null` fără avertisment.
+ *
  * @returns {Promise<object|null>}
  */
-export function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
-  return incarcaCladiriDate(url, 'sanctuar', (motiv) => `sanctuarul lipsește (${motiv}) — scena pornește fără el`);
+export function incarcaSanctuar(url = '/data/sanctuar_v2.json', { garda = null } = {}) {
+  return incarcaCladiriDate(url, 'sanctuar', (motiv) => `sanctuarul lipsește (${motiv}) — scena pornește fără el`, garda);
 }
 
 /**
@@ -170,20 +347,21 @@ export function incarcaSanctuar(url = '/data/sanctuar_v2.json') {
  *
  * @returns {Promise<object|null>}
  */
-export function incarcaCladiri(url = '/data/cladiri_v1.json') {
-  return incarcaCladiriDate(url, 'cladiri', (motiv) => `clădirile din afara sanctuarului lipsesc (${motiv}) — scena pornește fără ele`);
+export function incarcaCladiri(url = '/data/cladiri_v1.json', { garda = null } = {}) {
+  return incarcaCladiriDate(url, 'cladiri', (motiv) => `clădirile din afara sanctuarului lipsesc (${motiv}) — scena pornește fără ele`, garda);
 }
 
-async function incarcaCladiriDate(url, prefix, mesaj) {
+async function incarcaCladiriDate(url, prefix, mesaj, garda) {
   const lipsa = (motiv) => {
+    if (garda?.semnal.aborted) return null;
     console.warn(mesaj(motiv));
     return null;
   };
   try {
-    const r = await fetch(url);
+    const r = await cere(url, garda);
     if (!r.ok) return lipsa(`HTTP ${r.status}`);
     let d;
-    try { d = await r.json(); } catch { return lipsa('nu e JSON'); }
+    try { d = await citesteJson(r, garda); } catch { return lipsa('nu e JSON'); }
     if (!new RegExp(`^${prefix}_v\\d+$`).test(d?.nume ?? '')) return lipsa(`nume necunoscut: ${d?.nume}`);
     if (d.versiune_schema !== 1) return lipsa(`schema ${d.versiune_schema}, aștept 1`);
     for (const k of ['corpuri', 'turnuri', 'cupole', 'ziduri', 'apeduct', 'surse'])
@@ -214,7 +392,38 @@ export async function creeazaIncarcatorKtx2(renderer) {
 }
 
 /**
- * Poate porni transcodorul Basis aici? Aruncă dacă nu, înaintea celor ~12 MB de texturi.
+ * Eliberează un încărcător KTX2 oricând, și cu transcodorul încă în drum. r186 revocă URL-ul
+ * workerului (`workerSourceURL`) numai dacă există deja, iar `init()` îl face abia când sosește
+ * transcodorul: un încărcător eliberat înainte — o renunțare, un abandon — lăsa ~60 KB de blob
+ * cât trăiește pagina. `dispose()` rămâne pe loc, ca un încărcător nou să nu primească
+ * avertismentul „Multiple active KTX2 loaders”; restul se face la sosire.
+ */
+export function elibereazaKtx2(k) {
+  if (!k) return;
+  k.dispose();
+  k.transcoderPending?.then(() => {
+    k.workerPool.dispose();
+    if (k.workerSourceURL) URL.revokeObjectURL(k.workerSourceURL);
+  }, () => {});
+}
+
+/**
+ * Iese o textură Satelit comprimată pe placa asta? Se știe din `workerConfig`, imediat după
+ * `detectSupport`, înaintea oricărei cereri. Fără niciun format, transcodorul dă RGBA
+ * necomprimat, de patru ori mai mare: atunci peticul nici nu se mai cere (satelit.js).
+ *
+ * PVRTC nu se numără: cere laturi putere a lui 2 (`needsPowerOfTwo`), iar nicio textură
+ * Satelit nu le are, deci acolo tot RGBA iese. ETC1 se numără: texturile n-au alfa.
+ * `workerConfig` e public, dar nedocumentat; `npm run verifica-pagina` confruntă predicatul
+ * cu alegerea transcodorului însuși (`getTranscoderFormat`), pe fiecare .ktx2 din
+ * public/data, și pică dacă three schimbă câmpurile.
+ */
+export function cuCompresie(c) {
+  return Boolean(c && (c.astcSupported || c.bptcSupported || c.dxtSupported || c.etc2Supported || c.etc1Supported));
+}
+
+/**
+ * Poate porni transcodorul Basis aici? Aruncă dacă nu, înaintea oricărei texturi.
  *
  * Workerul lui cere WebAssembly și `new Function` — embind își face funcțiile din text.
  * Un CSP fără 'unsafe-eval' (numai cu 'wasm-unsafe-eval' cade al doilea), WebAssembly
@@ -310,6 +519,28 @@ export async function incarcaSidecarOrto(nume, semnal = null) {
 }
 
 /**
+ * Pornește cererile unei texturi Satelit — sidecarul și fișierul — DEODATĂ, fără să le
+ * aștepte; le judecă `incarcaOrto`. Fișierul nu mai așteaptă sidecarul: lanțul costa un
+ * dus-întors pe fiecare textură, iar cererile pornite devreme (satelit.js,
+ * `descarcaSatelit`) ar fi rămas altfel în urma construcției. `opreste()` le oprește pe
+ * amândouă — `incarcaOrto` o cheamă pe orice eșec, ca un sidecar lipsă să nu mai tragă după
+ * el megaocteții fișierului —, la fel `semnal`, printr-un ascultător, nu cu
+ * `AbortSignal.any`, pe care Firefox 115 ESR nu-l are. Fără `sidecar`, numai fișierul.
+ */
+export function cereOrto(nume, semnal = null, { sidecar = true } = {}) {
+  const oprire = new AbortController();
+  if (semnal?.aborted) oprire.abort();
+  else semnal?.addEventListener('abort', () => oprire.abort(), { once: true });
+  const meta = sidecar ? incarcaSidecarOrto(nume, oprire.signal) : null;
+  const raspuns = fetch(`/data/${nume}.ktx2`, { signal: oprire.signal });
+  // O cerere pe care n-o mai judecă nimeni — oprită, sau căzută după abandon — nu iese ca
+  // `unhandledrejection`; tratarea adevărată e în `incarcaOrto`.
+  meta?.catch(() => {});
+  raspuns.catch(() => {});
+  return { meta, raspuns, opreste: () => oprire.abort() };
+}
+
+/**
  * Textura Satelit a unei hărți. NU aruncă: fără ea, pagina rămâne pe Relief.
  *
  * Fișierul se verifică înainte de decodare — mărimea, sha256, antetul KTX2 cu
@@ -322,17 +553,21 @@ export async function incarcaSidecarOrto(nume, semnal = null) {
  * `limitaMs`: cât poate dura transcodarea după ce transcodorul a sosit
  * (`LIMITA_TRANSCODARE_MS`); trecută, `null` cu un avertisment.
  *
+ * `cereri`: cererile pornite dinainte cu `cereOrto`; fără ele, le pornește aici, tot deodată.
+ *
  * @returns {Promise<{meta: object, textura: THREE.CompressedTexture}|null>}
  */
-export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { limitaMs = LIMITA_TRANSCODARE_MS } = {}) {
+export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { limitaMs = LIMITA_TRANSCODARE_MS, cereri = null } = {}) {
+  const c = cereri ?? cereOrto(nume, semnal, { sidecar: !metaGata });
   const lipsa = (motiv) => {
+    c.opreste();
     if (semnal?.aborted) return null;
     console.warn(`textura Satelit ${nume} lipsește (${motiv})`);
     return null;
   };
   try {
-    const meta = metaGata ?? await incarcaSidecarOrto(nume, semnal);
-    const r = await fetch(`/data/${nume}.ktx2`, { signal: semnal });
+    const meta = metaGata ?? await c.meta;
+    const r = await c.raspuns;
     if (!r.ok) return lipsa(`HTTP ${r.status}`);
     const buf = await r.arrayBuffer();
     if (buf.byteLength !== meta.octeti) return lipsa(`${buf.byteLength} octeți, aștept ${meta.octeti}`);

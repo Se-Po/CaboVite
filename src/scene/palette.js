@@ -16,6 +16,8 @@
 // `p.calcar` (culoarea hârtiei, 0xf7f3ea) și `p.masurat.calcar` (piatra, 0x9d958c)
 // stăteau pe același obiect, la o literă distanță.
 
+import { cere, citesteJson } from './loaders.js';
+
 /**
  * Paleta scenei, pentru interfața întunecată.
  *
@@ -89,15 +91,17 @@ const SPRE_SRGB = (() => {
  * Fiecare material are `rgb`, `culoare` (0xRRGGBB) și `liniar` — cele trei canale
  * în RGB liniar, calculate aici o singură dată, ca regula să nu le reconvertească
  * pe fiecare fațetă.
+ *
+ * `garda`: garda pornirii (loaders.js); abandonată, fără avertisment.
  */
 let masurat = null;
 let atribuireOrtofoto = null;
 
-export async function incarcaPaleta(url = '/data/paleta-teren.json') {
+export async function incarcaPaleta(url = '/data/paleta-teren.json', { garda = null } = {}) {
   try {
-    const r = await fetch(url);
+    const r = await cere(url, garda);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
+    const j = await citesteJson(r, garda);
     masurat = Object.fromEntries(Object.entries(j.materiale).map(([nume, m]) => [nume, {
       ...m,
       culoare: (m.rgb[0] << 16) | (m.rgb[1] << 8) | m.rgb[2],
@@ -109,7 +113,7 @@ export async function incarcaPaleta(url = '/data/paleta-teren.json') {
   } catch (e) {
     // Pagina trebuie să rămână o pagină. Fără măsurători, culoareTeren() întoarce
     // griul de rezervă — exact cum arăta terenul înainte să existe fotografiile.
-    console.warn('paleta măsurată nu s-a încărcat:', e.message);
+    if (!garda?.semnal.aborted) console.warn('paleta măsurată nu s-a încărcat:', e.message);
     masurat = null;
     atribuireOrtofoto = null;
   }

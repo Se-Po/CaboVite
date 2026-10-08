@@ -78,5 +78,10 @@ export default defineConfig({
   // Hărțile de cod se publică, dar Vercel le dă numai membrilor echipei autentificați
   // („Protected Source Maps”); publicul primește 403. Rămân pentru depanarea paginii
   // publicate, cu stivele arătate pe sursă (alegerea autorului, 2026-10-08).
-  build: { target: 'es2022', sourcemap: true },
+  //
+  // Ținta: es2022, plus Safari și iOS 15.4. three r186 are șase blocuri `static {}`, pe care
+  // es2022 le lasă neatinse, iar Safari le parsează abia de la 16.4: sub el tot graful de module
+  // cădea, cu pagina goală. Coborâte, devin atribuiri după clasă (+62 B în three.core). Proba:
+  // `npm run verifica-livrare` numără blocurile din dist/assets.
+  build: { target: ['es2022', 'safari15.4', 'ios15.4'], sourcemap: true },
 });

@@ -14,6 +14,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
 import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
 import { GRI_REZERVA, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
@@ -29,6 +30,27 @@ const OCTETI_ATRIBUTE = 103893192;    // 54 × TRIUNGHIURI: position Float32 + c
 // pragul stă sub griul de rezervă măsurat pe aceleași fațete — tipărit alături —,
 // deci o regulă care a căzut înapoi pe gri, sau una stricată, pică.
 const PRAG_ORTOFOTO = 11;
+// Amprenta plaselor lui alpha, cu regula de culoare și NDVI-ul, ca în pagină: sha256 pe
+// atribute, plus cutia și sfera scrise. Citită pe 2026-10-08 pe codul de dinainte de
+// bucla scalară (`plasaPlata`), deci o optimizare a construcției trebuie s-o lase la bit;
+// o schimbare voită a datelor, a paletei sau a regulii o rescrie aici, cu motivul în commit.
+const AMPRENTA = {
+  baza: {
+    position: '4a45b6efb66dffe78bccb3c54948ac979807d9bae69e14c4b0c698067b5e0f61',
+    color: '90852b2941ceaec373e2d0cfcd3c3e2efe07f20640e68136d45bafc58b53d267',
+    cutie: '-567,-8,-1492,1163,150.0030975341797,1288',
+    sfera: '298,71.00154876708984,-102,1639.0748136395723',
+  },
+  petic: {
+    position: 'ba604ad603e1f262184e13b4092ccb549539c743066eaed2abce9a83c8d377eb',
+    color: '544a1398ce8d25e420e2ec679f28ee720a83df3acfc0b115d28a94f43aa8310b',
+    cutie: '-161,-8,-600,339,134.35824584960938,100',
+    sfera: '89,63.17912292480469,-250,435.96613118491723',
+  },
+};
+// Apelurile lui `pastreaza` la construcția bazei. Apa se întreabă întâi, deci câte celule
+// nu sunt apă; pe codul de dinainte, câte celule are cutia: 1 735 196.
+const APELURI_PASTREAZA = 774562;
 
 let picate = 0;
 const proba = (bun, text) => {
@@ -303,6 +325,61 @@ async function main() {
       + `mediană ${q.mediana.toFixed(2)}, p90 ${q.p90.toFixed(2)}`);
   } else {
     console.log('      față de ortofoto: sărit, dala nu e în date-sursa/ortofoto');
+  }
+
+  console.log('\n5. Construcția, la bit și pe numărătoare');
+  {
+    const incarcat = await incarcaRelief();
+    const relief = incarcat.baza, reliefPetic = incarcat;
+    const masca = mascaBazei(relief, reliefPetic);
+    const ndvi = straturiNdvi(relief, reliefPetic);
+    let apeluri = 0;
+    const pastreaza = (x, zz) => { apeluri++; return masca.pastreaza(x, zz); };
+    const t0 = performance.now();
+    const baza = creeazaTeren(relief, { pastreaza, paleta: paletaCurenta(), ndvi: ndvi.baza });
+    const msBaza = performance.now() - t0;
+    const petic = creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta: paletaCurenta(), ndvi: ndvi.petic });
+    const amprenta = (t) => {
+      const g = t.obiect.geometry, b = g.boundingBox, sf = g.boundingSphere;
+      const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+      return {
+        position: sha(g.attributes.position.array), color: sha(g.attributes.color.array),
+        cutie: [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].join(','),
+        sfera: [sf.center.x, sf.center.y, sf.center.z, sf.radius].join(','),
+      };
+    };
+    for (const [care, t] of [['baza', baza], ['petic', petic]]) {
+      const a = amprenta(t), diferite = Object.keys(AMPRENTA[care]).filter((k) => a[k] !== AMPRENTA[care][k]);
+      proba(diferite.length === 0, `${care}: sha256 pe position și color, cutia și sfera, cât în AMPRENTA${diferite.length ? `; diferă ${diferite.map((k) => `${k} (${a[k].slice(0, 16)})`).join(', ')}` : ''}`);
+    }
+    proba(apeluri <= APELURI_PASTREAZA, `baza: ${apeluri} apeluri ale lui pastreaza (cel mult ${APELURI_PASTREAZA}: apa întâi; pe codul de dinainte, 1 735 196); construită în ${msBaza.toFixed(0)} ms`);
+    // Control: un nod de uscat al peticului ridicat cu 1 mm schimbă amprenta.
+    const k = reliefPetic.inaltimi.findIndex((y) => y > 50);
+    const mutat = { ...reliefPetic, inaltimi: reliefPetic.inaltimi.slice() };
+    mutat.inaltimi[k] += 0.001;
+    const pm = creeazaTeren(mutat, { deplasare: reliefPetic.meta.deplasare_scena, paleta: paletaCurenta(), ndvi: ndvi.petic });
+    proba(amprenta(pm).position !== AMPRENTA.petic.position, `control negativ: un nod al peticului ridicat cu 1 mm dă altă amprentă position`);
+    pm.dispose(); baza.dispose(); petic.dispose();
+
+    // Scurtătura dreptunghiului din mascaBazei (interiorul strict al unui contur aliniat
+    // la axe) dă exact ce dă inPoligon: pe centrul fiecărei celule a bazei, pe muchii, în
+    // colțuri, la ±1e-9 de ele și în afară.
+    const L = masca.limitaDatelor, g = reliefPetic.meta.gaura_scena;
+    const xs = L.map((q) => q.x), zs = L.map((q) => q.z);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+    const asteptat = (x, zz) => inPoligon(x, zz, L) && !(x > g.x0 && x < g.x1 && zz > g.z0 && zz < g.z1);
+    let n = 0, gresite = 0;
+    const incearca = (x, zz) => { n++; if (masca.pastreaza(x, zz) !== asteptat(x, zz)) gresite++; };
+    const { latime: w, inaltime: h, pasX, pasZ } = relief;
+    for (let r = 0; r < h - 1; r++) for (let c = 0; c < w - 1; c++)
+      incearca((c - (w - 1) / 2) * pasX + pasX / 2, (r - (h - 1) / 2) * pasZ + pasZ / 2);
+    for (const e of [0, 1e-9, -1e-9, 0.5, -0.5]) {
+      for (let f = 0; f <= 1; f += 1 / 64) {
+        const x = x0 + (x1 - x0) * f, zz = z0 + (z1 - z0) * f;
+        incearca(x, z0 + e); incearca(x, z1 + e); incearca(x0 + e, zz); incearca(x1 + e, zz);
+      }
+    }
+    proba(gresite === 0, `mascaBazei: scurtătura dreptunghiului dă ce dă inPoligon pe ${n} puncte (${gresite} diferite)`);
   }
 
   console.warn = warnOriginal;
