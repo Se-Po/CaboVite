@@ -83,7 +83,9 @@ const rectDin = (el) => el?.getBoundingClientRect?.() ?? null;
  * - **pivotul pe teren**: la începutul unei rotiri ținta coboară pe raza privirii până
  *   pe teren. Imaginea nu se mișcă, iar camera se rotește în jurul locului privit, nu
  *   al unui punct care plutește la 60 m deasupra mării;
- * - **ciupirea** apropie spre punctul dintre degete, ca rotița spre cursor.
+ * - **ciupirea** apropie spre punctul dintre degete, ca rotița spre cursor;
+ * - **gestul se încheie și fără `pointerup`** (`incheieGestul`): la un zbor pornit cu
+ *   harta ținută, la pierderea capturii pointerului și la pierderea focusului ferestrei.
  *
  * `connect()` și `update()` rulează din constructorul lui OrbitControls, înaintea
  * câmpurilor de mai jos: nimic de aici nu se sprijină pe ele.
@@ -91,6 +93,14 @@ const rectDin = (el) => el?.getBoundingClientRect?.() ?? null;
 export class ControaleHarta extends MapControls {
   constructor(camera, element) {
     super(camera, element);
+    // `pointermove` vine de pe document, iar OrbitControls nu întreabă dacă pointerul e
+    // al gestului (OrbitControls.js:1592). Un deget pus pe busolă, sau unul rămas pe
+    // sticlă după un gest încheiat de zbor sau de `blur`, ar fi mutat harta ca și cum ar fi
+    // fost degetul care o ține: măsurat, 242–322 m de salt. Se învelește numai mișcarea —
+    // OrbitControls o înscrie abia la apăsare, prin proprietatea asta —, nu și ridicarea,
+    // pe care `connect()` a legat-o deja de `pointercancel`.
+    this._onPointerMoveOrbit = this._onPointerMove;
+    this._onPointerMove = (e) => { if (this._isTrackingPointer(e)) this._onPointerMoveOrbit(e); };
     // `connect()` trece prin `disconnect()`, care scrie pe canvas `style.cursor =
     // 'auto'` (OrbitControls.js:536): inline, ar bate cursoarele din CSS.
     element?.style?.removeProperty('cursor');
@@ -100,6 +110,50 @@ export class ControaleHarta extends MapControls {
     // O tragere sau o rotire iau camera: treptele rămase nu mai alunecă peste ea.
     // Rotița emite și ea `start`, dar cu starea NIMIC.
     this.addEventListener('start', () => { if (this.state !== STARE.NIMIC) this.rotita.opreste(); });
+    // OrbitControls încheie gestul numai la `pointerup` sau `pointercancel`, iar
+    // `pointermove` îl ascultă pe document, fără să citească `buttons`
+    // (OrbitControls.js:1592). Fără `pointerup` — Alt+Tab în mijlocul unei trageri —
+    // harta urma mouse-ul fără buton, și peste textul paginii: măsurat, pe 200 px,
+    // 128,8 m de mutare sau 900,7 m de rotire. Captura pierdută încheie numai
+    // pointerul ei: dacă unul din două degete își pierde captura fără să se ridice,
+    // celălalt mută mai departe. După un `pointerup` obișnuit pointerul nu mai e urmărit,
+    // deci captura pierdută de atunci — browserul o pierde implicit după ridicare — nu
+    // face nimic.
+    this._laCapturaPierduta = (e) => {
+      if (!this._isTrackingPointer(e)) return;
+      if (this._pointers.length > 1) this._onPointerUp(e); else this.incheieGestul();
+    };
+    this._laBlur = () => this.incheieGestul();
+    element?.addEventListener?.('lostpointercapture', this._laCapturaPierduta);
+    globalThis.addEventListener?.('blur', this._laBlur);
+  }
+
+  /**
+   * Încheie gestul în curs ca la ridicarea ultimului pointer — eliberează captura, lasă
+   * documentul, emite `end` —, fără să mai aștepte `pointerup`. Fără pointer apăsat nu
+   * face nimic, deci nici `end` fără `start`.
+   *
+   * Îl cheamă și zborul (zbor.js): `_apucat` e un punct de LUME, iar o tragere lăsată
+   * deschisă peste zbor l-ar fi adus înapoi sub cursor la prima mișcare — măsurat, harta
+   * sărea cu 1,47 km de acasă. Nu ajunge să uiți punctul: `_panStart` rămâne cel de la
+   * apăsare, iar mutarea lui OrbitControls ar sări cu 169 m.
+   */
+  incheieGestul() {
+    const ids = [...this._pointers];
+    if (!ids.length) return;
+    // Întâi se uită pointerii: `lostpointercapture` poate veni chiar din eliberare.
+    this._pointers.length = 0;
+    this._pointerPositions = {};
+    const el = this.domElement;
+    el.ownerDocument.removeEventListener('pointermove', this._onPointerMove);
+    el.ownerDocument.removeEventListener('pointerup', this._onPointerUp);
+    for (const id of ids) {
+      // Pe un pointer care nu mai e activ, specificația cere NotFoundError.
+      try { el.releasePointerCapture(id); } catch { /* n-are ce elibera */ }
+    }
+    this._apucat = null;
+    this.dispatchEvent({ type: 'end' });
+    this.state = STARE.NIMIC;
   }
 
   /** Relieful randat, cu limitele lui, și alpha: pentru rotiță, apucare și pivot. */
@@ -252,6 +306,8 @@ export class ControaleHarta extends MapControls {
 
   dispose() {
     super.dispose();
+    this.domElement?.removeEventListener?.('lostpointercapture', this._laCapturaPierduta);
+    globalThis.removeEventListener?.('blur', this._laBlur);
     this._apucat = null;
     this.rotita.opreste();
     // `disconnect()` scrie pe canvas `style.cursor = 'auto'` (OrbitControls.js:536):
@@ -276,6 +332,45 @@ export function creeazaCamera(canvas) {
   controale.update();
 
   return { camera, controale };
+}
+
+// Peste cât e pagina mărită: o scară de repaus poate ieși 1,0000001, nu 1.
+export const PRAG_MARIRE = 1.01;
+
+/**
+ * Pagina mărită cu degetele dă harta înapoi paginii, până la micșorare.
+ *
+ * Canvasul acoperă tot ecranul, iar OrbitControls îi scrie `touch-action: none`
+ * (OrbitControls.js:508). Pagina se poate mări pe textul fișei sau pe fundalul modalei
+ * „© DGT”, unde ciupirea e a ei; după închiderea lor, sub degete rămânea numai harta: un
+ * deget o muta, două o apropiau, iar pagina nu se mai micșora. Busola, Satelit și
+ * „Coordonate” sunt fixe, deci puteau rămâne și ele în afara zonei mărite.
+ *
+ * Cât `visualViewport.scale` trece de PRAG_MARIRE, canvasul ia `touch-action:
+ * manipulation` — mutarea și ciupirea paginii; după specificație, sinonimul lui `pan-x
+ * pan-y pinch-zoom`, pe care Safari îl știe de la iOS 13 —, iar controalele se opresc:
+ * oprite, nu pornesc nimic la apăsare (OrbitControls.js:1555) și nu mai opresc rotița,
+ * deci și ciupirea pe touchpad micșorează pagina. O atingere scurtă măsoară mai departe
+ * (punct.js). Pe desktop, o mărire cu touchpadul oprește și mouse-ul pe hartă, până la
+ * micșorare. touch-action se citește la începutul atingerii, deci schimbarea contează de
+ * la gestul următor.
+ *
+ * Starea se citește și la creare, nu numai la `resize`: pagina poate porni mărită —
+ * scara restaurată la reîncărcare sau din bfcache.
+ *
+ * @returns {() => void} scoate ascultătorul
+ */
+export function urmaresteMarireaPaginii(controale, vv = globalThis.visualViewport) {
+  const el = controale.domElement;
+  if (!vv?.addEventListener || !el?.style) return () => {};
+  const aplica = () => {
+    const marita = vv.scale > PRAG_MARIRE;
+    el.style.touchAction = marita ? 'manipulation' : 'none';
+    controale.enabled = !marita;
+  };
+  aplica();
+  vv.addEventListener('resize', aplica);
+  return () => vv.removeEventListener('resize', aplica);
 }
 
 /**

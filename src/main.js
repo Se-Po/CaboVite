@@ -184,18 +184,39 @@ function scrieSurse(surse) {
 }
 
 // Fără scenă, pagina n-ar avea nimic de arătat până vin capitolele. Un anunț
-// neutru: calea asta o iau și WebGL-ul lipsă, și o eroare la încărcare.
+// neutru: calea asta o iau WebGL-ul lipsă, o eroare la încărcare și bucla oprită
+// după cadre eșuate la rând.
 function faraScena(motiv) {
   canvas?.remove();
   document.body.dataset.scena = 'indisponibila';
+  // Pe ultima cale subsolul fusese scris, dar fără scenă n-are ce atribui. Modala se
+  // închide întâi: altfel ar rămâne deschisă, modală, într-un subsol ascuns.
+  if (dom?.dialog.open) dom.dialog.close();
+  if (subsol) subsol.hidden = true;
   if (continut && !continut.textContent.trim()) continut.append(el('p', 'Harta 3D nu a putut porni.'));
   console.info('Pagina rulează fără scenă 3D:', motiv);
 }
 
+// `let`, în afara lui `try`: `laEsec` o eliberează după ce a pornit.
+let scena = null;
 try {
   // `laSurse`: vederea Satelit își adaugă sursa când îi sosește textura, după ce
   // subsolul a fost deja scris; atunci se scrie din nou.
-  const scena = await porneste(canvas, { continut: { sanctuar: SANCTUAR, cladiri: CLADIRI }, laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); } });
+  // `laEsec`: bucla s-a oprit după cadre eșuate la rând. Întâi `dispose()`, prin aceeași
+  // listă ca la pornire, apoi calea fără scenă: `faraScena()` singur scoate numai
+  // canvasul, iar bucla, plasa și ascultătorii ar rămâne vii. Canvasul e abandonat, deci
+  // contextul se pierde și el, ca pe calea de eroare de la pornire: altfel ar rămâne viu,
+  // cu bufferul de desen, cât trăiește pagina (canvasul e ținut de `canvas` și `__scena`).
+  scena = await porneste(canvas, {
+    continut: { sanctuar: SANCTUAR, cladiri: CLADIRI },
+    laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); },
+    laEsec: (e) => {
+      const r = scena?.renderer;
+      scena?.dispose();
+      r?.forceContextLoss();
+      faraScena(`cadre eșuate la rând: ${e?.message ?? e}`);
+    },
+  });
   if (!scena) {
     faraScena('WebGL indisponibil');
   } else {

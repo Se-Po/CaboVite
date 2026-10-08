@@ -7,9 +7,14 @@ import { descarcaInertia } from './camera.js';
 // metri, direcția, înălțimea. Regulile:
 //   - un singur ceas: `pas()` se cheamă din `setAnimationLoop`, niciun al doilea
 //     requestAnimationFrame;
+//   - un gest în curs se încheie întâi (camera.js, `incheieGestul`): Home apăsat
+//     cu harta ținută lăsa punctul apucat legat de cursor, iar la prima mișcare de
+//     după zbor harta sărea înapoi la el;
 //   - inerția utilizatorului se descarcă întâi (camera.js, `descarcaInertia`),
 //     altfel zborul ar ateriza alături;
 //   - sub `prefers-reduced-motion` se sare direct la capăt;
+//   - un punct de privire cu un câmp lipsă se refuză, iar o cameră NaN sare la
+//     capăt: NaN-ul ar fi ținut zborul activ pe vecie;
 //   - orice atingere a controalelor anulează zborul: camera e a utilizatorului.
 //
 // Punctul se dă în două feluri:
@@ -60,14 +65,8 @@ export function creeazaZbor({ camera, controale, cereRandare, azimutNordAdevarat
      */
     spre({ tinta, pozitie, distanta, azimut, elevatie }) {
       if (!viu) return;
-      descarcaInertia(controale);
-      // Un zbor vechi nu supraviețuiește: nici ieșirii de mai jos, nici saltului
-      // de sub reduced-motion, după care `pas()` l-ar fi dus mai departe.
-      zbor = null;
-      laPornire?.();
-      const de = sferic();
       // Cu `pozitie`, coordonatele sferice ale camerei față de țintă, ca în sferic().
-      const d = pozitie ? pozitie.map((v, k) => v - tinta[k]) : null;
+      const d = pozitie ? pozitie.map((v, k) => v - tinta?.[k]) : null;
       const r = d ? Math.hypot(d[0], d[1], d[2]) : distanta;
       const la = {
         t: tinta,
@@ -76,11 +75,31 @@ export function creeazaZbor({ camera, controale, cereRandare, azimutNordAdevarat
         phi: Math.min(controale.maxPolarAngle, Math.max(controale.minPolarAngle,
           d ? Math.acos(Math.min(1, Math.max(-1, d[1] / r))) : (90 - elevatie) * RAD)),
       };
+      // Un punct de privire cu un câmp lipsă sau null — ori cu poziția chiar în țintă —
+      // se refuză întreg, înainte să atingă ceva. Se judecă pe valorile CALCULATE, deci
+      // pe ambele forme: Math.min și Math.max lasă NaN să treacă. Fără gardă, cu
+      // `distanta` lipsă durata ieșea NaN și zborul nu se mai termina, randând la
+      // fiecare cadru; cu `azimut` lipsă se termina, dar cu camera NaN; cu un `null`
+      // în țintă, JS-ul îl socotea 0 și zborul ducea ținta tăcut la cota 0.
+      if (!(tinta?.length === 3 && [...tinta, la.r, la.theta, la.phi].every(Number.isFinite))) {
+        console.warn('zborul refuzat: punctul de privire nu e complet', { tinta, pozitie, distanta, azimut, elevatie });
+        return;
+      }
+      controale.incheieGestul?.();
+      descarcaInertia(controale);
+      // Un zbor vechi nu supraviețuiește: nici ieșirii de mai jos, nici saltului
+      // de sub reduced-motion, după care `pas()` l-ar fi dus mai departe.
+      zbor = null;
+      laPornire?.();
+      const de = sferic();
       // Deja acolo: un al doilea clic pe busolă nu zboară 900 ms pe loc.
       const t = controale.target;
       if (Math.hypot(t.x - la.t[0], t.y - la.t[1], t.z - la.t[2]) < 1e-6 && Math.abs(de.r - la.r) < 1e-6
         && Math.abs(drumScurt(la.theta - de.theta)) * la.r < 1e-6 && Math.abs(la.phi - de.phi) * la.r < 1e-6) return;
-      if (faraMiscare?.matches) { pune(la.t, la.r, la.theta, la.phi); cereRandare(); return; }
+      // O cameră care nu mai are coordonate — NaN venit de oriunde — nu se poate
+      // interpola: se sare la capăt, ca sub reduced-motion. Animat, durata ieșea NaN,
+      // zborul nu se termina, iar Home și busola nu mai reparau nimic.
+      if (faraMiscare?.matches || ![de.r, de.theta, de.phi].every(Number.isFinite)) { pune(la.t, la.r, la.theta, la.phi); cereRandare(); return; }
       const t0 = [controale.target.x, controale.target.y, controale.target.z];
       // Durata crește cu cât se schimbă scara și cu cât se mută ținta: de la 5 km
       // la 300 m se zboară mai mult decât o corecție de câteva zeci de metri.
@@ -99,7 +118,9 @@ export function creeazaZbor({ camera, controale, cereRandare, azimutNordAdevarat
       const r = Math.exp(Math.log(z.de.r) + (Math.log(z.la.r) - Math.log(z.de.r)) * u);
       pune(tinta, r, z.de.theta + z.dTheta * u, z.de.phi + (z.la.phi - z.de.phi) * u);
       cereRandare();
-      if (t >= 1) zbor = null;
+      // `!(t < 1)`, nu `t >= 1`: un zbor cu durata NaN, de oriunde ar veni, se încheie
+      // aici, nu rămâne activ pe vecie.
+      if (!(t < 1)) zbor = null;
     },
     opreste() { zbor = null; },
     get activ() { return Boolean(zbor); },

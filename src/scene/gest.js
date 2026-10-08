@@ -56,11 +56,11 @@ export function creeazaGest({ gazda, canvas, camera, controale }) {
   };
   const laSfarsit = () => seteaza(null);
 
+  // Fereastra pierde focusul în mijlocul unei trageri (Alt+Tab) sau captura se pierde:
+  // controalele încheie singure gestul și emit `end` (camera.js, `incheieGestul`). Înainte
+  // se ștergea aici numai cursorul, iar harta mergea mai departe după mouse.
   controale.addEventListener('start', laStart);
   controale.addEventListener('end', laSfarsit);
-  // Fereastra pierde focusul în mijlocul unei trageri (Alt+Tab): `end` poate să nu mai vină.
-  globalThis.addEventListener('blur', laSfarsit);
-  canvas.addEventListener('lostpointercapture', laSfarsit);
 
   return {
     /** Pe cadrul care se desenează, după `camera.updateMatrixWorld()`. */
@@ -69,8 +69,6 @@ export function creeazaGest({ gazda, canvas, camera, controale }) {
     dispose() {
       controale.removeEventListener('start', laStart);
       controale.removeEventListener('end', laSfarsit);
-      globalThis.removeEventListener('blur', laSfarsit);
-      canvas.removeEventListener('lostpointercapture', laSfarsit);
       delete radacina.dataset.gest;
       pivot.remove();
     },

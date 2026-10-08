@@ -7,11 +7,12 @@
 // incarcaRelief, mascaBazei, creeazaTeren, incarcaCladiri, creeazaSanctuar —, cu
 // `fetch` înlocuit de o citire din public/. Iese cu cod 1 dacă a picat vreo probă.
 //
-// Probele de fond au control negativ: acoperișurile (ridicate cu 1 m) și amprentele
-// (mutate 2 m). Cer dalele MDS/MDT de 50 cm din date-sursa/; fără ele se sar și se
-// spune. Vârful farului e o probă de CONSISTENȚĂ: e chiar maximul MDS, deci prinde
+// Probele de fond au control negativ: acoperișurile (ridicate cu 1 m), amprentele
+// (mutate 2 m) și sha256-ul plasei (vârful farului coborât 1 mm). Cele de LiDAR cer
+// dalele MDS/MDT de 50 cm din date-sursa/; fără ele se sar și se spune. Vârful farului e o probă de CONSISTENȚĂ: e chiar maximul MDS, deci prinde
 // numai o greșeală de transport până în pagină.
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { incarcaCladiri, incarcaRelief } from '../src/scene/loaders.js';
@@ -23,6 +24,15 @@ import { fereastraLidar, fisierDala, daleFereastra } from './comun/lidar.mjs';
 const BUGET = { triunghiuri: 6000, json_kb: 20 };
 const FISIER = 'public/data/cladiri_v1.json';
 const MDS_FAR = 168.28;
+// Amprenta plasei, sha256 pe atributele ei, pe `cladiri_v1` așezat pe `harta_v5` +
+// `harta_v4`. O refactorizare a formelor trebuie s-o lase la bit; o schimbare voită a
+// datelor, a reliefului sau a formelor o rescrie aici, cu motivul în commit. Citită pe
+// 2026-10-08, înainte de turn() pe orice număr de colțuri.
+const AMPRENTA = {
+  position: '9e6d5e3fa9818c798511aebfe04e38d431312b13671c1348a27543ef9428e000',
+  color: '0d40b30a2926c6e41b24bfca362fdfe848ae14406043cb1b336e0789de091944',
+  ocluzie: '8fde375fe2512c2d8febc45c1d50a736937aefb9576f485a54b341604cf950ed',
+};
 
 let picate = 0;
 const proba = (bun, text) => {
@@ -123,6 +133,20 @@ proba(poz.every(Number.isFinite), `toate cele ${poz.length / 3} vârfuri sunt fi
   const [xf, zf] = date.cupole[0].centru;
   const lov = cladiri.loveste(new THREE.Ray(new THREE.Vector3(xf, 400, zf), new THREE.Vector3(0, -1, 0)));
   proba(lov?.cheie === 'far.turn' && Math.abs(lov.y - MDS_FAR) < 0.01, `raza verticală pe axul farului lovește ${lov?.cheie} la ${lov?.y.toFixed(3)} m`);
+}
+{
+  // amprenta plasei: o refactorizare a formelor o lasă la bit
+  const at = cladiri.obiect.geometry.attributes;
+  const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+  const citit = Object.fromEntries(Object.keys(AMPRENTA).map((k) => [k, sha(at[k].array)]));
+  const diferite = Object.keys(AMPRENTA).filter((k) => citit[k] !== AMPRENTA[k]);
+  proba(diferite.length === 0, `sha256 pe position, color și ocluzie, cât în AMPRENTA${diferite.length ? `; diferă ${diferite.map((k) => `${k} (${citit[k]})`).join(', ')}` : ''}`);
+  // control: vârful farului coborât cu 1 mm schimbă amprenta
+  const mutat = structuredClone(date);
+  mutat.cupole[0].profil.at(-1)[1] -= 0.001;
+  const r = creeazaSanctuar({ date: mutat, inaltimeLa, ancora, eticheta: 'clădiri' });
+  proba(r && sha(r.obiect.geometry.attributes.position.array) !== AMPRENTA.position, `control negativ: ${mutat.cupole[0].cheie} cu vârful coborât 1 mm dă altă amprentă position`);
+  r?.dispose();
 }
 
 // ------------------------------------------------------------ 4. față de LiDAR

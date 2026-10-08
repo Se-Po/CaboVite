@@ -208,8 +208,90 @@ async function incarcaCladiriDate(url, prefix, mesaj) {
  * cerut numai când trebuie.
  */
 export async function creeazaIncarcatorKtx2(renderer) {
+  verificaTranscodorul();
   const { KTX2Loader } = await import('three/addons/loaders/KTX2Loader.js');
   return new KTX2Loader().detectSupport(renderer);
+}
+
+/**
+ * Poate porni transcodorul Basis aici? Aruncă dacă nu, înaintea celor ~12 MB de texturi.
+ *
+ * Workerul lui cere WebAssembly și `new Function` — embind își face funcțiile din text.
+ * Un CSP fără 'unsafe-eval' (numai cu 'wasm-unsafe-eval' cade al doilea), WebAssembly
+ * oprit de un mod de securitate al browserului: workerul moare atunci fără să spună
+ * nimic paginii. Un worker din `blob:` moștenește CSP-ul documentului, deci proba din
+ * firul principal e reprezentativă. Un `worker-src` care oprește `blob:` sau un worker
+ * care moare din alt motiv nu se văd de aici: pe acelea le prinde limita de timp din
+ * `incarcaOrto`.
+ */
+export function verificaTranscodorul() {
+  if (typeof WebAssembly !== 'object' || !WebAssembly) throw new Error('WebAssembly lipsește: transcodorul KTX2 nu poate porni');
+  try {
+    new WebAssembly.Module(Uint8Array.of(0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00));
+  } catch (e) {
+    throw new Error(`WebAssembly refuzat (${e?.message ?? e}): transcodorul KTX2 nu poate porni`);
+  }
+  try {
+    new Function('');
+  } catch (e) {
+    throw new Error(`new Function refuzat (${e?.message ?? e}): transcodorul KTX2 nu poate porni`);
+  }
+}
+
+/**
+ * Cât poate dura o textură Satelit DUPĂ ce transcodorul a sosit: pornirea workerului,
+ * compilarea WASM-ului, coada și transcodarea. Descărcările nu intră.
+ *
+ * Fără limită, un worker care nu pornește agăța Satelit pentru totdeauna: workerul
+ * Basis își așteaptă transcodorul la nesfârșit, WorkerPool nu ascultă 'error', iar
+ * `parse()` nu mai cheamă nici `onLoad`, nici `onError`. Rămâneau Relief fără
+ * buton și fără avertisment — cu preferința Relief, un buton `aria-busy` pe vecie —,
+ * iar `dispose()` nu mai oprea workerii.
+ *
+ * Măsurat pe desktop (Chrome, 20 de fire): toate cele șapte texturi printr-un singur
+ * worker, cu pornirea lui, în 0,40 s (BC7) și 0,29 s (RGBA); cu patru, 0,21 s. Pe un
+ * telefon de 10–20 de ori mai lent — estimare, NEVERIFICAT pe un telefon — ar fi 4–8 s,
+ * deci limita lasă o margine de cel puțin patru ori.
+ */
+export const LIMITA_TRANSCODARE_MS = 30_000;
+
+const ABANDON = Symbol('abandon'), EXPIRAT = Symbol('expirat');
+
+/**
+ * Promisiunea `p`, sau `ABANDON` când `semnal` se oprește, sau `EXPIRAT` după `limitaMs`
+ * de pagină VIZIBILĂ (0: fără limită).
+ *
+ * Vizibilă, fiindcă pe telefon o filă ascunsă poate fi înghețată cu workeri cu tot, iar
+ * la întoarcere un temporizator trecut de termen ar suna înaintea workerului, care n-a
+ * apucat să termine (dedus, nemăsurat pe un telefon). Un termen în care pagina a fost
+ * ascunsă măcar o clipă nu se numără: ceasul pornește din nou, întreg.
+ */
+function inCursa(p, semnal, limitaMs) {
+  return new Promise((res, rej) => {
+    const doc = globalThis.document;
+    let ceas = null, ascuns = false, terminat = false;
+    const laVizibilitate = () => { if (doc.hidden) ascuns = true; };
+    const gata = (f, v) => {
+      if (terminat) return;
+      terminat = true;
+      clearTimeout(ceas);
+      semnal?.removeEventListener('abort', laAbandon);
+      doc?.removeEventListener?.('visibilitychange', laVizibilitate);
+      f(v);
+    };
+    const laAbandon = () => gata(res, ABANDON);
+    const arma = () => {
+      ascuns = !!doc?.hidden;
+      ceas = setTimeout(() => (ascuns ? arma() : gata(res, EXPIRAT)), limitaMs);
+    };
+    if (semnal?.aborted) return laAbandon();
+    semnal?.addEventListener('abort', laAbandon, { once: true });
+    if (limitaMs > 0) {
+      doc?.addEventListener?.('visibilitychange', laVizibilitate);
+      arma();
+    }
+    Promise.resolve(p).then((v) => gata(res, v), (e) => gata(rej, e));
+  });
 }
 
 /** Sidecarul unei texturi Satelit: `<hartă>-orto_vN.json`. Aruncă numai pe greșeli de programare. */
@@ -237,9 +319,12 @@ export async function incarcaSidecarOrto(nume, semnal = null) {
  * `semnal` (un AbortSignal) oprește cererile pornite și, dacă fișierul a sosit deja,
  * transcodarea: întoarce `null` fără avertisment — nu lipsește nimic, scena a plecat.
  *
+ * `limitaMs`: cât poate dura transcodarea după ce transcodorul a sosit
+ * (`LIMITA_TRANSCODARE_MS`); trecută, `null` cu un avertisment.
+ *
  * @returns {Promise<{meta: object, textura: THREE.CompressedTexture}|null>}
  */
-export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null) {
+export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { limitaMs = LIMITA_TRANSCODARE_MS } = {}) {
   const lipsa = (motiv) => {
     if (semnal?.aborted) return null;
     console.warn(`textura Satelit ${nume} lipsește (${motiv})`);
@@ -268,8 +353,17 @@ export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null) {
     }
     // Abandonată cât se verifica: transcodorul nu se mai cere.
     if (semnal?.aborted) return null;
-    // parse() nu întoarce o promisiune; o eroare de transcodare vine pe onError.
-    const textura = await new Promise((res, rej) => ktx2.parse(buf, res, rej));
+    // Transcodorul (~0,6 MB) se așteaptă ÎNTÂI, fără limită: e aceeași promisiune pe care
+    // o cheamă `parse()`, deci nu se cere de două ori, iar limita de mai jos nu cuprinde
+    // și descărcarea lui — pe o legătură lentă ar fi oprit încărcări bune. `init()` e
+    // public în r186, dar marcat „TODO: Make this method private”: verifica-pagina pică
+    // dacă dispare sau dacă `parse()` nu mai trece prin el.
+    if (await inCursa(ktx2.init(), semnal, 0) === ABANDON) return null;
+    // parse() nu întoarce o promisiune; o eroare de transcodare vine pe onError. Un
+    // worker care n-a pornit nu cheamă nimic: de aceea limita.
+    const textura = await inCursa(new Promise((res, rej) => ktx2.parse(buf, res, rej)), semnal, limitaMs);
+    if (textura === ABANDON) return null;
+    if (textura === EXPIRAT) return lipsa(`transcodorul n-a răspuns în ${limitaMs / 1000} s`);
     return { meta, textura };
   } catch (e) {
     return lipsa(e?.message ?? String(e));

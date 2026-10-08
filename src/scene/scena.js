@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { creeazaRenderer, redimensioneaza } from './renderer.js';
-import { creeazaCamera, VEDERE_START } from './camera.js';
+import { creeazaCamera, urmaresteMarireaPaginii, VEDERE_START } from './camera.js';
 import { creeazaLumini } from './lights.js';
 import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
@@ -10,6 +10,7 @@ import { incarcaCladiri, incarcaRelief, incarcaSanctuar, straturiNdvi } from './
 import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
+import { creeazaCadruFisa } from './fisa-cadru.js';
 import { creeazaUmbre } from './umbre.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
 import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './palette.js';
@@ -30,8 +31,13 @@ import { instantaneuMemorie } from './dispose.js';
 // capitol. Bucla rulează prin setAnimationLoop, dar decide de fiecare dată dacă
 // are ce desena; asta ține și amortizarea controalelor lină.
 
-/** @param {HTMLCanvasElement} canvas */
-export async function porneste(canvas, { continut, laSurse } = {}) {
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {{continut?: object, laSurse?: (surse: object[]) => void, laEsec?: (e: Error) => void}} [o]
+ *   `laEsec`: bucla s-a oprit după cadre eșuate la rând (vezi bucla); cine a pornit
+ *   scena o eliberează și trece pagina pe calea fără scenă.
+ */
+export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -54,7 +60,7 @@ export async function porneste(canvas, { continut, laSurse } = {}) {
   };
 
   try {
-    return await construieste(canvas, renderer, deEliberat, curata, continut, laSurse);
+    return await construieste(canvas, renderer, deEliberat, curata, continut, laSurse, laEsec);
   } catch (e) {
     curata();
     renderer.dispose();
@@ -68,7 +74,7 @@ export async function porneste(canvas, { continut, laSurse } = {}) {
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata, continut, laSurse) {
+async function construieste(canvas, renderer, deEliberat, curata, continut, laSurse, laEsec) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
   // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
@@ -110,6 +116,8 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
 
   const { camera, controale } = creeazaCamera(canvas);
   deEliberat.push(() => controale.dispose());
+  // Pagina mărită cu degetele: harta le dă înapoi paginii, până la micșorare (camera.js).
+  deEliberat.push(urmaresteMarireaPaginii(controale));
 
   const lumini = creeazaLumini(paleta);
   scena.add(lumini.obiect);
@@ -322,17 +330,31 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       // Pragul se judecă în buclă, nu aici: soarele se mută între Relief și Satelit.
       if (grupuriUmbra.length > 1)
         umbreGrup = urmaresteGrupul({ umbre: u, grupuri: grupuriUmbra, unita, texelMaxim: TEXEL_MAXIM, camera, controale, canvas: renderer.domElement });
-      // Harta nu se redesenează singură (autoUpdate = false). După pierderea
-      // contextului WebGL, three face un WebGLShadowMap nou, dar lumina ar fi sărită
-      // de-acum încolo: umbrele s-ar compara cu o textură nedesenată. Ascultătorul
-      // three.js e înregistrat înaintea noastră, deci contextul e deja refăcut aici.
-      const laRestaurare = () => { u.refa(); cereRandare(); };
-      canvas.addEventListener('webglcontextrestored', laRestaurare);
-      deEliberat.push(() => canvas.removeEventListener('webglcontextrestored', laRestaurare));
     } catch (e) {
       console.warn('umbrele sanctuarului sărite:', e.message);
     }
   }
+
+  // După pierderea contextului WebGL, bufferul nou e gol până la primul cadru
+  // desenat: se cere unul, cu umbre sau fără. Cât contextul e pierdut, `render()` iese
+  // devreme, dar bucla tot consumă cererile, deci nicio cerere de atunci n-a desenat
+  // nimic. Ascultătorul stătea înainte numai pe ramura umbrelor: fără sanctuar și fără
+  // clădiri, canvasul rămânea gol până la prima atingere.
+  //
+  // Harta de umbre nu se redesenează singură (autoUpdate = false): three face un
+  // WebGLShadowMap nou, dar lumina ar fi sărită de-acum încolo, iar umbrele s-ar
+  // compara cu o textură nedesenată. `umbre`, nu o copie locală: există și dacă
+  // `urmaresteGrupul` a aruncat după `creeazaUmbre`. Ascultătorul three.js e înscris
+  // în constructorul rendererului, înaintea noastră, deci contextul e deja refăcut
+  // aici. Înainte de `setAnimationLoop`, `cerut` e încă true: o restaurare venită în
+  // timpul pornirii nu pierde nimic.
+  //
+  // Probă, în pagină: fără sanctuar și fără clădiri (cererile lor cu 404), contextul
+  // pierdut și refăcut cu WEBGL_lose_context: în 1 s fără nicio atingere, 0 cadre
+  // înainte, 1 acum.
+  const laRestaurare = () => { umbre?.refa(); cereRandare(); };
+  canvas.addEventListener('webglcontextrestored', laRestaurare);
+  deEliberat.push(() => canvas.removeEventListener('webglcontextrestored', laRestaurare));
 
   // Vederea Satelit: ortofotoul pe relief, comutabil cu vederea de mai sus. Pornește
   // pe Relief și trece singur pe Satelit când texturile sunt gata — dacă omul nu
@@ -489,50 +511,26 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
   });
   deEliberat.push(() => zbor.dispose());
 
-  // Cât fișa e deschisă, imaginea se mută în partea de ecran pe care n-o acoperă:
-  // pe telefon fișa e foaie jos și acoperă peste jumătate, pe desktop stă la
-  // dreapta. Un decalaj de obiectiv (`setViewOffset`), nu altă țintă: camera și
-  // pivotul rămân unde le-a pus zborul, deci rozeta, raza panoului punctului și
-  // proiecția etichetei merg neschimbate — toate citesc matricea de proiecție.
-  let decalaj = null; // fracțiunile părții libere, sau null
-  const aplicaDecalaj = () => {
-    const c = renderer.domElement, cw = c.clientWidth, ch = c.clientHeight;
-    if (!decalaj || !cw || !ch) { camera.clearViewOffset(); cereRandare(); return; }
-    camera.setViewOffset(cw, ch, (0.5 - (decalaj.x0 + decalaj.x1) / 2) * cw, (0.5 - (decalaj.y0 + decalaj.y1) / 2) * ch, cw, ch);
-    cereRandare();
-  };
-  const potrivesteLaFisa = (fisa) => {
-    const c = renderer.domElement.getBoundingClientRect();
-    decalaj = { x0: 0, x1: 1, y0: 0, y1: 1 };
-    if (fisa && c.width && c.height) {
-      if (fisa.width >= 0.8 * c.width && fisa.top > c.top + 0.25 * c.height) decalaj.y1 = Math.min(1, (fisa.top - c.top) / c.height);
-      // Laterală până la trei sferturi din lățime: între 545 și 666 px fișa trece de
-      // 60% — și mai mult cu textul mărit —, iar un prag la 40% lăsa complexul sub
-      // ea. Peste trei sferturi nu mai rămâne loc în care să încapă ceva.
-      else if (fisa.left > c.left + 0.25 * c.width) decalaj.x1 = Math.min(1, (fisa.left - c.left) / c.width);
-    }
-    aplicaDecalaj();
-  };
-  // Distanța zborului: cel puțin cât cere punctul de privire, și destul ca
-  // complexul — ~110 m de la centrul terreiro-ului până la biserică și la capetele
-  // aripilor — să încapă în partea liberă, pe lățime și pe înălțime.
-  const RAZA_COMPLEX = 110;
-  const zborLaFisa = () => {
-    const z = sanctuar.poi.zbor, t = Math.tan((camera.fov * Math.PI) / 360), L = decalaj ?? { x0: 0, x1: 1, y0: 0, y1: 1 };
-    const distanta = Math.max(z.distanta, RAZA_COMPLEX / (t * camera.aspect * (L.x1 - L.x0)), (0.6 * RAZA_COMPLEX) / (t * (L.y1 - L.y0)));
-    return { ...z, distanta };
-  };
-  eticheta = sanctuar?.poi?.zbor ? creeazaEticheta({
+  // Cât fișa e deschisă, imaginea se mută în partea de ecran pe care n-o acoperă,
+  // iar camera stă destul de departe ca să încapă complexul; la o rotire a ecranului
+  // se reface. Regulile, în fisa-cadru.js.
+  const cadruFisa = sanctuar?.poi?.zbor ? creeazaCadruFisa({
+    camera, controale, zbor, poi: sanctuar.poi.zbor, canvas: renderer.domElement, cereRandare,
+    cutieFisa: () => document.getElementById('sanctuar-fisa')?.getBoundingClientRect(),
+  }) : null;
+  if (cadruFisa) deEliberat.push(() => cadruFisa.dispose());
+  eticheta = cadruFisa ? creeazaEticheta({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, inaltimeLa: inaltimeRandata, cereRandare,
     ancora: sanctuar.poi.ancora,
     continut: continut?.sanctuar,
-    laDeschidere: (fisa) => { potrivesteLaFisa(fisa); zbor.spre(zborLaFisa()); },
-    laInchidere: () => { decalaj = null; aplicaDecalaj(); },
+    laDeschidere: cadruFisa.laDeschidere,
+    laInchidere: cadruFisa.laInchidere,
   }) : null;
   if (eticheta) deEliberat.push(() => eticheta.dispose());
 
-  renderer.setAnimationLoop(() => {
+  // Un cadru. Întoarce true numai după ce `render()` a întors.
+  const cadru = () => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
     // doar dacă desenează — deci zborul camerei se agață aici, nu într-un al
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
@@ -551,8 +549,9 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       const c = renderer.domElement;
       camera.aspect = c.clientWidth / c.clientHeight;
       camera.updateProjectionMatrix();
-      // decalajul fișei se socotește din nou: fișa și canvasul și-au schimbat mărimea
-      if (decalaj) potrivesteLaFisa(document.getElementById('sanctuar-fisa')?.getBoundingClientRect());
+      // Fișa și canvasul și-au schimbat mărimea: decalajul se socotește din nou, iar
+      // distanța crește, dacă trebuie, cu un zbor.
+      cadruFisa?.laRedimensionare();
       cerut = true;
     }
     if (!cerut && !seMisca) return;
@@ -569,6 +568,34 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     // strânge pe cutia potrivită, în cadrul acesta.
     umbreGrup?.pas();
     renderer.render(scena, camera);
+    return true;
+  };
+
+  // Cadrele eșuate de la ultima randare reușită. three cere cadrul următor ÎNAINTEA
+  // buclei (WebGLAnimation.js:10), deci o excepție nu oprește bucla, ci se repetă:
+  // una persistentă în zbor, rotiță, controale sau limita alpha arunca la fiecare
+  // cadru, și în repaus — măsurat în pagină, 61 de erori în 1 s —, iar imaginea
+  // rămânea înghețată fără niciun semn. Acum o excepție trecătoare costă un cadru, ca
+  // înainte, și cadrul se cere din nou: aruncată după `cerut = false`, n-ar mai fi
+  // desenat nimic până la următoarea atingere. A treia la rând, fără nicio randare
+  // reușită între ele, oprește bucla și predă scena lui `laEsec`, care o eliberează
+  // prin aceeași listă și lasă pagina fără scenă — degradarea cerută pentru WebGL
+  // lipsă. Cadrele de repaus nu golesc contorul: n-au desenat nimic. Măsurat, cu
+  // `zbor.pas` aruncând mereu: trei apeluri, un console.error, 0 erori neprinse, 0
+  // geometrii după.
+  const ESECURI_LA_RAND = 3;
+  let esecuri = 0;
+  renderer.setAnimationLoop(() => {
+    try {
+      if (cadru()) esecuri = 0;
+    } catch (e) {
+      // Un singur mesaj, cu excepția întreagă: repetările n-ar spune nimic nou.
+      if (!esecuri++) console.error('cadrul scenei a eșuat:', e);
+      cerut = true;
+      if (esecuri < ESECURI_LA_RAND) return;
+      renderer.setAnimationLoop(null);
+      laEsec?.(e);
+    }
   });
 
   // Relieful se dă printr-un getter, iar referința se STINGE la dispose(), nu se
@@ -595,7 +622,7 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
     renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo, alpha, acasa,
     // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
     get surse() { return surse; },
-    zbor, eticheta, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
+    zbor, eticheta, cadruFisa, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
@@ -621,7 +648,8 @@ async function construieste(canvas, renderer, deEliberat, curata, continut, laSu
       // din `porneste()`. După `loseContext()` același element canvas nu mai poate
       // sluji un renderer nou, iar de aici scena trebuie să se poată reporni pe
       // canvasul existent — la schimbarea de capitol, de pildă. Contextul rămâne
-      // deci viu intenționat, nu din scăpare.
+      // deci viu intenționat, nu din scăpare. Numai `laEsec` din main.js, care abandonează
+      // canvasul, îl pierde după `dispose()`.
     },
   };
 }
@@ -648,16 +676,18 @@ function unesteSurse(a, b) {
  * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
  * Altfel, de departe tot ea: cât texelul ei nu trece de mărimea unui pixel de ecran
  * la țintă, o hartă mai strânsă n-ar desena nimic în plus. Pixelul e al CANVASULUI
- * (`canvas.height`), deci de dispozitiv, nu CSS. De aproape, grupul cel mai
- * apropiat de țintă.
+ * (`canvas.height`), nu CSS și nu neapărat de dispozitiv: raportul e plafonat la 2.
+ * De aproape, grupul cel mai apropiat de țintă.
  *
  * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Primul cadru
  * are soarele Relief — Satelit își pune soarele abia când i-a sosit textura —,
  * deci cutia unită rămâne numai pe un canvas înalt de cel mult ~922 px de
- * dispozitiv; sub Satelit histerezisul păstrează apoi alegerea (întoarcerea la
- * cutia unită cere ≤ ~917 px). Pe telefoane și pe ecranele dense harta pornește
- * strânsă pe sanctuar (~430 m de țintă; farul e la ~800 m), cu 0,21–0,22 m pe
- * texel — farul își primește umbra când te apropii de el.
+ * canvas; sub Satelit histerezisul păstrează apoi alegerea (întoarcerea la
+ * cutia unită cere ≤ ~917 px). Pe telefoanele în portret și pe ecranele dense harta
+ * pornește strânsă pe sanctuar (~430 m de țintă; farul e la ~800 m), cu 0,21–0,22 m
+ * pe texel — farul își primește umbra când te apropii de el. Un telefon în peisaj
+ * rămâne pe cutia unită: cu raportul de pixeli plafonat la 2 (renderer.js), canvasul
+ * de 844 × 390 la 3× are 780 px înălțime, nu 1170.
  *
  * Două praguri cu histerezis — ±10% pe pixel,
  * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu

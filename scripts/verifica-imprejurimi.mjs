@@ -15,6 +15,9 @@
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import * as THREE from 'three';
+import { creeazaCer } from '../src/scene/cer.js';
+import { creeazaLumini } from '../src/scene/lights.js';
 import { IN_DOUA_TREPTE } from '../src/scene/satelit.js';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
 import { campNeted, creeazaTeren, INELE_APA, mascaBazei } from '../src/scene/terrain.js';
@@ -472,6 +475,77 @@ console.log('\nAltitudinea împrejurimilor');
   const x = L7.cutie.x1 - 32 * 5, z = L7.cutie.z0 + 32 * 5;
   const c7 = Math.round((x - L7.meta.deplasare_scena.x) / 32 + (N7.latime - 1) / 2), r7 = Math.round((z - L7.meta.deplasare_scena.z) / 32 + (N7.inaltime - 1) / 2);
   proba(Math.abs(imp.inaltimeLa(x, z) - g.inaltimeLa(x, z)) < 1e-9 && Number.isInteger(c7) && Number.isInteger(r7), `pe un nod al lui harta_v7, altitudinea compusă e a lui (${imp.inaltimeLa(x, z).toFixed(2)} m)`);
+}
+
+// ------------------------------------------------------------ 7. fără codul umbrelor
+
+// r186 definește USE_SHADOWMAP pe renderer (WebGLPrograms.js:363), deci și împrejurimile,
+// fără `receiveShadow`, calculau pe fiecare vârf poziția în harta de umbre. Proba ia
+// shaderul lui MeshStandardMaterial, îl trece prin `onBeforeCompile`-ul materialelor, îi
+// pune în față definițiile pe care le pune three cu o lumină care aruncă umbră și îl
+// preprocesează cu bucățile lui three. Pe GPU — uniformele programului — o face pagina.
+console.log('\nÎmprejurimile, fără codul umbrelor');
+{
+  const preproceseaza = (sursa, definite) => {
+    const def = new Map(Object.entries(definite));
+    const include = (s, k = 0) => s.replace(/^[ \t]*#include +<([\w.]+)>/gm, (_, n) => {
+      if (k > 20 || THREE.ShaderChunk[n] === undefined) throw new Error(`#include <${n}>`);
+      return include(THREE.ShaderChunk[n], k + 1);
+    });
+    const evalueaza = (e) => Function(`return !!(${e
+      .replace(/defined\s*\(\s*(\w+)\s*\)/g, (_, n) => (def.has(n) ? '1' : '0'))
+      .replace(/\b[A-Za-z_]\w*\b/g, (n) => String(Number(def.get(n) ?? 0) || 0))});`)();
+    const stiva = [], iese = [];
+    const activ = () => stiva.every((s) => s.activ);
+    for (const l of include(sursa).split('\n')) {
+      const m = l.match(/^\s*#\s*(\w+)\s*(.*?)\s*$/);
+      if (!m) { if (activ()) iese.push(l); continue; }
+      const d = m[1], rest = m[2].replace(/\/\/.*$/, '').trim();
+      if (d === 'if' || d === 'ifdef' || d === 'ifndef') {
+        const c = activ() && (d === 'if' ? evalueaza(rest) : def.has(rest) === (d === 'ifdef'));
+        stiva.push({ activ: c, luat: c });
+      } else if (d === 'elif') { const s = stiva.at(-1); s.activ = !s.luat && evalueaza(rest); s.luat ||= s.activ; }
+      else if (d === 'else') { const s = stiva.at(-1); s.activ = !s.luat; s.luat = true; }
+      else if (d === 'endif') stiva.pop();
+      else if (!activ()) continue;
+      else if (d === 'define') { const [n, ...v] = rest.split(/\s+/); def.set(n, v.join(' ') || '1'); }
+      else if (d === 'undef') def.delete(rest);
+      else iese.push(l);
+    }
+    return iese.join('\n');
+  };
+  // Prefixul lui WebGLProgram pentru scena paginii: o lumină direcțională cu umbră, PCF,
+  // culori pe vârf, ceață. Numerele luminilor three le scrie în text; aici sunt definiții.
+  const PREFIX = {
+    STANDARD: '', USE_COLOR: '', USE_FOG: '', USE_SHADOWMAP: '', SHADOWMAP_TYPE_PCF: '',
+    NUM_DIR_LIGHTS: 1, NUM_DIR_LIGHT_SHADOWS: 1, NUM_HEMI_LIGHTS: 1, NUM_POINT_LIGHTS: 0, NUM_SPOT_LIGHTS: 0,
+    NUM_RECT_AREA_LIGHTS: 0, NUM_POINT_LIGHT_SHADOWS: 0, NUM_SPOT_LIGHT_SHADOWS: 0, NUM_SPOT_LIGHT_MAPS: 0,
+    NUM_SPOT_LIGHT_COORDS: 0, NUM_SPOT_LIGHT_SHADOWS_WITH_MAPS: 0, NUM_CLIPPING_PLANES: 0, UNION_CLIPPING_PLANES: 0,
+  };
+  const shader = (m, plat) => {
+    const sh = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
+    m.onBeforeCompile(sh, null);
+    const def = plat ? { ...PREFIX, FLAT_SHADED: '' } : PREFIX;
+    return { vs: preproceseaza(sh.vertexShader, def), fs: preproceseaza(sh.fragmentShader, def), cheie: m.customProgramCacheKey() };
+  };
+  // Ce citește codul umbrelor: matricea și coordonata pe vârf, harta în fragment.
+  const umbre = (s) => ['directionalShadowMatrix', 'vDirectionalShadowCoord'].filter((t) => s.vs.includes(t))
+    .concat(['directionalShadowMap', 'getShadow('].filter((t) => s.fs.includes(t)));
+  const lumini = creeazaLumini(paleta);
+  const cer = creeazaCer({ paleta, soare: lumini.soare });
+  const cuCer = creeazaImprejurimi({ niveluri: niveluri.slice(0, 2), margineAlpha, paleta, cer });
+  const cazuri = [['fără cer', imp], ['cu cer', cuCer]];
+  for (const [text, i] of cazuri) for (const p of i.plase) {
+    const s = shader(p.teren.obiect.material, !p.neted);
+    const u = umbre(s), ceata = s.fs.includes('culoareCer(');
+    const cheie = text === 'cu cer' ? 'teren-imprejurimi' : 'teren-imprejurimi-fara-cer';
+    proba(u.length === 0 && ceata === (text === 'cu cer') && s.cheie === cheie && /gl_FragColor/.test(s.fs) && /gl_Position/.test(s.vs),
+      `${p.nume}, ${p.neted ? 'netezit' : 'cu fațete'}, ${text}: codul umbrelor ${u.length ? `rămâne (${u.join(', ')})` : 'lipsește'}; ceața pe cer ${ceata ? 'da' : 'nu'}; cheia „${s.cheie}”`);
+  }
+  // Control: același shader, fără `onBeforeCompile`, are codul umbrelor.
+  const c = umbre(shader(new THREE.MeshStandardMaterial({ vertexColors: true }), false));
+  proba(c.length === 4, `control, MeshStandardMaterial fără onBeforeCompile: ${c.join(', ')} — rămân`);
+  cuCer.dispose(); cer.dispose(); lumini.dispose();
 }
 
 imp.dispose();

@@ -36,6 +36,7 @@
     "verifica-imprejurimi": "node scripts/verifica-imprejurimi.mjs",
     "verifica-controale": "node scripts/verifica-controale.mjs",
     "verifica-livrare": "node scripts/verifica-livrare.mjs",
+    "verifica-pagina": "node scripts/verifica-pagina.mjs",
     "iconite": "node scripts/iconite.mjs"
   },
   "dependencies": {

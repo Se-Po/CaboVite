@@ -5,6 +5,12 @@
 // NU prin `raycaster.intersectObject()` pe plasă, ci mergând pe rază peste câmpul
 // de înălțimi (`marsPeTeren`, în raza.js, cu motivele și cifrele ei).
 //
+// Punctul e ce SE VEDE sub cursor, ca la zoomul rotiței și la apucarea hărții
+// (`punctVazut`): relieful, suprafața mării la `COTA_MARE` sau o clădire. Pe apă
+// relieful e umplutura de −8 m, iar raza care mergea numai pe relief trecea de
+// suprafață și se oprea pe ea: din vederea de pornire, punctul de pe mare ieșea
+// mutat de-a lungul razei cu mediana 13,5 m, până la 34,5 m.
+//
 // ──────────────────────────────────────────── clic față de mutarea hărții
 //
 // Butonul stâng e al controalelor — mută harta, ca la o hartă (camera.js) — și NU
@@ -23,11 +29,11 @@
 //
 // ────────────────────────────────────────────────── ce cifre au acoperire
 //
-// Coordonatele sunt ÎNTOTDEAUNA adevărate — raza lovește un loc real chiar și pe
-// apă. Altitudinea nu. `inaltimeLa` prinde indicii la marginea grilei, deci în
-// afara hărții întoarce valoarea nodului de margine cu aceeași convingere ca
-// înăuntru, fără să semnaleze nimic. Iar peste mare întoarce umplutura de
-// −8 m — sidecarul o numește „artificiu de randare, nu batimetrie".
+// Coordonatele sunt ÎNTOTDEAUNA adevărate — pe apă, raza se oprește pe suprafața
+// mării, care e un loc real. Altitudinea nu. `inaltimeLa` prinde indicii la
+// marginea grilei, deci în afara hărții întoarce valoarea nodului de margine cu
+// aceeași convingere ca înăuntru, fără să semnaleze nimic. Iar peste mare întoarce
+// umplutura de −8 m — sidecarul o numește „artificiu de randare, nu batimetrie".
 //
 // Deci altitudinea primește etichetă, iar regula nu e aleasă din ochi. Sidecarul
 // scrie `regula_apa`: „exact 0.0 m sau NODATA (−999); plaja, care are valori mici
@@ -47,7 +53,8 @@
 
 import * as THREE from 'three';
 import { inPoligon } from './terrain.js';
-import { marsPeTeren } from './raza.js';
+import { punctVazut } from './raza.js';
+import { COTA_MARE } from './mare.js';
 
 const PRAG_CLIC = 5;   // px între apăsare și ridicare; peste atât, harta a fost mutată
 
@@ -101,7 +108,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const lim = limiteMars ?? geo.limite;
   const raycaster = new THREE.Raycaster();
   const cursor = new THREE.Vector2();
-  const planApa = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  // Suprafața mării, ca în `punctVazut`: y + (−COTA_MARE) = 0.
+  const planApa = new THREE.Plane(new THREE.Vector3(0, 1, 0), -COTA_MARE);
   const temp = new THREE.Vector3();
 
   // ------------------------------------------------------------ culegerea
@@ -123,13 +131,16 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     const diag = Math.hypot(lim.xMax - lim.xMin, lim.zMax - lim.zMin);
     const maxim = raza.origin.length() + diag * 1.5;
 
-    const t = marsPeTeren(raza, inaltimeLa, lim, maxim);
+    // Relieful sau suprafața mării, cel mai apropiat. Clădirile NU intră aici, ci în
+    // `cuCladire`, care le ține și cheia; prioritatea e aceeași: la egalitate, terenul.
+    const t = punctVazut(raza, { inaltimeLa, lim }, maxim);
     if (t !== null) {
       raza.at(t, temp);
       return cuCladire({ x: temp.x, z: temp.z, t });
     }
 
-    // Dincolo de uscat, raza cade pe planul apei — ca să se poată arăta și marea.
+    // Marea de dincolo de `maxim`: punctul cade tot pe suprafața ei, ca panoul să
+    // spună „în afara zonei alpha”, nu să lase pe ecran punctul de dinainte.
     if (raza.intersectPlane(planApa, temp)) return cuCladire({ x: temp.x, z: temp.z, t: temp.distanceTo(raza.origin) });
     return cuCladire(null);
   }
@@ -183,9 +194,13 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     + '<dt>longitudine</dt><dd class="lon"></dd>'
     + '<dt>latitudine</dt><dd class="lat"></dd>'
     + '</dl>'
+    // Câte un element pe axă, nu un text cu două spații între axe: spațiile la rând se
+    // strâng într-unul (`white-space`, CSS Text 3), deci pe ecran rămânea unul singur.
+    // Golul îl face CSS-ul, lărgind spațiul dintre ele, care rămâne și pentru textContent,
+    // cititoare și selecție: selectat, rândul iese pe o singură linie.
     + '<dl class="mici" hidden>'
-    + '<dt>scenă (m)</dt><dd class="sc"></dd>'
-    + '<dt>TM06 (m)</dt><dd class="tm"></dd>'
+    + '<dt>scenă (m)</dt><dd class="sc"><span class="axa"></span> <span class="axa"></span> <span class="axa"></span></dd>'
+    + '<dt>TM06 (m)</dt><dd class="tm"><span class="axa"></span> <span class="axa"></span></dd>'
     + '</dl>'
     + '<button class="copiaza" type="button" hidden>Copiază</button>'
     + '<span class="anunt" role="status" aria-live="polite"></span>'
@@ -203,8 +218,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     alt: radacina.querySelector('.alt'),
     lon: radacina.querySelector('.lon'),
     lat: radacina.querySelector('.lat'),
-    sc: radacina.querySelector('.sc'),
-    tm: radacina.querySelector('.tm'),
+    sc: [...radacina.querySelectorAll('.sc .axa')],
+    tm: [...radacina.querySelectorAll('.tm .axa')],
     cl: radacina.querySelector('dd.cl'),
     sol: radacina.querySelector('dd.sol'),
   };
@@ -256,8 +271,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     camp.alt.classList.toggle('fara', h === null);
     camp.lon.textContent = nr(g.lon, 6);
     camp.lat.textContent = nr(g.lat, 6);
-    camp.sc.textContent = `X ${nr(p.x, 2)}  Y ${y}  Z ${nr(p.z, 2)}`;
-    camp.tm.textContent = `X ${nr(t.x, 2)}  Y ${nr(t.y, 2)}`;
+    [`X ${nr(p.x, 2)}`, `Y ${y}`, `Z ${nr(p.z, 2)}`].forEach((s, i) => { camp.sc[i].textContent = s; });
+    [`X ${nr(t.x, 2)}`, `Y ${nr(t.y, 2)}`].forEach((s, i) => { camp.tm[i].textContent = s; });
 
     indemn.hidden = true;
     dlMari.hidden = false;
@@ -349,6 +364,9 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     apasat = null;   // o apăsare începută înainte nu mai culege
     // Cursorul hărții devine sfera cu punct cât se măsoară (main.css).
     canvas.toggleAttribute('data-culege', stare);
+    // Pe <html>, pentru CSS-ul fișei și al versiunii, care stau în afara panoului
+    // (main.css). Nu `:has()`: lipsește în Firefox sub 121, deci și în 115 ESR.
+    document.documentElement.toggleAttribute('data-punct-deschis', stare);
     cutie.hidden = !stare;
     activeazaBtn.hidden = stare;
     activeazaBtn.setAttribute('aria-expanded', String(stare));
@@ -391,6 +409,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       minimizeazaBtn.removeEventListener('click', laMinimizare);
       clearTimeout(cronoCopiere);
       canvas.removeAttribute('data-culege');
+      document.documentElement.removeAttribute('data-punct-deschis');
       apasat = null;
       ales = null;
       radacina.remove();

@@ -12,25 +12,41 @@
 // nu intră în depozit; fără el se sar și se spune. Un prag pe care nu-l poate pica
 // nimic nu dovedește nimic, deci probele de fond au control negativ — aceeași
 // probă pe o greșeală cunoscută trebuie să pice: acoperișurile (ridicate cu 1 m),
-// amprentele (mutate 2 m), drapajul (față de relieful interpolat, altă suprafață)
-// și zborul (pe nordul grilei). Bugetul n-are nevoie de unul, iar vârfurile
+// amprentele (mutate 2 m), drapajul (față de relieful interpolat, altă suprafață),
+// zborul (pe nordul grilei), sha256-ul plasei (un vârf de turn mutat 1 mm) și fișa cu
+// ecranul rotit (fără zbor nou, ca pe codul de până pe 2026-10-08). Turnul
+// pe 5, 6 și 8 colțuri pica pe codul de dinainte de 2026-10-08, cu flișa la 34–140 m
+// de el; zborul cu un punct incomplet sau cu camera NaN, în cinci din șase cazuri.
+// Bugetul n-are nevoie de control, iar vârfurile
 // turnurilor sunt o probă de CONSISTENȚĂ, nu una independentă: `varf` e chiar
 // maximul MDS al părții, deci proba prinde doar o greșeală de transport a lui.
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
 import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
-import { yMinim } from '../src/scene/sanctuar-forme.js';
+import { creeazaScriitor, turn, yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
 import { creeazaCamera } from '../src/scene/camera.js';
+import { creeazaCadruFisa, distantaLaFisa, parteLibera, PRAG_ZBOR_NOU, RAZA_COMPLEX } from '../src/scene/fisa-cadru.js';
 import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
 const BUGET = { cladiri: 70000, drapaj: 80000, json_kb: 150 };
 const FISIER = 'public/data/sanctuar_v2.json';
+// Amprenta plasei clădirilor, sha256 pe atributele ei, pe `sanctuar_v2` așezat pe
+// `harta_v5` + `harta_v4` (talpa pereților vine din relief). O refactorizare a formelor
+// trebuie s-o lase la bit; o schimbare voită a datelor, a reliefului sau a formelor o
+// rescrie aici, cu motivul în commit. Citită pe 2026-10-08, înainte de turn() pe orice
+// număr de colțuri.
+const AMPRENTA = {
+  position: '80849bfb6118470886b683fa4731c37c4d9ef40610f9fe35996c8fcee63b9f9e',
+  color: '1c28d835408390bcfbfc0893f5db2cb20f003fb1544ab7ddf1c59ad7fb66987e',
+  ocluzie: '5132591b4f8a24ccf918f9fc80de64e23419f47503000e3eed68ea04a39e5fbd',
+};
 
 let picate = 0;
 const proba = (bun, text) => {
@@ -149,6 +165,48 @@ proba(ocl?.count === poz.length / 3 && ocl.normalized, `ocluzia: un octet normal
   const convex = (c) => { let semn = 0; for (let k = 0; k < c.length; k++) { const p = c[k], q = c[(k + 1) % c.length], r = c[(k + 2) % c.length]; const x = (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]); if (Math.abs(x) < 1e-9) continue; if (semn && Math.sign(x) !== semn) return false; semn = Math.sign(x); } return true; };
   const neconvexe = date.corpuri.filter((c) => !convex(c.contur)).map((c) => c.cheie);
   proba(neconvexe.length === 0, `toate cele ${date.corpuri.length} corpuri au contur convex${neconvexe.length ? `: ${neconvexe.join(', ')}` : ''}`);
+}
+{
+  // amprenta plasei: o refactorizare a formelor o lasă la bit
+  const at = sanctuar.obiect.geometry.attributes;
+  const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+  const citit = Object.fromEntries(Object.keys(AMPRENTA).map((k) => [k, sha(at[k].array)]));
+  const diferite = Object.keys(AMPRENTA).filter((k) => citit[k] !== AMPRENTA[k]);
+  proba(diferite.length === 0, `sha256 pe position, color și ocluzie, cât în AMPRENTA${diferite.length ? `; diferă ${diferite.map((k) => `${k} (${citit[k]})`).join(', ')}` : ''}`);
+  // control: vârful unui turn mutat cu 1 mm schimbă amprenta
+  const mutat = structuredClone(date);
+  mutat.turnuri[0].varf += 0.001;
+  const r = creeazaSanctuar({ date: mutat, inaltimeLa, ancora, retea });
+  proba(r && sha(r.obiect.geometry.attributes.position.array) !== AMPRENTA.position, `control negativ: ${mutat.turnuri[0].cheie} cu vârful mutat 1 mm dă altă amprentă position`);
+  r?.dispose();
+}
+{
+  // turn() pe orice număr de colțuri. Turnurile din date au câte 4, dar nimic nu cere
+  // asta: încărcătorul verifică listele, `valid` numai numerele. Până pe 2026-10-08,
+  // centrul flișei era suma colțurilor împărțită la 4: la 5 colțuri vârful ei ieșea la
+  // 34,09 m de turn, la 6 la 69,44 m, fără niciun avertisment. Poligoane regulate cu
+  // centrul în (100; 100) și raza de 3 m: vârful flișei cade pe centru, inelul ei de sus
+  // stă la 1,27 m de el, iar nimic nu iese din amprenta lărgită cu cornișa (0,25 m).
+  // Pragul, 0,1 mm, e de vreo 13 ori pasul Float32 de la 100 m.
+  const C = [100, 100], R = 3, Y = { registru: 10, cornisa: 12, platforma: 14, varf: 20 };
+  const cul = { var: [240, 240, 235], cantaria: [200, 190, 170] };
+  const m = (v) => (v < 1e-3 ? v.toExponential(0) : v.toFixed(2));
+  for (const n of [4, 5, 6, 8]) {
+    const contur = Array.from({ length: n }, (_, k) => { const a = (2 * Math.PI * k) / n + 0.3; return [C[0] + R * Math.cos(a), C[1] + R * Math.sin(a)]; });
+    const s = creeazaScriitor();
+    turn(s, contur, 0, Y, cul);
+    const { pozitii: p } = s.preda();
+    const yVarf = Math.fround(Y.varf), yInel = Math.fround(Y.platforma + 0.3);
+    let varf = 0, nVarf = 0, inel = 0, nInel = 0, iesit = 0;
+    for (let i = 0; i < p.length; i += 3) {
+      const d = Math.hypot(p[i] - C[0], p[i + 2] - C[1]);
+      if (p[i + 1] === yVarf) { varf = Math.max(varf, d); nVarf++; }
+      if (p[i + 1] === yInel) { inel = Math.max(inel, Math.abs(d - 1.27)); nInel++; }
+      iesit = Math.max(iesit, d - (R + 0.25));
+    }
+    proba(nVarf > 0 && nInel > 0 && varf < 1e-4 && inel < 1e-4 && iesit < 1e-4,
+      `turn cu ${n} colțuri: vârful flișei la ${m(varf)} m de centru, inelul ei la ${m(inel)} m de 1,27 m, ${m(iesit)} m în afara amprentei`);
+  }
 }
 
 // ------------------------------------------------------------ 4. suprafețele pe teren
@@ -436,6 +494,204 @@ console.log('\nZborul spre sanctuar');
   const citeste = (nord) => ((180 - thetaStart - nord) % 360 + 360) % 360;
   proba(Math.round(citeste(n)) === 306 && Math.round(citeste(0)) === 307,
     `busola citește ${citeste(n).toFixed(2)}° (306° NV); pe nordul grilei ar citi ${citeste(0).toFixed(2)}°`);
+
+  // Un punct de privire incomplet și o cameră NaN. Math.min și Math.max lasă NaN să
+  // treacă: până pe 2026-10-08, cu `distanta` lipsă zborul nu se mai termina și randa la
+  // fiecare cadru, cu `azimut` lipsă se termina, dar cu camera NaN, cu un `null` în
+  // țintă ducea ținta tăcut la cota 0, iar Home, animat, nu mai repara o cameră NaN. Pe codul
+  // de atunci pică primele cinci. Control: același Home sub reduced-motion, care sărea
+  // la capăt și înainte.
+  console.log('\nZborul cu un punct incomplet sau cu camera NaN');
+  const faNaN = ({ punct, cameraNaN = false, redus = false }) => {
+    globalThis.matchMedia = () => ({ matches: redus, addEventListener() {} });
+    const { camera, controale } = creeazaCamera(null);
+    camera.aspect = 1.5; camera.updateProjectionMatrix();
+    camera.position.set(500, 900, 1800);
+    controale.target.set(144, 60, 581);
+    controale.update();
+    if (cameraNaN) camera.position.x = NaN;
+    const p0 = camera.position.clone(), t0 = controale.target.clone();
+    let ceas = 0, avertismente = 0;
+    const acum = performance.now, warn = console.warn;
+    performance.now = () => ceas;
+    console.warn = () => { avertismente++; };
+    const zbor = creeazaZbor({ camera, controale, cereRandare: () => {}, azimutNordAdevarat: n });
+    zbor.spre(punct);
+    let pasi = 0;
+    for (; pasi < 2000 && zbor.activ; pasi++) { ceas += 16.7; zbor.pas(); controale.update(); }
+    performance.now = acum; console.warn = warn;
+    globalThis.matchMedia = undefined;
+    const p = camera.position, t = controale.target;
+    const [px, py, pz] = VEDERE_START.pozitie, [tx, ty, tz] = VEDERE_START.tinta;
+    return {
+      activ: zbor.activ, pasi, avertismente,
+      finita: [p.x, p.y, p.z, t.x, t.y, t.z].every(Number.isFinite),
+      neatinsa: p.equals(p0) && t.equals(t0),
+      eStart: Math.max(Math.hypot(p.x - px, p.y - py, p.z - pz), Math.hypot(t.x - tx, t.y - ty, t.z - tz)),
+    };
+  };
+  const poi = date.poi.zbor;
+  for (const [punct, cum] of [
+    [{ ...poi, distanta: undefined }, '`distanta` lipsă'],
+    [{ ...poi, azimut: undefined }, '`azimut` lipsă'],
+    [{ ...poi, tinta: [poi.tinta[0], null, poi.tinta[2]] }, 'un `null` în țintă'],
+    [{ tinta: VEDERE_START.tinta, pozitie: VEDERE_START.tinta }, 'poziția chiar în țintă'],
+  ]) {
+    const z = faNaN({ punct });
+    proba(!z.activ && z.pasi === 0 && z.neatinsa && z.avertismente === 1,
+      `${cum}: zborul ${z.activ ? 'încă activ' : 'inactiv'} după ${z.pasi} cadre, camera ${z.neatinsa ? 'neatinsă' : 'mutată'}${z.finita ? '' : ' (NaN)'}, ${z.avertismente} avertisment(e)`);
+  }
+  const homeNaN = faNaN({ punct: VEDERE_START, cameraNaN: true });
+  proba(!homeNaN.activ && homeNaN.finita && homeNaN.eStart < 1e-9,
+    `camera NaN, apoi Home animat: zborul ${homeNaN.activ ? 'încă activ' : 'încheiat'} după ${homeNaN.pasi} cadre, camera ${homeNaN.finita ? `acasă, la ${homeNaN.eStart.toExponential(1)} m` : 'NaN'}`);
+  const homeNaNRedus = faNaN({ punct: VEDERE_START, cameraNaN: true, redus: true });
+  proba(!homeNaNRedus.activ && homeNaNRedus.finita && homeNaNRedus.eStart < 1e-9,
+    `control: camera NaN, apoi Home sub reduced-motion, cum trecea și înainte: acasă, la ${homeNaNRedus.eStart.toExponential(1)} m`);
+}
+
+// ------------------------------------------------------------ 7b. fișa și ecranul rotit
+
+// Fișa deschisă, apoi ecranul rotit: cadrul fișei (fisa-cadru.js), zborul și camera
+// paginii. Canvasul e un obiect cu mărimea ecranului; cutia fișei se socotește după
+// main.css — foaie jos până la 34rem, laterală peste —, cu textul mai înalt decât
+// `max-height`, cum iese în pagină (la 390 × 844: 374 × 464 px, sus la 372; la
+// 844 × 390: 384 × 134, la 444; 160). Pe codul de până pe 2026-10-08 rotirea refăcea
+// numai decalajul: 844 × 390 → 390 × 844 lăsa ancora etichetei la x = −18, iar
+// 1024 × 768 → 768 × 1024, la x = −68. Controlul e calea aceea, care a rămas pentru
+// o cameră atinsă de utilizator după deschidere: aceeași măsurătoare trebuie să pice.
+console.log('\nFișa deschisă, apoi ecranul rotit');
+{
+  const n = -convergentaDinColturi(relief.meta.colturi_geo);
+  const REM = 16, poi = date.poi.zbor;
+  const fisaLa = (w, h) => {
+    if (w <= 34 * REM) {
+      const H = 0.55 * h, bottom = h - 0.5 * REM;
+      return { left: 0.5 * REM, right: w - 0.5 * REM, top: bottom - H, bottom, width: w - REM, height: H };
+    }
+    const width = Math.min(24 * REM, w - 2 * REM), right = w - REM, top = 10 * REM, H = Math.max(8 * REM, h - 16 * REM);
+    return { left: right - width, right, top, bottom: top + H, width, height: H };
+  };
+  let ceas = 0;
+  const acum = performance.now;
+  performance.now = () => ceas;
+  const sesiune = ({ redus = false } = {}) => {
+    globalThis.matchMedia = () => ({ matches: redus, addEventListener() {} });
+    const ecran = { w: 0, h: 0 };
+    const canvas = {
+      get clientWidth() { return ecran.w; }, get clientHeight() { return ecran.h; },
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: ecran.w, height: ecran.h }),
+    };
+    const { camera, controale } = creeazaCamera(null);
+    const zbor = creeazaZbor({ camera, controale, cereRandare: () => {}, azimutNordAdevarat: n });
+    const cadru = creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFisa: () => fisaLa(ecran.w, ecran.h), cereRandare: () => {} });
+    globalThis.matchMedia = undefined;
+    const s = {
+      camera, controale, zbor, cadru, ecran,
+      // Ca bucla din scena.js: mărimea nouă, aspectul, apoi cadrul fișei.
+      marime(w, h) { ecran.w = w; ecran.h = h; camera.aspect = w / h; camera.updateProjectionMatrix(); cadru.laRedimensionare(); },
+      deschide() { cadru.laDeschidere(fisaLa(ecran.w, ecran.h)); },
+      cadre(max = 400) { let k = 0; for (; k < max && zbor.activ; k++) { ceas += 16.7; zbor.pas(); controale.update(); } return k; },
+      get poz() { return [camera.position.clone(), controale.target.clone()]; },
+    };
+    return s;
+  };
+  const deLa = (a, b) => Math.max(a[0].distanceTo(b[0]), a[1].distanceTo(b[1]));
+  // Ce iese din partea liberă — din canvas sau sub fișă: 64 de puncte pe cercul
+  // complexului, la cota țintei, ancora etichetei și colțurile corpurilor, pe teren.
+  const masoara = ({ camera, controale, ecran }) => {
+    camera.updateMatrixWorld();
+    const f = fisaLa(ecran.w, ecran.h), v = new THREE.Vector3();
+    const pe = (x, y, z) => { v.set(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * ecran.w, (-v.y * 0.5 + 0.5) * ecran.h, v.z]; };
+    const liber = ([x, y, z]) => z < 1 && x >= 0 && x <= ecran.w && y >= 0 && y <= ecran.h && !(x >= f.left && x <= f.right && y >= f.top && y <= f.bottom);
+    let cerc = 0, corp = 0, corpN = 0, bis = 0, bisN = 0;
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * 2 * Math.PI;
+      if (!liber(pe(poi.tinta[0] + RAZA_COMPLEX * Math.cos(a), poi.tinta[1], poi.tinta[2] + RAZA_COMPLEX * Math.sin(a)))) cerc++;
+    }
+    for (const c of date.corpuri) for (const [x, z] of c.contur) {
+      const afara = liber(pe(x, inaltimeLa(x, z), z)) ? 0 : 1;
+      corp += afara; corpN++;
+      if (c.cheie.startsWith('biserica.')) { bis += afara; bisN++; }
+    }
+    const anc = pe(...date.poi.ancora);
+    return { cerc, corp, corpN, bis, bisN, anc, ancLibera: liber(anc), r: camera.position.distanceTo(controale.target) };
+  };
+  const scrie = (m) => `${m.r.toFixed(0)} m; din cercul complexului ${m.cerc}/64 afară, din colțurile corpurilor ${m.corp}/${m.corpN}, `
+    + `ale bisericii ${m.bis}/${m.bisN}, ancora la (${m.anc[0].toFixed(0)}; ${m.anc[1].toFixed(0)})${m.ancLibera ? '' : ', afară'}`;
+  const deschisLa = (w, h, o) => { const s = sesiune(o); s.marime(w, h); s.deschide(); s.cadre(); return s; };
+
+  // Peisaj → portret: un zbor nou, până unde ar fi ajuns o deschidere direct în portret.
+  for (const [[w0, h0], [w1, h1]] of [[[844, 390], [390, 844]], [[1024, 768], [768, 1024]]]) {
+    const direct = deschisLa(w1, h1), mD = masoara(direct);
+    const s = deschisLa(w0, h0);
+    s.marime(w1, h1);
+    const zboara = s.zbor.activ, pasi = s.cadre(), m = masoara(s), e = deLa(s.poz, direct.poz);
+    proba(zboara && e < 1e-6 && m.ancLibera && m.cerc <= mD.cerc,
+      `${w0} × ${h0} → ${w1} × ${h1}: zbor nou, ${pasi} cadre, la ${e.toExponential(1)} m de o deschidere direct în ${w1} × ${h1}: ${scrie(m)}`);
+    // Control: o atingere după deschidere — camera e a utilizatorului, rotirea reface numai decalajul, ca înainte.
+    const c = deschisLa(w0, h0), p0 = c.poz;
+    c.controale.dispatchEvent({ type: 'start' });
+    c.marime(w1, h1);
+    const zboaraC = c.zbor.activ; c.cadre();
+    const mC = masoara(c), eC = deLa(c.poz, p0);
+    proba(!zboaraC && eC === 0 && !(mC.ancLibera && mC.cerc <= mD.cerc),
+      `control, cu o atingere după deschidere: camera rămâne (${eC} m), ca pe codul vechi: ${scrie(mC)} — pică`);
+  }
+
+  // Portret → peisaj: camera stă doar mai departe; nicio mișcare.
+  for (const [[w0, h0], [w1, h1]] of [[[390, 844], [844, 390]], [[768, 1024], [1024, 768]]]) {
+    const s = deschisLa(w0, h0), p0 = s.poz;
+    s.marime(w1, h1);
+    const zboara = s.zbor.activ, m = masoara(s), mD = masoara(deschisLa(w1, h1));
+    proba(!zboara && deLa(s.poz, p0) === 0 && m.ancLibera && m.cerc <= mD.cerc,
+      `${w0} × ${h0} → ${w1} × ${h1}: niciun zbor, camera la ${deLa(s.poz, p0)} m de unde era: ${scrie(m)}`);
+  }
+
+  // Bara de adrese: ±56 px pe înălțime nu trec de prag.
+  {
+    const s = deschisLa(390, 844), p0 = s.poz, r0 = masoara(s).r;
+    const cerute = [];
+    for (const h of [900, 790, 844]) {
+      s.marime(390, h);
+      cerute.push(distantaLaFisa(poi, s.camera, parteLibera(fisaLa(390, h), { left: 0, top: 0, width: 390, height: h })));
+      if (s.zbor.activ) break;
+    }
+    proba(!s.zbor.activ && deLa(s.poz, p0) === 0 && Math.max(...cerute) <= PRAG_ZBOR_NOU * r0,
+      `390 × 844 → 900 → 790 → 844 px de înălțime (bara de adrese): niciun zbor; cerute ${cerute.map((d) => d.toFixed(0)).join(' / ')} m față de ${r0.toFixed(0)} m, prag ×${PRAG_ZBOR_NOU}`);
+  }
+
+  // Fișa închisă: rotirea nu mută camera și nu lasă decalaj.
+  {
+    const s = sesiune(), p0 = s.poz;
+    s.marime(844, 390); s.marime(390, 844);
+    proba(!s.zbor.activ && deLa(s.poz, p0) === 0 && !s.camera.view?.enabled, `fără fișă: rotirea nu mută camera (${deLa(s.poz, p0)} m) și nu lasă decalaj`);
+    s.deschide(); s.cadre(); s.cadru.laInchidere();
+    proba(!s.camera.view?.enabled && !s.cadru.deschisa, 'fișa închisă: decalajul se șterge');
+  }
+
+  // Rotirea în timpul zborului de la deschidere: zborul nou merge până unde trebuie,
+  // deși camera, încă pe drum, era mai departe decât cere portretul.
+  {
+    const direct = deschisLa(390, 844), rD = masoara(direct).r;
+    const s = sesiune();
+    s.marime(844, 390); s.deschide();
+    for (let k = 0; k < 3; k++) { ceas += 16.7; s.zbor.pas(); s.controale.update(); }
+    const rPeDrum = masoara(s).r;
+    s.marime(390, 844); s.cadre();
+    const e = deLa(s.poz, direct.poz);
+    proba(e < 1e-6, `rotit după 3 cadre de zbor, cu camera la ${rPeDrum.toFixed(0)} m: aterizează la ${e.toExponential(1)} m de o deschidere în portret (${rD.toFixed(0)} m)`
+      + `${rD <= PRAG_ZBOR_NOU * rPeDrum ? '; o comparație cu distanța de atunci n-ar fi zburat' : ''}`);
+  }
+
+  // Sub prefers-reduced-motion, zborul nou sare la capăt, în 0 cadre.
+  {
+    const direct = deschisLa(390, 844);
+    const s = deschisLa(844, 390, { redus: true });
+    s.marime(390, 844);
+    const activ = s.zbor.activ, e = deLa(s.poz, direct.poz);
+    proba(!activ && e < 1e-6, `sub prefers-reduced-motion: camera în portret imediat, la ${e.toExponential(1)} m, fără zbor animat`);
+  }
+  performance.now = acum;
 }
 
 // ------------------------------------------------------------ 8. clădirea lovită

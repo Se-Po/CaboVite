@@ -104,8 +104,12 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
   fisa.append(inchide, titlu, lista, el('p', { className: 'model' }, continut.despre_model));
   gazda.append(radacina, fisa);
 
+  // Pe <html>, pentru CSS-ul panoului punctului, care împarte coloana cu fișa
+  // (main.css). Nu `:has()`: lipsește în Firefox sub 121, deci și în 115 ESR.
+  const radacinaDoc = document.documentElement;
   const deschide = () => {
     fisa.hidden = false;
+    radacinaDoc.toggleAttribute('data-fisa-deschisa', true);
     buton.setAttribute('aria-expanded', 'true');
     titlu.focus();
     murdar = true;
@@ -114,6 +118,7 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
   const inchideFisa = (readuFocus = true) => {
     if (fisa.hidden) return;
     fisa.hidden = true;
+    radacinaDoc.removeAttribute('data-fisa-deschisa');
     buton.setAttribute('aria-expanded', 'false');
     if (readuFocus) buton.focus();
     murdar = true;
@@ -214,6 +219,7 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
       globalThis.removeEventListener('scroll', marcheaza);
       globalThis.removeEventListener('resize', marcheaza);
       observator?.disconnect();
+      radacinaDoc.removeAttribute('data-fisa-deschisa');
       radacina.remove();
       fisa.remove();
     },

@@ -169,6 +169,13 @@ export function creeazaCer({ paleta, soare }) {
   // gl_Position.z = w, pe planul îndepărtat: nu acoperă nimic.
   cer.scale.setScalar(40000);
   cer.frustumCulled = false;
+  // Ultimul din lista opacă. three o sortează întâi după renderOrder, apoi după
+  // material.id (WebGLRenderLists.js:7-13), iar materialul cerului se face primul,
+  // deci cerul se umbrea pe tot ecranul și se acoperea apoi: la pornire pe 93% din
+  // pixeli, de aproape pe 100%. Desenat la urmă, testul de adâncime (LessEqual, cu
+  // z = w, deci 1,0, cât curățarea) îl lasă numai unde n-a scris nimic altceva. Nu
+  // scrie adâncime, deci nici transparentele de după el nu se schimbă.
+  cer.renderOrder = 2;
   cer.matrixAutoUpdate = false;
   cer.updateMatrix();
   const u = cer.material.uniforms;

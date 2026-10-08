@@ -82,6 +82,12 @@ export function creeazaMare(paleta, cer = null, intindere = 120000) {
     roughness: 0.32,
     metalness: 0,
   });
+  // Marea se desenează DUPĂ teren și clădiri (`renderOrder = 1`, mai jos), ca să nu se
+  // umbrească pe pixelii pe care terenul îi acoperă oricum — de aproape, aproape toți.
+  // Cu ordinea inversată, la adâncime egală ar câștiga ea, nu terenul ca înainte: pe
+  // țărm, de la 8 km, se vedeau pixeli schimbați. `Less` strict păstrează câștigătorul
+  // de dinainte; e stare GL, nu schimbă programul. Marea Satelit (satelit.js) la fel.
+  material.depthFunc = THREE.LessDepth;
   if (cer) {
     material.onBeforeCompile = (sh) => ceataCer(sh, cer);
     material.customProgramCacheKey = () => 'mare-ceata-cer';
@@ -89,6 +95,8 @@ export function creeazaMare(paleta, cer = null, intindere = 120000) {
 
   const obiect = new THREE.Mesh(geometrie, material);
   obiect.name = 'mare';
+  // Pe obiect, nu pe material: rămâne și când Satelit îi schimbă materialul. Cerul are 2.
+  obiect.renderOrder = 1;
   obiect.matrixAutoUpdate = false;
   obiect.updateMatrix();
 

@@ -46,9 +46,10 @@ se poartă în română.
 | `npm run surse-imprejurimi` | aduce o singură dată, prin HTTP pe intervale, ferestrele Copernicus DEM și Sentinel-2 ale împrejurimilor → `date-sursa/copernicus/`, `date-sursa/sentinel/`, cu manifestul `scripts/imprejurimi/surse.json` |
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
-| `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea |
-| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor |
+| `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea, shaderul fără codul umbrelor |
+| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate”, harta cu pagina mărită |
 | `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate; `-- --live` le compară cu sebastians.life |
+| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2) |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
@@ -73,6 +74,22 @@ EXIF-ul — stă în `scripts/comun/`.
   capitol — **nu** deschide al doilea `requestAnimationFrame`. Bucla rulează deja
   la fiecare cadru și decide doar *dacă* desenează, deci animația se agață în ea.
   Modelul e `zbor.pas()`, chemat ca primă instrucțiune din buclă.
+- O excepție în buclă nu se lasă să se repete. three cere cadrul următor ÎNAINTEA
+  buclei (`WebGLAnimation.js:10`), deci una persistentă ar arunca la fiecare cadru,
+  și în repaus, cu imaginea înghețată: măsurat în pagină, cu `zbor.pas` aruncând
+  mereu, 61 de erori neprinse în 1 s și 0 cadre. Corpul buclei din `scena.js`
+  (`cadru()`) stă într-un `try`: la prima excepție, un singur `console.error`, iar
+  cadrul se cere din nou; contorul se golește numai după ce `render()` a întors. La
+  al treilea eșec la rând, `setAnimationLoop(null)` și `laEsec`, opțiunea lui
+  `porneste()`: `main.js` cheamă `dispose()`, prin aceeași listă ca la pornire, apoi
+  `forceContextLoss()` — canvasul e abandonat, deci contextul n-are de ce să rămână viu,
+  ca pe calea de eroare de la pornire — și calea fără scenă
+  (`data-scena="indisponibila"`, subsolul ascuns). Probe, în
+  pagină: aruncând mereu, trei apeluri, un `console.error`, 0 erori neprinse, de la
+  14 geometrii și 9 texturi la 0 și 1; o excepție o singură dată, în `zbor.pas` sau
+  în `gest.pas` (după `cerut = false`), costă un cadru, redesenat la cel următor,
+  iar scena rămâne activă — pe codul de dinainte, cea din `gest.pas` lăsa cadrul
+  cerut nedesenat (0 cadre în 0,5 s).
 - Importă addon-urile ca `three/addons/...`, nu `three/examples/jsm/...`.
 - `THREE.Clock` e deprecat din r183 → folosește `THREE.Timer`.
 - `PCFSoftShadowMap` a fost **eliminat** în r186 → `THREE.PCFShadowMap`.
@@ -114,6 +131,10 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
   nicio versiune. Pe serverul de dezvoltare e a ultimului commit, fără lucrul nesalvat.
   Ce stă pe marginea de jos urcă deasupra ei cu `--versiune` (1,15rem): pe desktop
   „Coordonate” și Satelit, pe aceeași linie; pe telefon busola, Satelit și panoul.
+  Variabila stă pe `#versiune ~ *` — panourile vin după versiune în `<body>` —, nu pe
+  `:root:has(#versiune)`: Firefox 115 ESR n-are `:has()`, iar acolo „Coordonate” intra
+  13,1 px peste versiune. Proba, în pagină: `--versiune` e 1,15rem pe busolă, Satelit,
+  panou și fișă; cu versiunea mutată la sfârșitul lui `<body>`, gol.
 
 ## Livrarea: `vercel.json`
 
@@ -144,9 +165,10 @@ revalidau 45 de fișiere, în lanț — HTML, JS, apoi cele trei niveluri de dat
 (cameră, microfon, geolocație oprite) și CSP-ul, deocamdată `Content-Security-Policy-Report-Only`:
 numai scrie în consolă. Fiecare sursă are un motiv:
 - `script-src 'self' 'unsafe-eval'`: transcodorul Basis al KTX2Loader face `new Function`
-  (embind) și compilează WebAssembly, în worker. Fără `'unsafe-eval'` workerul moare la
-  pornire, iar `ktx2.parse` nu se mai întoarce: Satelit nu apare și pagina nu spune nimic.
-  De aceea politica se impune abia după ce transcodorul are limită de timp.
+  (embind) și compilează WebAssembly, în worker. Fără `'unsafe-eval'`, `verificaTranscodorul`
+  (`loaders.js`) oprește Satelit în firul principal, înaintea oricărei descărcări, cu un
+  avertisment, iar Relief rămâne. Un worker mort din alt motiv îl prinde limita de 30 s a
+  transcodării. Înainte de impunere mai rămâne încercarea din Firefox și Safari/iOS (mai jos).
 - `worker-src 'self' blob:`: workerul KTX2Loader e făcut dintr-un Blob. `child-src` repetă
   sursele pentru browserele care nu citesc `worker-src` <!-- NEVERIFICAT: Safari vechi -->.
 - `img-src 'self' data:`: cursoarele, ca URI de date în CSS.
@@ -533,6 +555,37 @@ Tot la început, `spre()` golește zborul în curs. Altfel un zbor spre sanctuar
 în aer, urmat de un clic pe busolă sub `prefers-reduced-motion`, ar fi dus camera
 înapoi la sanctuar la cadrul următor: măsurat, la 1 092 m de vederea de pornire.
 
+Și, înaintea inerției, `spre()` încheie gestul în curs (`incheieGestul`, în
+`camera.js`). Home apăsat cu harta ținută — butonul stâng, sau un deget pe o tabletă
+cu tastatură — lăsa apucarea legată de un punct de LUME: zborul ateriza exact, iar la
+prima mișcare harta sărea înapoi după el, măsurat **1 469,8 m**. Nu ajunge să uiți
+punctul: `_panStart` rămâne cel de la apăsare, iar mutarea lui OrbitControls sărea
+169,3 m. Zborul eliberează captura, lasă documentul și emite `end`, ca o ridicare;
+fără pointer apăsat nu face nimic, deci nici `end` fără `start`. Ca să tragi din nou,
+apeși din nou. Spre deosebire de o ridicare, un deget rămas pe sticlă trimite mai departe
+`pointermove` la document: `ControaleHarta` le lasă să treacă numai pe ale pointerilor
+urmăriți. Altfel, un deget nou pus pe hartă era deturnat de cel vechi — măsurat, salturi de
+321,7 m după zbor și de 327,1 m după `blur` —, iar un deget mișcat pe busolă cât altul ține
+harta muta harta cu 344,5 m. Probele, cu controlul fără filtru, sunt în `verifica-controale`. Busola și eticheta pornesc zborul la `click`: cu mouse-ul nu se poate în
+timpul unei trageri, fiindcă pointerul e capturat de canvas.
+
+**NaN-ul nu intră în zbor.** `Math.min` și `Math.max` lasă NaN să treacă, deci un
+punct de privire cu un câmp lipsă ajungea în cameră: cu `distanta` lipsă durata ieșea
+NaN, iar zborul nu se mai termina și randa la fiecare cadru; cu `azimut` lipsă se
+termina, cu camera NaN; un `null` în țintă, socotit 0, ducea ținta tăcut la cota 0. Azi
+nu se cunoaște nicio sursă: `poi.zbor` e o constantă din `build-sanctuar`, verificată de
+proba zborului. Trei gărzi:
+- `spre()` judecă valorile CALCULATE — ținta, distanța, unghiurile, pe ambele forme —
+  și refuză, cu un avertisment, înainte să atingă ceva: gestul, inerția și zborul în
+  curs rămân cum erau;
+- o cameră deja NaN, de oriunde ar veni, sare la capăt, ca sub reduced-motion. Animat,
+  Home și busola n-o mai reparau;
+- `pas()` încheie zborul pe `!(t < 1)`, nu pe `t >= 1`: o durată NaN nu-l mai ține activ.
+
+Pe traiectoriile obișnuite reparația e identică la bit: cinci zboruri — spre sanctuar,
+după o aruncare, acasă în zbor, sub reduced-motion, cu ambele forme ale punctului —,
+7 343 de valori ale camerei și ale țintei, cadru cu cadru, 0 diferite cu `Object.is`.
+
 **Probe care pot eșua.** La pornire busola scrie **306° NV**; cu nordul grilei ar
 scrie 307°, cu semnul lui γ inversat 308°. Poziția și ținta camerei sunt exact
 `VEDERE_START` la pornire și după clicul pe busolă, de oriunde ar pleca: în pagină,
@@ -540,7 +593,13 @@ de la 2,3 km, la 4·10⁻¹⁴ m. Iar `__scena.busola.convergenta` trebuie să c
 mai puțin de 0,001 de valoarea analitică: pragul e ales ca să pice dacă factorul
 elipsoidal lipsește. Zborul înapoi are probele lui și în `npm run verifica-sanctuar`:
 din zborul spre sanctuar, după o aruncare și sub reduced-motion (0 cadre), la
-sub 10⁻¹² m; aterizarea nu depinde de nord; al doilea clic nu pornește nimic.
+sub 10⁻¹² m; aterizarea nu depinde de nord; al doilea clic nu pornește nimic. Tot
+acolo, NaN-ul: `distanta` lipsă, `azimut` lipsă, un `null` în țintă și poziția chiar în
+țintă se refuză, cu camera neatinsă și un avertisment; camera NaN urmată de Home
+animat ajunge acasă la 3·10⁻¹⁴ m. Pe codul de dinainte pică toate cinci — zborul încă
+activ după 2 000 de cadre, sau încheiat cu camera NaN ori cu ținta la cota 0 în loc de
+132,67 m. Control:
+același Home sub reduced-motion, care trecea și înainte.
 
 ## Punctul de sub clic
 
@@ -568,6 +627,27 @@ aceeași coloană: pe ecrane înalte fișa se oprește deasupra panoului (24rem 
 pe o clădire panoul ocupă de jos 21,64rem), iar sub ~56rem își împart înălțimea
 dintre 10rem și marginea de jos și defilează fiecare. Pe telefon fișa e o foaie jos,
 peste busolă, Satelit și panou, ca înainte.
+
+Cine e deschis spun atributele `data-punct-deschis` (punct.js) și `data-fisa-deschisa`
+(eticheta.js) de pe `<html>`, scoase la `dispose()`; înainte, `:has()`, pe care Firefox
+115 ESR nu-l are. Înălțimile maxime ale cutiei se scriu cu `--vizibil`: `100dvh` sub
+`@supports`, altfel `100vh`. O linie cu `vh` pusă înaintea celei cu `dvh` n-ar fi ajuns:
+declarațiile au `env()` și `var()`, deci se acceptă la parsare și devin invalide abia la
+calcul, iar `max-height` ajunge `none`. Proba, în panoul Browser (2026-10-08), cu foaia
+simulată:
+- fără `:has()` — regulile șterse din `document.styleSheets` —, la 1280 × 720, cu panoul
+  pe `far.turn` și fișa deschise: fișa trecea cu 250,3 px peste cutie, cu tot cu antetul;
+  acum se oprește cu 16 px deasupra ei, cât și cu `:has()`;
+- fără `dvh` — foaia reinjectată cu `dvh` → `dvhx` —, la 844 × 390, cu panoul pe
+  `far.turn`: `max-height` era `none`, iar cutia urca până la y 25,3, în banda rândului cu
+  sursele; acum 299,6 px, cu cutia de la y 60, ca în Chromium cu `dvh`. Control: o linie
+  cu `vh` înainte dă tot `none`;
+- la 320 × 256, cu panoul deschis, versiunea e ascunsă; minimizat, se vede;
+- `npm run verifica-pagina` păzește foaia: niciun `:has(`, `dvh` numai în rezervă; pe
+  foaia de dinainte pică.
+
+Pe Firefox 115 și pe Chrome 94–107 adevărate nu s-a încercat
+<!-- NEVERIFICAT: pagina în Firefox 115 ESR și într-un Chrome sub 108 -->.
 
 **Nu se dă raycast pe plasă.** `raycaster.intersectObject()` pe geometria
 neindexată costă **53 ms pe rază**, măsurat pe cele 2,56 milioane de triunghiuri
@@ -598,8 +678,18 @@ indicii la marginea grilei — la (1300, 0), la 136 m est de cutie, ar fi dat
 se oprește pe deal, nu pe alpha din spatele lui — măsurat: clicul țintit pe
 (2600; −3000), din nord-est, cade la (2600; −3000).
 
-În alpha, raza lovește un loc real chiar și pe apă, deci lon/lat, scena și TM06 se
-arată întotdeauna. Altitudinea primește etichetă după o regulă verificabilă:
+**Punctul e ce se VEDE sub cursor**, cu același `punctVazut` ca zoomul rotiței și
+apucarea hărții: relieful, o clădire sau, pe apă, suprafața mării la `COTA_MARE`
+(−0,25 m) — nu umplutura de −8 m de sub ea. În alpha, lon/lat, scena și TM06 se arată
+deci întotdeauna, iar pe mare sunt ale locului atins. Înainte, raza panoului mergea
+numai pe relief, trecea de suprafață și se oprea pe umplutură: din vederea de pornire,
+la 1600 × 900, pe marea din alpha (47% din pixeli) punctul ieșea mutat de-a lungul
+razei cu 7,75 m / tan(elevație) — mediana 13,54 m, până la 34,52 m, de ~100 de ori
+precizia afișată. Planul de rezervă, pentru marea de dincolo de capătul mersului, a
+trecut și el de la y = 0 la `COTA_MARE`; fără el, un clic acolo ar lăsa pe ecran
+punctul de dinainte, în loc de „În afara zonei alpha”. Clădirile rămân în `cuCladire`,
+care le ține și numele, cu aceeași prioritate ca în `punctVazut`: la egalitate,
+terenul. Altitudinea primește etichetă după o regulă verificabilă:
 
 - **„apă"** dacă altitudinea nu e strict pozitivă. Regula vine din sidecar, nu
   din ochi: `regula_apa` spune „exact 0.0 m sau NODATA (−999); plaja, care are
@@ -619,6 +709,34 @@ peticului și până la 0,153 m pe cusătură.
 ancorate pe **centrul** lui `bbox_tm06` — vezi convenția de mai sus. Longitudinea
 și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
 mai multe ar fi precizie inventată peste o sursă rotunjită.
+
+**Rândurile mici** — scena și TM06 — au câte un element pe axă (`.axa`), în linie,
+despărțite de un spațiu lărgit cu `word-spacing` cât două spații. Erau un text cu două spații între
+axe, pe care `white-space` le strângea într-unul (CSS Text 3): pe ecran rămânea unul.
+Pe un rând prea îngust o axă trece întreagă pe rândul următor, în loc să iasă din
+cutie, iar litera nu se mai desparte de cifra ei: la 195 px (390 cu pagina mărită de
+două ori), textul vechi lăsa „Z” la capăt de rând și cifra pe rândul următor. Textul
+copiat nu se schimbă, iar o selecție făcută de mână peste rând iese tot pe o linie. Ca itemi
+flex, axele erau blocuri, iar selecția le scotea câte una pe rând (recenzia).
+
+**Probele.** `npm run verifica-controale` cheamă panoul adevărat, cu un DOM falsificat,
+prin `culegeLa`, pe 100 × 56 de pixeli ai vederii de pornire, la 1600 × 900: pe cei
+5 200 cu ceva sub cursor, punctul e al lui `punctVazut` la 0 m; pe cei 2 645 de pe
+marea din alpha eticheta e „apă” peste tot, iar fiecare axă stă în elementul ei.
+Control: compunerea veche, înghețată în probă, pune punctul de pe mare la mediana
+13,53 m (cel mult 33,99 m); cu `punct.js` vechi pus la loc pică două probe, cu 3 107
+pixeli la peste 1 µm. În pagină, la 916 × 417, pe 625 de pixeli: 0 la peste 1 µm,
+„apă” pe 316 din 316.
+
+Rândurile mici, în pagină, cu valorile cele mai lungi (X −1163,00 · Y 168,28 ·
+Z −1492,00; TM06 X −95790,00 · Y −138900,00): golul dintre axe e de 2,0 spații
+(6,86 px pe desktop, 6,33 px pe telefon); textul cu două spații avea lățimea celui cu
+unul. Rândul scenei stă pe o linie pe desktop, la 360, 320 și 844 × 390; la 390 × 844,
+390 × 330 și 195 px, Z trece pe al doilea rând. Rândurile mici nu fac cutia să
+defileze pe orizontală la nicio lățime, nici cu o bară de defilare clasică de 15 px,
+simulată cu o margine de 16 px, și nicio axă nu se rupe. Singura depășire nu vine de
+la ele: la 195 px, cu bara simulată, cutia iese cu 6 px din cauza rândurilor mari
+(altitudine, longitudine, latitudine), la fel și înainte.
 
 ## Mouse-ul, degetele și cursorul
 
@@ -713,6 +831,50 @@ cursorul. Valorile stărilor sunt `_STATE`, privat în OrbitControls, scrise în
 proba le citește înapoi. `connect()` trece prin `disconnect()`, care scrie pe canvas
 `style.cursor = 'auto'` inline: `ControaleHarta` îl scoate la creare și la `dispose()`.
 
+**Gestul se încheie și fără `pointerup`.** OrbitControls îl încheie numai la `pointerup`
+sau `pointercancel`, iar `pointermove` îl ascultă pe document, fără să citească `buttons`.
+Dacă fereastra pierdea focusul în mijlocul unei trageri (Alt+Tab) și `pointerup` nu mai
+venea, gest.js ștergea cursorul, dar controalele rămâneau în MUTARE sau ROTIRE: harta urma
+mouse-ul fără buton, și peste textul paginii, până la primul clic. Acum `ControaleHarta`
+încheie gestul la `blur` pe fereastră și la `lostpointercapture` pe canvas, iar gest.js
+ascultă numai `start` și `end`. Captura pierdută încheie numai pointerul ei — dacă unul din
+două degete o pierde fără să se ridice, celălalt mută mai departe —, iar după un `pointerup`
+obișnuit pointerul nu mai e urmărit, deci ea nu mai face nimic: browserul o pierde implicit
+abia după ridicare. Proba ei o face fără `pointerup`; cu ridicarea înainte, ramura nu s-ar
+atinge. Eliberarea capturii stă
+în `try`: pe un pointer care nu mai e activ specificația cere NotFoundError, iar
+`_onPointerUp` al lui OrbitControls s-ar fi oprit chiar acolo, cu gestul deschis. Dacă
+browserele trimit totuși `pointerup` la Alt+Tab nu s-a încercat de mână
+<!-- NEVERIFICAT: Alt+Tab adevărat în mijlocul unei trageri, în Chrome, Firefox și Safari -->;
+reparația nu depinde de asta.
+
+**Pagina mărită cu degetele.** Canvasul acoperă tot ecranul, iar OrbitControls îi scrie
+`touch-action: none`. Mărită pe textul fișei sau pe fundalul modalei „© DGT”, unde
+ciupirea e a paginii, pagina nu se mai putea micșora de pe hartă: un deget muta harta, două
+o apropiau, iar busola, Satelit și „Coordonate”, fixe, puteau rămâne în afara zonei mărite.
+Acum, cât `visualViewport.scale` trece de 1,01, canvasul ia `touch-action: manipulation`
+(sinonimul lui `pan-x pan-y pinch-zoom`, cunoscut și de Safari pe iOS), iar controalele se
+opresc: `urmaresteMarireaPaginii` din camera.js, chemată de scena.js după `creeazaCamera`
+și eliberată prin `deEliberat`. Degetele și rotița sunt atunci ale paginii; o atingere
+scurtă măsoară mai departe. Starea se citește și la creare: pagina poate porni mărită, cu
+scara restaurată la reîncărcare sau din bfcache. Consecința pe desktop: o mărire cu
+touchpadul, pornită pe un panou, oprește și mouse-ul pe hartă, până la micșorare; ciupirea
+pe hartă micșorează atunci pagina, fiindcă rotița cu Ctrl nu mai e oprită de controale.
+<!-- NEVERIFICAT: pe telefon, în Android Chrome și iOS Safari — modala „© DGT” mărită pe fundal, închisă, apoi micșorată cu două degete pe hartă; la fel cu fișa sanctuarului -->
+
+**Atingerea lungă.** Canvasul are `user-select: none`, `-webkit-touch-callout: none` și
+`-webkit-tap-highlight-color: transparent`; rozeta, Satelit, „Coordonate”, „–” și eticheta
+sanctuarului, numai `user-select: none` — n-au stare `:active`, deci pe iOS evidențierea
+atingerii e singurul lor semn. Textele fișei, ale panoului, ale capitolelor și rândul cu
+sursele rămân selectabile, iar linkurile surselor își păstrează previzualizarea. Pe iOS
+`contextmenu` nu vine la atingere, deci OrbitControls nu oprea selecția, iar
+`touch-action` acoperă numai mutarea și ciupirea — din cunoștințe
+<!-- NEVERIFICAT: apăsare de 1 s pe hartă, peste platou și peste mare, pe un iPhone, înainte și după; dacă nici înainte nu apare lupa sau selecția, constatarea se închide -->.
+În pagină: `#scena` și cele cinci butoane dau `user-select: none`; `dd` din panou, `li`
+din fișă, un `p` pus în `#continut` și rândul cu sursele, `auto`. Control: cu
+`body { user-select: none }` toate trei textele ies `none`; pe codul de dinainte, `#scena`
+dădea `auto`.
+
 **Pivotul rotirii** e o sferă aurie (`.pivot-rotire`) pe ținta camerei, cât ține rotirea —
 ca la Revit și Potree. Se proiectează pe cadrul care se desenează, după
 `camera.updateMatrixWorld()`, ca eticheta, și se stinge printr-o tranziție CSS de 250 ms,
@@ -738,9 +900,33 @@ l-ar fi făcut invizibil.
 - o treaptă: 22 de cadre, ln aplicat egal cu ln 1,4 la 10⁻¹⁵, apoi 0 cadre cerute;
 - rotiță, apoi zborul acasă: aterizarea la 10⁻¹³ m (control cu treptele lăsate în coadă:
   375,7 m);
+- gestul întrerupt, cu un canvas, un document și o fereastră care chiar își țin
+  ascultătorii și captura (eliberarea emite `lostpointercapture`, iar pe un pointer
+  inactiv aruncă NotFoundError):
+  - tras 290 px, Home cu harta ținută, cu mouse-ul și cu un deget, zbor animat și sub
+    reduced-motion: aterizarea la 4·10⁻¹³ m, iar 1 px și 300 de cadre o lasă acolo, cu un
+    singur `end`; o apăsare nouă apucă din nou terenul. Controale: fără gestul încheiat,
+    1 469,8 m; uitând numai punctul apucat, 169,3 m;
+  - `blur` sau `lostpointercapture` în mijlocul unei mutări sau rotiri, fără `pointerup`:
+    200 px fără buton mută camera cu 0 m, cu un `end`. Control, fără ascultătorii noi:
+    128,8 m la mutare, 900,7 m la rotire, 0 `end`;
+  - o tragere obișnuită, apoi `blur`: un singur `end`; două degete, ridicat A: B mută
+    harta cu 128,8 m, fără `end` până la ridicarea lui (control, captura pierdută încheie
+    `_pointers[0]`: 0 m); un deget inactiv, apoi `blur`: gestul se încheie, nimic aruncat
+    (control, prin `_onPointerUp`: NotFoundError, gestul rămâne deschis);
+  - pe codul de dinainte pică șapte dintre ele;
 - stările citite la `start`: drept → rotire, stâng → mutare, Shift + stâng → rotire,
   mijloc → zoom, un deget → mutare, două → zoom și rotire, ridicat unul → mutare;
-- metodele și câmpurile private folosite există — dacă three se schimbă, aici pică.
+- metodele și câmpurile private folosite există — dacă three se schimbă, aici pică;
+- panoul „Coordonate” culege același punct ca zoomul și apucarea, și pe mare (vezi
+  „Punctul de sub clic”): 0 m pe 5 200 de pixeli; control, compunerea veche: pe mare,
+  mediana 13,53 m;
+- pagina mărită, cu un `visualViewport` fals pus înainte de creare: pornită la scara 2,
+  fără niciun `resize`, `touch-action: manipulation` și controalele oprite, iar o atingere
+  nu pornește niciun gest; la scara 1 și sub prag (1,005), `none`, iar atingerea mută
+  harta; un ascultător cât trăiește scena, 0 după eliberare; fără `visualViewport`,
+  `none`. Controale: codul de dinainte și urmărirea numai la `resize` lasă `none` și
+  controalele pornite la scara 2.
 
 `verifica-sanctuar` construiește acum controalele zborului cu `creeazaCamera`, nu cu un
 OrbitControls copiat de mână, care n-avea nici `minPolarAngle`.
@@ -751,6 +937,16 @@ OrbitControls copiat de mână, care n-avea nici `minPolarAngle`.
 - la rotire, pivotul cade pe teren (la 14,62 m, pe relieful de acolo), imaginea nu se mișcă,
   iar sfera stă pe ținta proiectată la 0 px;
 - un clic măsoară, o tragere de 40 px nu, o atingere da, două degete nu;
+- Home în mijlocul unei trageri de 290 px (2026-10-08): pe loc starea −1, 0 pointeri,
+  fără `data-gest`, un `end`; zborul aterizează la 3,6·10⁻¹³ m, iar 1 px de mișcare cu
+  butonul ținut o lasă acolo, fără al doilea `end` la ridicare;
+- `blur` sau `lostpointercapture` în mijlocul unei mutări sau rotiri, cu inerția stinsă
+  de mână: 200 px fără buton, 0,000 m și un `end`; cu ascultătorii noi scoși, 128,2 m
+  (după `blur`) și 91,6 m (după captura pierdută) la mutare, 940,5 m la rotire, 0 `end`;
+- `visualViewport.scale` falsificat la 2, cu `resize` (2026-10-08): `touch-action:
+  manipulation` și controalele oprite, iar un `pointerdown` pe canvas nu pornește niciun
+  gest; înapoi la 1, `none`, iar același `pointerdown` pornește mutarea. Pe codul de
+  dinainte rămânea `none`, cu controalele pornite;
 - după `dispose()`: niciun `data-gest`, niciun pivot, niciun cursor inline, 0 geometrii.
 
 ## Cum se generează plasa terenului
@@ -771,9 +967,9 @@ fiecare cadru și nu se puteau vedea niciodată. Triunghiuri, pe `harta_v2`:
 2 562 454 → 1 362 122; pe `harta_v4`, cu uscatul din afara conturului, 1 923 948.
 
 Se taie numai celulele cu TOATE patru nodurile la cotă; malul rămâne întreg. Iar
-`inaltimeLa` citește din `grila`, nu din plasă, deci panoul punctului măsoară
-peste apă exact ca înainte — verificat: un clic pe mare întoarce punctul la
-centimetru și eticheta „apă".
+`inaltimeLa` citește din `grila`, nu din plasă, deci tăierea nu atinge panoul
+punctului: un clic pe mare întoarce punctul de pe suprafața mării, la `COTA_MARE`, și
+eticheta „apă" (vezi „Punctul de sub clic”).
 
 **Nu există atribut `normal`.** Cu `flatShading: true`, shaderul r186 nu-l
 citește: sub `FLAT_SHADED` varianta `vNormal` nici nu se declară, iar
@@ -896,6 +1092,81 @@ constantă ar da 2,85 / 4,54 / 0,59. Alpha stă sub 5 km de cameră și primeșt
 obișnuită, liniară, cu media orizontului ca culoare — aceeași lege ca înainte, deci
 terenul de aproape iese neschimbat. Împrejurimile, până la 50 km, păstrează legea
 liniară, dar iau culoarea cerului de pe azimut — vezi „Zona alpha și împrejurimile”. Cadre desenate în 2 s de repaus: 0.
+
+## Randarea: ordinea de desenare și mărimea canvasului
+
+### Cerul ultimul, marea după teren
+
+three sortează lista opacă întâi după `renderOrder`, apoi după `material.id`
+(WebGLRenderLists.js:7-13), iar cerul și marea își fac materialele înaintea terenului. Se
+desenau deci primele: cerul, Preetham și AgX pe fiecare pixel, se umbrea pe tot ecranul și
+se acoperea apoi pe 93% din pixeli la pornire și pe 100% de aproape; marea, cu ceața pe
+pixel, se umbrea sub teren pe 37% la pornire și pe 89–100% de aproape (acoperirea, din
+recenzie). În Satelit marea trecea și înaintea împrejurimilor și a terenului.
+
+Acum cerul are `renderOrder = 2` (cer.js), marea 1 (mare.js) — pe obiect, deci și când
+Satelit îi schimbă materialul. Marea, desenată după teren, are `depthFunc = LessDepth` în
+ambele materiale (mare.js și `mareM` din satelit.js): la egalitate de adâncime câștigă tot
+terenul, ca înainte, când el venea al doilea pe `LessEqual`. Cerul rămâne pe `LessEqual`:
+adâncimea lui e exact 1,0, cât a curățării, deci cu `Less` n-ar trece nicăieri. Nu scrie
+adâncime, deci nici transparentele de după el nu se schimbă.
+
+Probele:
+- `npm run verifica-pagina`, cu sortarea lui three însuși: cerul ultimul și marea înaintea
+  lui, și cu materialul mării din Satelit (`materialMareSatelit`, același ca în pagină);
+  marea pe `Less` în ambele materiale, cerul pe `LessEqual` fără să scrie adâncime. Control: fără `renderOrder`, cerul iese primul. Codul de dinainte
+  pică pe trei;
+- în pagină (panoul Browser, țintă fixă 640 × 400, fără MSAA, ieșire sRGB, cutia umbrelor
+  pusă de mână pe fiecare vedere): acasă, sanctuarul, farul și de la 8 km, pe Relief și pe
+  Satelit, față de codul de dinainte — **0 pixeli diferiți** în toate opt. Ordinea, din
+  `onBeforeRender`: Relief „teren, teren, sanctuar, drapaj-1…4, clădiri, harta_v6, v9, v7,
+  v8, mare, cer”, Satelit „sanctuar, clădiri, harta_v6…v8, teren, teren, mare, cer”;
+  înainte, Relief începea cu „cer, mare”, iar Satelit cu „cer, sanctuar, clădiri, mare”:
+  materialele Satelit se fac abia când sosesc texturile. Controale: fără `Less` pe mare, 19 pixeli
+  diferiți pe țărm de la 8 km pe Relief (18 pe Satelit, cel mult 83 pe un canal) și 2 acasă;
+  cerul ultimul, dar fără test de adâncime, schimbă 93% / 100% / 100% / 87,65% din cadru
+  (acasă / sanctuarul / farul / 8 km);
+- timpul GPU (EXT_disjoint_timer_query_webgl2, Intel UHD 770 prin ANGLE D3D11, panoul
+  vizibil, mediana a 15 randări, vechi și nou alternate în aceeași sesiune), pe canvasul de
+  916 × 914 cu MSAA:
+
+  | vederea | Relief | Satelit |
+  |---|---|---|
+  | acasă | 17,45 → 17,38 ms | 12,49 → 11,98 ms |
+  | sanctuarul | 18,99 → 17,54 | 12,89 → 11,93 |
+  | farul | 18,12 → 16,81 | 12,56 → 11,80 |
+  | 8 km | 17,15 → 16,53 | 12,67 → 12,14 |
+
+  Într-o țintă de 1600 × 900 cu MSAA 4 cifrele merg la fel (sanctuarul, Relief: 23,39 →
+  21,83), cu o excepție: Relief acasă iese +0,2 ms (21,45 → 21,63). Desfăcut, acolo
+  câștigul vine numai din cer (pe canvas −0,17 ms, în țintă ~0), iar marea mutată după
+  teren costă puțin (+0,05 pe canvas, +0,18 în țintă), fiindcă acum se umbrește și
+  terenul de sub suprafața ei, pe care înainte îl oprea testul de adâncime. Pe
+  GPU-urile Apple, care nu umbresc fragmentele opace acoperite, câștigul ar trebui să fie
+  aproape zero <!-- NEVERIFICAT: raționament, nu măsurătoare -->.
+
+### Mărimea canvasului
+
+`redimensioneaza()` din `renderer.js` are două plafoane: raportul de pixeli, cel mult 2 —
+alegerea autorului, 2026-10-08 —, și 2560 × 1440 de pixeli de dispozitiv. MSAA rămâne. Un
+telefon de 390 × 844 la 3× avea 1170 × 2532 (2,96 MP), sub plafonul de pixeli; acum are
+780 × 1688 (1,32 MP). Pe GPU-ul desktopului, Satelit la mărimea aceea costa 15,8 ms față de
+13,0 la 2× (linia de bază); pe un telefon adevărat câștigul nu e măsurat. Desktopul
+(1600 × 900 la 1×, 1440 × 900 la 2× → 2428 × 1517) și tableta (1024 × 1366 la 2× →
+1662 × 2217) nu se schimbă. Bufferul de desen la 390 × 844 la 3× e, calculat și nemăsurat,
+35,5–47,4 MB cu rezolvarea MSAA implicită și 118,5–130,3 MB cu cea explicită; la 2× e de
+2,25 ori mai mic <!-- NEVERIFICAT: ce rezolvare MSAA alege Chrome pe telefon -->.
+
+Ce a costat: un telefon în peisaj pornește cu umbrele pe cutia unită (vezi „Umbrele pe
+grupuri”), iar cu pagina mărită de două ori pe telefon (195 × 422 la 6×) canvasul rămâne
+390 × 844 — un pixel randat pe 3 × 3 ai ecranului. Un buget de pixeli pe
+`(pointer: coarse)`, care n-ar depinde de mărire, nu s-a ales.
+
+Probele: `npm run verifica-pagina`, pe un renderer fals — telefonul 780 × 1688, în peisaj
+1688 × 780, un Android de 412 × 915 la 3,5× 824 × 1830, desktopul, laptopul și tableta ca
+înainte, `setSize` mereu cu `false`; codul de dinainte pică pe patru (1170 × 2532). În
+pagină: presetul mobil al panoului (375 × 812, DPR 2) dă 750 × 1624, iar cu
+`devicePixelRatio` forțat la 3, 390 × 844 dă 780 × 1688 și 844 × 390 dă 1688 × 780.
 
 ## Zona alpha și împrejurimile
 
@@ -1066,6 +1337,24 @@ niciun format comprimat, unde KTX2 iese RGBA, împrejurimile de 2 m pe texel (`h
 `harta_v9`) pierd primul mip, ca peticul care folosește atunci textura bazei: ~67 MB pe
 placă în loc de ~103 <!-- NEVERIFICAT: calea RGBA, pe un GPU fără compresie -->.
 
+**Fără codul umbrelor.** r186 definește `USE_SHADOWMAP` pe renderer, nu pe obiect
+(WebGLPrograms.js:363), deci orice material luminat calcula pe fiecare vârf poziția în harta
+de umbre — un mat4 × vec4, normala în lume pentru deplasarea de normală și un varying
+vec4 —, și împrejurimile, care n-au `receiveShadow` și
+stau toate în afara hărții: 1 483 797 de vârfuri, 20% din terenul desenat în Relief.
+`onBeforeCompile`-ul ambelor materiale (cu fațete și netezit) pune `#undef USE_SHADOWMAP`
+în fața ambelor shadere, după prefixul cu `#define`; și fără cer, cu cheia
+`teren-imprejurimi-fara-cer`. Cheia cu cer rămâne `teren-imprejurimi`, iar numărul de
+programe nu crește. `ceataCer` își calculează singură poziția în lume, deci nu-i trebuie
+`worldPosition`, pe care `worldpos_vertex` îl face numai pentru umbre. În pagină:
+programele `teren-imprejurimi` n-au nici `directionalShadowMatrix`, nici
+`directionalShadowMap` printre uniforme — 0 din 8, față de 4 din 8 înainte —, iar în aceeași
+sesiune, cu materialele de dinainte puse înapoi, Relief dă 0 pixeli diferiți în cele patru
+vederi (țintă fixă 640 × 400). Timpul GPU, alternat vechi/nou, mediana a 15: pe canvasul de
+916 × 914 cu MSAA, acasă 17,71 → 17,40 ms, sanctuarul 17,84 → 17,53, de la 8 km 16,87 →
+16,54; în 1600 × 900 cu MSAA 4, −0,23…−0,33 ms. Același câștig în toate vederile: e în
+vârfuri. Satelit nu e atins — materialul lui e neiluminat.
+
 **Textura lui `harta_v9` vine în două trepte** (`IN_DOUA_TREPTE` din `satelit.js`,
 `TEXTURA_MICA` din `textura-imprejurimi`), la cererea autorului: să fie descărcată de la
 pornire și la detaliul întreg, dar fără să întârzie Satelit. Întâi `harta_v9-orto_v1-mic`,
@@ -1143,7 +1432,14 @@ busola (`acasa()`) și tasta Home. Rozeta poartă eticheta „Acasă — vederea
   4,32° / 3,30° / 3,42° (`harta_v9` / `harta_v7` / `harta_v8`), prag 1°; control: normala
   nodului de la est dă 2,10° / 2,52° / 2,10°;
 - bugetul: 600 000 de triunghiuri, 8 MB de fișiere, cu texturile mici ale primei trepte (azi
-  7,93); textura mică are cutia celei întregi, pasul dublu și sha256-ul din sidecar.
+  7,93); textura mică are cutia celei întregi, pasul dublu și sha256-ul din sidecar;
+- fără codul umbrelor: shaderul lui MeshStandardMaterial, trecut prin `onBeforeCompile`-ul
+  fiecărui nivel, cu definițiile pe care le pune three pentru o lumină cu umbră (PCF, culori,
+  ceață) și preprocesat cu bucățile lui three (`#include`, `#if`, `#define`, `#undef`), n-are
+  `directionalShadowMatrix`, `vDirectionalShadowCoord`, `directionalShadowMap` sau
+  `getShadow(` — pe cele patru niveluri fără cer și pe `harta_v6` și `harta_v9` cu cer, unde
+  ceața pe cer rămâne. Control: MeshStandardMaterial fără `onBeforeCompile` le are pe toate
+  patru; codul de dinainte pică pe toate șase.
 
 În pagină (panoul Browser, țintă fixă 640 × 400): alpha cu și fără împrejurimi dă
 **0 pixeli diferiți** în afara pixelilor în care se văd împrejurimile — scoși dintr-o
@@ -1262,6 +1558,40 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
   clic; butonul are `aria-busy` cât se încarcă. `?previzualizare` forțează Relief,
   fără buton. Crearea e în `try`, ca la cer și la umbre.
   Recenzia three.js a găsit exact aceste șase lucruri; sunt reparate.
+- **Transcodorul care nu pornește.** Workerul Basis cere WebAssembly și `new Function`
+  (embind). Fără ele — un CSP fără `'unsafe-eval'`, WebAssembly oprit de un mod de
+  securitate — workerul se agață tăcut: își așteaptă transcodorul la nesfârșit,
+  WorkerPool nu ascultă `error`, iar `parse()` nu mai cheamă nimic. Satelit rămânea
+  atunci fără buton și fără avertisment, cu preferința Relief un buton `aria-busy` pe
+  vecie, iar `dispose()` nu mai oprea workerii. Acum, două gărzi:
+  - `creeazaIncarcatorKtx2` încearcă întâi, în firul principal, un modul WASM gol și
+    `new Function('')` (`verificaTranscodorul`): un worker din `blob:` moștenește
+    CSP-ul documentului. Dacă una cade, aruncă, iar `pregateste()` lasă Relief cu un
+    avertisment, înaintea oricărei descărcări;
+  - `incarcaOrto` așteaptă întâi `ktx2.init()` — aceeași promisiune pe care o cheamă
+    `parse()`, deci transcodorul nu se cere de două ori —, apoi pune pe `parse()` o
+    limită, `LIMITA_TRANSCODARE_MS` = 30 s, numărată numai cât pagina e vizibilă: pe
+    telefon o filă ascunsă poate fi înghețată cu workeri cu tot, iar la întoarcere
+    temporizatorul ar suna primul <!-- NEVERIFICAT: dedus, nemăsurat pe un telefon -->.
+    Un termen atins de o ascundere pornește din nou, întreg. Descărcările nu intră în
+    limită: pe o legătură lentă ar fi oprit încărcări bune. Trecută, `null` cu un
+    avertisment; un abandon (`dispose()`), `null` pe loc, fără avertisment. Aceeași
+    gardă ține și a doua treaptă a lui `harta_v9`: acolo rămâne textura mică.
+  Pe desktop (Chrome, 20 de fire) toate cele șapte texturi trec printr-un singur
+  worker, cu pornirea lui, în 0,40 s (BC7) și 0,29 s (RGBA); cu patru, 0,21 s. Pe
+  telefon limita lasă o margine de cel puțin patru ori dacă el e de 10–20 de ori mai
+  lent <!-- NEVERIFICAT: nemăsurat pe un telefon -->. `init()` e public în r186, dar
+  marcat „TODO: Make this method private”: `npm run verifica-pagina` pică dacă dispare
+  sau dacă `parse()` nu mai trece prin el. Un `worker-src` care oprește `blob:` sau un
+  worker mort din alt motiv nu se văd dinainte; pe acelea le prinde numai limita.
+  Proba, `npm run verifica-pagina`, cu un încărcător fals și un ceas virtual: un
+  `parse()` tăcut e încă în așteptare la 29 999 ms și `null` la 30 000, cu un
+  avertisment; abandonul în timpul transcodării sau al descărcării transcodorului dă
+  `null` pe loc; transcodorul sosit după 60 s, cu transcodarea de 0,1 s, dă textura;
+  pagina ascunsă de la 10 la 40 s, cu transcodarea gata la 50 s, la fel. Controalele:
+  fără limită, tot în așteptare după 300 s; descărcarea transcodorului pusă în limită
+  pierde textura; fără semnalul de vizibilitate, pagina ascunsă dă `null`. Pe
+  `loaders.js` de dinainte pică 9 probe din 18.
 
 Probele, în pagină (panoul Browser):
 - **Relief rămâne la octet:** trei vederi 640 × 400 în țintă fixă, înainte de orice
@@ -1281,6 +1611,21 @@ Probele, în pagină (panoul Browser):
   pe care three îl ține global pentru materialele PBR, și fără Satelit;
 - **căile de eșec:** sidecar lipsă (Vite dă index.html), KTX2 trunchiat, un octet
   schimbat, HTTP 404, rețea căzută — fiecare `null` cu un singur avertisment;
+- **transcodorul care nu răspunde** (2026-10-08), cu preferința Relief și workerii
+  înlocuiți cu unii care nu răspund niciodată: după clic, la 30,1 s butonul pleacă,
+  `aria-busy` se scoate, anunțul spune „Fotografia aeriană nu s-a putut încărca.”,
+  câte un avertisment pe fiecare din cele șase texturi, 4 workeri porniți și 4 opriți,
+  3 texturi pe placă, cât Relief. `dispose()` cu cei 4 workeri agățați îi oprește în
+  7 ms, fără avertisment. Controlul, cu `loaders.js` de dinainte: la 36 s butonul
+  e tot `aria-busy`, cu „Se încarcă fotografia aeriană…”, niciun avertisment, iar la
+  5 s după `dispose()` 0 workeri opriți din 4. A doua treaptă, cu workerul ei mort
+  imediat după prima: la 30,0 s un avertisment pentru `harta_v9-orto_v1`, workerul
+  oprit, iar `harta_v9` rămâne pe textura mică, 1216 × 1376. Cu un CSP pus prin `<meta>`: fără
+  `'unsafe-eval'`, clicul eșuează în 11 ms pe WebAssembly, iar numai cu
+  `'wasm-unsafe-eval'`, tot în 11 ms, pe `new Function`, amândouă fără niciun octet
+  de textură sau de transcodor descărcat. Ocolind verificarea, workerul adevărat sub
+  al doilea CSP aruncă `EvalError` numai în consolă, fără eveniment `error`, iar
+  `incarcaOrto` cu limita de 3 s întoarce `null` la 3,01 s;
 - la 390 px butonul nu atinge busola, panoul punctului — minimizat sau deschis pe
   o clădire —, rândul cu sursele sau eticheta; la fel la 320, 700, 1440 și
   844 × 390 (2026-09-30);
@@ -1534,7 +1879,23 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
   să încapă complexul (~110 m în jurul terreiro-ului). Camera și pivotul nu se mută.
   Pe telefon, fără el, biserica ieșea din ecran la x = −18. Fișa laterală contează
   de la un sfert din lățime: între 545 și 666 px trece de 60%, iar un prag la 40%
-  lăsa complexul sub ea.
+  lăsa complexul sub ea. Regulile stau în `src/scene/fisa-cadru.js`, ca proba Node
+  să ruleze același cod.
+- **Ecranul rotit cu fișa deschisă** reface decalajul și, dacă trebuie, distanța.
+  Până pe 2026-10-08 refăcea numai decalajul: din peisaj în portret partea liberă
+  devine foaia îngustă de deasupra fișei, iar camera rămânea la distanța de la
+  deschidere — în pagină, 844 × 390 → 390 × 844 lăsa ancora etichetei la x = −17,6
+  (eticheta în modul „margine”), iar 1024 × 768 → 768 × 1024, la x = −67,5. Acum
+  pornește un zbor nou, numai dacă distanța cerută trece de cea de acum cu peste
+  10% (`PRAG_ZBOR_NOU`) — cât zborul deschiderii e încă în aer, de cea spre care
+  merge — și numai dacă utilizatorul n-a atins controalele de la deschidere
+  (`start`, pe care îl emit mutarea, rotirea, rotița și degetele, dar nu zborul).
+  Din portret în peisaj camera stă doar mai departe, fără mișcare; bara de adrese,
+  câteva procente din înălțime, nu trece de prag. După o atingere camera e a
+  utilizatorului: rotirea reface numai decalajul, ca înainte. Măsurat în pagină,
+  după rotire: 574,71 m și ancora la (85,7; 191,5) pe telefon, 738,96 m și (83,0;
+  517,2) pe tabletă, eticheta în modul „ancora”; după o rotiță pe canvas, camera
+  rămâne la 228,31 m.
 - `creeazaSanctuar()` își golește scriitorul imediat după predare, iar `dispose()`
   stinge pozițiile pe care le ține `loveste`: obiectul întors trăiește în
   `globalThis.__scena`, deci altfel rămâneau 2,38 MiB după dispose(); acum 0.
@@ -1553,8 +1914,24 @@ pe care r186 o alocă oricum.
 `autoUpdate = false` și fără `needsUpdate` e sărită. Proba: contextul pierdut și
 refăcut dă 0 pixeli diferiți; fără umbre, pe aceeași vedere, diferă 8 393.
 
+Ascultătorul de restaurare e unul singur și se înscrie oricum, după blocul umbrelor:
+cere un cadru și, dacă sunt umbre, le reface (`umbre?.refa()`). Stătea înainte numai
+pe ramura umbrelor, iar cât contextul e pierdut `render()` iese devreme și bucla tot
+consumă cererile: fără sanctuar și fără clădiri, canvasul rămânea gol până la prima
+atingere. Probe, în pagină, cu `WEBGL_lose_context`, 1 s fără nicio atingere:
+- fără umbre (cererile `sanctuar_v2.json` și `cladiri_v1.json` cu 404): 1 cadru și
+  harta pe ecran; pe codul de dinainte, 0 cadre și fundalul gol;
+- cu umbre, din vederea de pornire, în țintă fixă 640 × 400: `refa()` chemat o dată,
+  1 cadru, 0 pixeli diferiți; control, cu `refa()` ocolit: 37;
+- pierdut și refăcut în timpul pornirii, cu relieful întârziat 2 s: 0 erori, harta pe
+  ecran — ascultătorul nu era încă înscris, dar bucla pornește cu `cerut = true`.
+  Mai devreme nu poate sta: `cereRandare` și `umbre` se declară în `construieste()`,
+  iar înscris la începutul ei ar fi aruncat ReferenceError la o restaurare venită în
+  timpul unui `await` (dedus din cod, nemăsurat).
+
 Aruncă umbră sanctuarul și, din v0.1.0, clădirile din afara lui; primesc
-clădirile, suprafețele și terenul. Cutia trece între grupuri — vezi „Umbrele pe
+clădirile, suprafețele și terenul. Împrejurimile nu primesc și n-au nici codul umbrelor în
+shader (vezi „Zona alpha și împrejurimile”). Cutia trece între grupuri — vezi „Umbrele pe
 grupuri”, la far.
 
 Soarele nu se mută ca să încadreze umbra — numai între vederi, Relief ↔ Satelit,
@@ -1568,7 +1945,8 @@ cu totul ascuns.
 
 Codul paginii, în Node, cu `fetch` înlocuit. Probele de fond au control negativ —
 aceeași probă pe o greșeală cunoscută, care trebuie să pice: acoperișurile,
-amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
+amprentele, drapajul, zborul, sha256-ul plasei și fișa cu ecranul rotit. Bugetul
+n-are nevoie de unul.
 - **încărcătorul:** index.html cu 200, 404, JSON trunchiat, nume străin, schemă
   necunoscută, material fără rgb, listă lipsă — `null` și un avertisment, fără
   aruncare; ancoră greșită; o coordonată `null` sare numai elementul ei;
@@ -1576,6 +1954,20 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
   (60 866 pe `harta_v4`/`harta_v5`; 60 855 pe v2/v3), JSON ≤ 150 KB (94,7);
 - **geometria:** vârfuri finite, ocluzie pe fiecare, stâlpi în ordine cu goluri
   ≥ 0,2 m, corpuri convexe — proba care a prins linia rotită a aripii N;
+- **amprenta plasei:** sha256 pe position, color și ocluzie, egal cu `AMPRENTA` din
+  capul scriptului, citită pe 2026-10-08 (`sanctuar_v2` pe `harta_v5` + `harta_v4`). O
+  refactorizare a formelor o lasă la bit; o schimbare voită o rescrie acolo, cu motivul
+  în commit. Pagina dă aceleași trei sume, citite cu `crypto.subtle` din
+  `__scena.sanctuar`. Control: vârful lui `biserica.turn_n` mutat 1 mm dă altă sumă;
+- **turnul pe orice număr de colțuri:** `turn()` pe poligoane regulate de 4, 5, 6 și 8
+  colțuri, cu centrul în (100; 100): vârful flișei cade pe centru (0 m), inelul ei de
+  sus la 1,27 m de el (abatere ≤ 4·10⁻⁶ m, Float32), iar nimic nu iese din amprenta
+  lărgită cu cornișa. Până pe 2026-10-08 centrul flișei era suma colțurilor împărțită
+  la 4: proba pica la 5, 6 și 8 colțuri, cu vârful la 34,09 / 69,44 / 140,15 m de
+  centru, fără niciun avertisment. Turnurile din date au toate câte 4 colțuri, deci
+  pagina n-a arătat niciodată greșeala, dar nimic n-o cerea: încărcătorul verifică
+  listele, `valid` numai numerele. Media colțurilor e acum o singură funcție,
+  `mediaColturi`, pentru turn, piramidă, `micsorat` și plăci;
 - **numărătoarea din 1880** ajunge întreagă în pagină: 47 / 63 de arce, 36 / 46 de
   ferestre. Pe `sanctuar_v1` ar fi picat: 49 / 60 de arce, 35 / 41 de ferestre;
 - **suprafețele** stau pe triunghiurile randate: 0 vârfuri în afară, maximum 1 mm;
@@ -1595,6 +1987,19 @@ amprentele, drapajul și zborul. Bugetul n-are nevoie de unul.
 - **zborul** aterizează la 1e-13 m din repaus, după o aruncare și sub
   `prefers-reduced-motion` (acolo în 0 cadre), iar busola citește 205°; control:
   pe nordul grilei ar citi 204,33°;
+- **fișa cu ecranul rotit**, cu `fisa-cadru.js`, zborul și camera paginii, pe un
+  canvas fals și cu cutia fișei socotită după main.css (cum iese în pagină: la
+  390 × 844, 374 × 464 px, sus la 372). Ce iese din partea liberă: 64 de puncte pe
+  cercul complexului, ancora și cele 200 de colțuri ale corpurilor. 844 × 390 →
+  390 × 844 și 1024 × 768 → 768 × 1024 zboară până la o deschidere direct în portret
+  (la 10⁻¹³ m; 575 și 739 m): 6/64 puncte afară, 4/200 colțuri, 0/28 ale bisericii,
+  ancora liberă. Control, o atingere după deschidere — calea veche: camera rămâne la
+  320 / 327 m, cu 48/64 și 46/64 puncte afară, 24/28 și 28/28 colțuri ale bisericii,
+  ancora la x = −18 și −68 — pică. Invers, din portret, niciun zbor și 0/64; bara de
+  adrese (înălțimea 844 → 900 → 790 px, cerute 613 / 538 m față de 575), niciun zbor; fără fișă, camera nu se mișcă; rotit după
+  3 cadre ale zborului deschiderii, cu camera încă la 611 m, aterizează tot la
+  575 m — o comparație cu distanța de atunci n-ar fi zburat; sub reduced-motion, în
+  0 cadre;
 - **raza** verticală pe navă lovește acoperișul la 1 mm; una prin golul unui arc
   trece de fațadă și lovește fundul galeriei la 11,8 m; una în stâlp, la 10 m.
 
@@ -1691,7 +2096,8 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
   opționale. `materiale_profil` dă câte o culoare pe segment de profil. Fiecare
   element poartă un `grup`, iar obiectul întors are `cutiiGrupuri`.
 - Proba refactorizării: `sanctuar_v2` dă același sha256 pe position, color și
-  ocluzie, înainte și după.
+  ocluzie, înainte și după. Din 2026-10-08 sumele stau în `verifica-sanctuar` și
+  `verifica-cladiri` (`AMPRENTA`), deci orice refactorizare trece prin ele.
 - Clădirile sunt al doilea Mesh, pe același program (`sanctuar-ocluzie`): un apel
   de desenare în plus și 232 de triunghiuri.
 - Panoul punctului ia clădirea cea mai apropiată din oricare set. Numele vin din
@@ -1708,15 +2114,22 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 
 - **`urmaresteGrupul()`** din `scena.js` alege cutia la fiecare cadru desenat:
   - cutia unită, dacă texelul ei stă sub TEXEL_MAXIM (0,3 m) sau nu trece de
-    pixelul ecranului la țintă. Pixelul e al canvasului, deci de dispozitiv;
+    pixelul ecranului la țintă. Pixelul e al canvasului (`canvas.height`), nu CSS și nu
+    neapărat de dispozitiv: raportul e plafonat la 2, iar canvasul la 2560 × 1440;
   - la pornire ținta e la 611 m. Primul cadru are soarele Relief — Satelit își pune
     soarele abia când i-a sosit textura —, deci cutia unită rămâne numai pe un
-    canvas înalt de cel mult ~922 px de dispozitiv; sub Satelit histerezisul
+    canvas înalt de cel mult ~922 px de canvas; sub Satelit histerezisul
     păstrează alegerea (întoarcerea la cutia unită cere ≤ ~917 px). ~1 121 px e
-    pragul de ieșire din cutia unită cu soarele zborului deja pus. Pe telefoane și
-    pe ecranele dense harta pornește pe sanctuar — măsurat: 1440 × 900 la DPR 1 dă
-    „toate”, la DPR 2 „sanctuar”, cu 0,216 m pe texel sub soarele zborului —, iar
-    farul își primește umbra când te apropii de el. Cutia unită, forțată, ar fi
+    pragul de ieșire din cutia unită cu soarele zborului deja pus. Pe telefoanele în
+    portret și pe ecranele dense harta pornește pe sanctuar — măsurat: 1440 × 900 la
+    DPR 1 dă „toate”, la DPR 2 „sanctuar”, cu 0,216 m pe texel sub soarele zborului —,
+    iar farul își primește umbra când te apropii de el. Un telefon în PEISAJ pornește
+    pe cutia unită: raportul de pixeli e plafonat la 2 (vezi „Mărimea canvasului”),
+    deci 844 × 390 la 3× dă un canvas de 1688 × 780, sub ~922 px. Măsurat în pagină,
+    cu scena repornită pe fereastra emulată și `devicePixelRatio` 3: „toate” la primul
+    cadru și după Satelit, 0,497 m pe texel; 390 × 844 la 3× (780 × 1688) dă
+    „sanctuar”. Control: același canvas pe care l-ar fi avut înainte, 2532 × 1170
+    (1266 × 585 la 2×), dă „sanctuar”. Cutia unită, forțată, ar fi
     făcut umbrele sanctuarului, din mijlocul imaginii, de 2,3 ori mai difuze sub
     Satelit și de 2,9 ori sub Relief;
   - altfel, grupul cel mai apropiat de țintă.
@@ -1740,6 +2153,9 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
   cu avertisment; înainte, culoarea nedefinită se scria tăcut ca negru;
 - **vârful:** cel mai înalt vârf e la 168,28 m, iar raza verticală pe ax lovește
   `far.turn` la 168,280 m;
+- **amprenta plasei:** sha256 pe position, color și ocluzie, egal cu `AMPRENTA` din
+  capul scriptului (2026-10-08), ca în pagină; control: vârful lanternei coborât 1 mm
+  dă altă sumă. `cladiri_v1` n-are `turnuri`: farul e o cupolă cu `laturi`;
 - **față de LiDAR** (cere dalele):
   - acoperișurile, pe 3 774 de pixeli: mediana −0,001 m, p90 0,085 m. Ridicate cu
     1 m, pică;

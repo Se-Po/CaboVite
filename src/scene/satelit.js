@@ -49,6 +49,29 @@ function matriceUV(meta, centru) {
 const UV_DIN_POZITIE = '#include <uv_vertex>\n\tvMapUv = ( mapTransform * vec3( position.xz, 1.0 ) ).xy;';
 
 /**
+ * Materialul mării în Satelit: în cutia texturii, fotografia (pe apă, amestecată deja cu
+ * apa adâncă); în afara ei, culoarea apei adânci, `srgb`, măsurată pe aceeași fotografie.
+ * Exportat pentru proba din Node (verifica-pagina), care îi citește `depthFunc`.
+ */
+export function materialMareSatelit(textura, srgb, cer) {
+  const m = new THREE.MeshBasicMaterial({ map: textura, toneMapped: false });
+  m.color.setRGB(...srgb.map((v) => v / 255), THREE.SRGBColorSpace);
+  // Marea se desenează după teren (renderOrder pe obiect, mare.js); `Less` strict
+  // lasă terenului egalitățile de adâncime, ca înainte de reordonare.
+  m.depthFunc = THREE.LessDepth;
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', UV_DIN_POZITIE);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `
+	vec4 texSat = texture2D( map, vMapUv );
+	float inCutie = step( 0.0, vMapUv.x ) * step( vMapUv.x, 1.0 ) * step( 0.0, vMapUv.y ) * step( vMapUv.y, 1.0 );
+	diffuseColor.rgb = mix( diffuse, texSat.rgb, inCutie );`);
+    if (cer) ceataCer(sh, cer);
+  };
+  m.customProgramCacheKey = () => 'satelit-mare';
+  return m;
+}
+
+/**
  * @param {{renderer: THREE.WebGLRenderer, scena: THREE.Scene, camera: THREE.Camera,
  *   teren: object, petic: object|null, mare: object, drapaj: THREE.Object3D[],
  *   soare: THREE.DirectionalLight, cer: object|null, umbre: object|null,
@@ -141,19 +164,7 @@ export function creeazaSatelit(o) {
       m.customProgramCacheKey = () => 'satelit-teren';
       return m;
     };
-    // Marea: în cutia texturii, fotografia (pe apă, amestecată deja cu apa adâncă);
-    // în afara ei, culoarea apei adânci, măsurată pe aceeași fotografie.
-    const mareM = new THREE.MeshBasicMaterial({ map: tB, toneMapped: false });
-    mareM.color.setRGB(...b.meta.mare.srgb.map((v) => v / 255), THREE.SRGBColorSpace);
-    mareM.onBeforeCompile = (sh) => {
-      sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', UV_DIN_POZITIE);
-      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `
-	vec4 texSat = texture2D( map, vMapUv );
-	float inCutie = step( 0.0, vMapUv.x ) * step( vMapUv.x, 1.0 ) * step( 0.0, vMapUv.y ) * step( vMapUv.y, 1.0 );
-	diffuseColor.rgb = mix( diffuse, texSat.rgb, inCutie );`);
-      if (cer) ceataCer(sh, cer);
-    };
-    mareM.customProgramCacheKey = () => 'satelit-mare';
+    const mareM = materialMareSatelit(tB, b.meta.mare.srgb, cer);
     for (const p of imprejurimi) {
       if (!p.tex) continue;
       const t = pregateste(p.tex.textura, p.tex.meta);

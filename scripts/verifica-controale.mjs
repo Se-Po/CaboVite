@@ -1,4 +1,5 @@
-// Verifică, în Node, mânuirea hărții: rotița, apucarea, pivotul și stările gesturilor.
+// Verifică, în Node, mânuirea hărții: rotița, apucarea, pivotul și stările gesturilor,
+// plus punctul pe care îl culege panoul „Coordonate” — același „ce e sub cursor”.
 //
 //   npm run verifica-controale
 //
@@ -21,8 +22,10 @@ import { buclaNoduri, dreptunghiGrila } from '../src/scene/cusatura.js';
 import { creeazaAlpha } from '../src/scene/alpha.js';
 import { marsPeTeren, punctVazut, reliefRandat } from '../src/scene/raza.js';
 import { FACTOR_TREAPTA, pasZoom, treapta } from '../src/scene/rotita.js';
-import { ControaleHarta, creeazaCamera, descarcaInertia, STARE, VEDERE_START } from '../src/scene/camera.js';
+import { ControaleHarta, creeazaCamera, descarcaInertia, STARE, urmaresteMarireaPaginii, VEDERE_START } from '../src/scene/camera.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
+import { creeazaPunct } from '../src/scene/punct.js';
+import { creeazaGeo } from '../src/scene/geo.js';
 
 let picate = 0;
 const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
@@ -43,7 +46,7 @@ await incarcaPaleta();
 const paleta = paletaCurenta();
 const incarcat = await incarcaRelief();
 const relief = incarcat.baza, reliefPetic = incarcat;
-const { pastreaza, subPetic } = mascaBazei(relief, reliefPetic);
+const { pastreaza, subPetic, limitaDatelor } = mascaBazei(relief, reliefPetic);
 const ndvi = straturiNdvi(relief, reliefPetic);
 const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza });
 const petic = creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic });
@@ -487,10 +490,12 @@ console.log('\nStările gesturilor, citite la `start`, ca în gest.js');
     `degetele: unul ${unu}, două ${doi}, ridicat unul ${iarUnu} (aștept ${STARE.DEGET_MUTARE}, ${STARE.DEGETE_ZOOM_ROTIRE}, ${STARE.DEGET_MUTARE})`);
   // Ce folosim din OrbitControls fără să fie public: dacă three se schimbă, aici pică.
   const priv = ['_handleMouseWheel', '_customWheelEvent', '_handleMouseDownPan', '_handleMouseMovePan', '_handleTouchStartPan',
-    '_handleTouchMovePan', '_handleMouseDownRotate', '_handleTouchStartDollyRotate', '_handleTouchMoveDolly', '_getSecondPointerPosition'];
+    '_handleTouchMovePan', '_handleMouseDownRotate', '_handleTouchStartDollyRotate', '_handleTouchMoveDolly', '_getSecondPointerPosition',
+    '_isTrackingPointer'];
   const lipsa = priv.filter((m) => typeof OrbitControls.prototype[m] !== 'function');
-  const campuri = ['_panOffset', '_controlActive', '_pointers', '_dollyStart'].filter((c) => !(c in k));
-  proba(!lipsa.length && !campuri.length, `metodele și câmpurile private folosite există (${priv.length} + 4)${lipsa.length || campuri.length ? ': lipsesc ' + [...lipsa, ...campuri].join(', ') : ''}`);
+  const CAMPURI = ['_panOffset', '_controlActive', '_pointers', '_dollyStart', '_pointerPositions', '_onPointerMove', '_onPointerUp'];
+  const campuri = CAMPURI.filter((c) => !(c in k));
+  proba(!lipsa.length && !campuri.length, `metodele și câmpurile private folosite există (${priv.length} + ${CAMPURI.length})${lipsa.length || campuri.length ? ': lipsesc ' + [...lipsa, ...campuri].join(', ') : ''}`);
   k.dispose();
   proba(!('cursor' in stil), 'după dispose(), niciun cursor inline: disconnect() scrie „auto”, iar dispose() îl scoate');
   const { controale } = creeazaCamera(null);
@@ -498,6 +503,465 @@ console.log('\nStările gesturilor, citite la `start`, ca în gest.js');
   proba(controale instanceof ControaleHarta && controale.mouseButtons.LEFT === THREE.MOUSE.PAN && controale.mouseButtons.RIGHT === THREE.MOUSE.ROTATE
     && controale.touches.ONE === THREE.TOUCH.PAN && controale.touches.TWO === THREE.TOUCH.DOLLY_ROTATE && controale.screenSpacePanning === false,
   'creeazaCamera: stânga mută, dreapta rotește, un deget mută, două ciupesc și rotesc, mutarea pe orizontală');
+}
+
+// ------------------------------------------------------------ 8. panoul punctului
+
+console.log('\nPanoul „Coordonate”: punctul e ce se vede sub cursor, ca la rotiță și la apucare');
+{
+  // Panoul adevărat, prin `culegeLa`, cu un DOM falsificat cât îi trebuie: elemente care
+  // țin `textContent` și `hidden`, câte unul pe selector, și ascultători care nu fac nimic.
+  const fals = () => ({ hidden: false, textContent: '', title: '', classList: { toggle() {} }, setAttribute() {}, toggleAttribute() {},
+    removeAttribute() {}, addEventListener() {}, removeEventListener() {}, focus() {}, remove() {} });
+  const noduri = new Map();
+  const unul = (s) => noduri.get(s) ?? noduri.set(s, fals()).get(s);
+  const NR_AXE = { '.sc .axa': 3, '.tm .axa': 2 };
+  globalThis.document = { documentElement: fals(), createElement: () => ({ ...fals(), set innerHTML(_) {}, querySelector: unul,
+    querySelectorAll: (s) => Array.from({ length: NR_AXE[s] ?? 0 }, (_, i) => unul(`${s} ${i}`)) }) };
+  globalThis.addEventListener = globalThis.removeEventListener = () => {};
+  const { camera } = pagina();
+  camera.updateMatrixWorld();
+  const loveste = TEREN.loveste, lim = imp.limite;
+  const panou = creeazaPunct({ gazda: { appendChild() {} }, canvas: { ...fals(), getBoundingClientRect: () => RECT }, camera,
+    geo: creeazaGeo(relief.meta), inaltimeLa: inaltimeRandata, limitaDatelor, limiteMars: lim, inAlpha: alpha.contine,
+    zMin: relief.meta.zMin_m, loveste });
+  proba(panou?.culegeLa(800, 450) === null, 'minimizat, `culegeLa` nu culege nimic');
+  panou.activeaza();
+
+  // Compunerea de dinainte din punct.js (v0.1.5), înghețată aici: mersul numai pe relief,
+  // apoi planul y = 0, apoi clădirile. Pe apă relieful e umplutura de −8 m.
+  const planVechi = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const vechi = (raza, maxim) => {
+    const tmp = new THREE.Vector3();
+    let p = null;
+    const t = marsPeTeren(raza, inaltimeRandata, lim, maxim);
+    if (t !== null) { raza.at(t, tmp); p = { x: tmp.x, z: tmp.z, t }; }
+    else if (raza.intersectPlane(planVechi, tmp)) p = { x: tmp.x, z: tmp.z, t: tmp.distanceTo(raza.origin) };
+    const c = loveste(raza);
+    return c && !(p && p.t <= c.t) ? { x: c.x, z: c.z, t: c.t } : p;
+  };
+
+  // Grila de pixeli a vederii de pornire, 100 × 56, la 1600 × 900.
+  const diag = Math.hypot(lim.xMax - lim.xMin, lim.zMax - lim.zMin);
+  let n = 0, departe = 0, mare = 0, apa = 0, axe = 0;
+  const peMare = [], peMareVechi = [];
+  for (let py = 8; py < H; py += 16) for (let px = 8; px < W; px += 16) {
+    const raza = razaLa(camera, px, py).clone();
+    const maxim = raza.origin.length() + diag * 1.5;
+    const t = punctVazut(raza, { inaltimeLa: inaltimeRandata, lim, loveste }, maxim);
+    if (t === null) continue;
+    const v = raza.at(t, new THREE.Vector3());
+    const p = panou.culegeLa(px, py);
+    n++;
+    const d = p ? Math.max(Math.hypot(p.x - v.x, p.z - v.z), Math.abs(p.t - t)) : Infinity;
+    if (d > 1e-6) departe++;
+    if (Math.abs(v.y - COTA_MARE) > 1e-6 || !alpha.contine(v.x, v.z)) continue;
+    // Marea din alpha: eticheta altitudinii e „apă”, iar fiecare axă stă în elementul ei.
+    mare++;
+    if (unul('.alt').textContent === 'apă') apa++;
+    if ([0, 1, 2].every((i) => /^[XYZ] \S+$/.test(unul(`.sc .axa ${i}`).textContent))) axe++;
+    peMare.push(d);
+    const w = vechi(raza, maxim);
+    peMareVechi.push(w ? Math.hypot(w.x - v.x, w.z - v.z) : Infinity);
+  }
+  const mediana = (a) => [...a].sort((x, y) => x - y)[a.length >> 1];
+  const maxNou = Math.max(...peMare);
+  proba(n > 4000 && departe === 0 && mare > 1000,
+    `${n} pixeli cu ceva sub cursor, ${mare} pe marea din alpha: punctul panoului e cel văzut (\`punctVazut\`) peste tot, `
+    + `${departe} la peste 1 µm (pe mare, cel mult ${maxNou.toExponential(1)} m)`);
+  proba(apa >= 0.999 * mare && axe === mare, `pe marea din alpha, „apă” pe ${apa} din ${mare} pixeli; axele scrise câte una pe element pe ${axe}`);
+  const mv = mediana(peMareVechi), maxV = Math.max(...peMareVechi);
+  proba(mv > 1, `control: compunerea veche (relieful, apoi y = 0) pune punctul pe umplutura de −8 m, la mediana ${mv.toFixed(2)} m `
+    + `(cel mult ${maxV.toFixed(2)} m) de suprafața văzută — pică`);
+  panou.dispose();
+  delete globalThis.document;
+  delete globalThis.addEventListener;
+  delete globalThis.removeEventListener;
+}
+
+// ------------------------------------------------------------ 9. gestul întrerupt
+
+console.log('\nGestul întrerupt: zborul pornit cu harta ținută, focusul sau captura pierdute în mijlocul unei trageri');
+{
+  // Un canvas, un document și o fereastră ca ale browserului, cât le trebuie controalelor:
+  // ascultătorii chiar se înscriu și chiar primesc evenimentele, deci unul scos nu mai aude
+  // nimic. `pointermove` și `pointerup` ajung la document, unde urcă de pe canvasul
+  // capturat. Captura se ține minte: o atingere se capturează singură la apăsare, eliberarea
+  // emite `lostpointercapture` pe loc — browserul îl emite înaintea următorului eveniment de
+  // pointer —, iar pe un pointer care nu mai e activ aruncă NotFoundError, ca în
+  // specificație. După `pointerup`, captura rămasă se pierde implicit.
+  const browser = ({ faraMiscare = false } = {}) => {
+    const doc = new EventTarget(), fereastra = new EventTarget();
+    globalThis.addEventListener = fereastra.addEventListener.bind(fereastra);
+    globalThis.removeEventListener = fereastra.removeEventListener.bind(fereastra);
+    const el = Object.assign(new EventTarget(), {
+      style: { removeProperty() {} }, ownerDocument: doc, getRootNode: () => doc,
+      getBoundingClientRect: () => RECT, clientWidth: W, clientHeight: H,
+    });
+    const capturat = new Set(), activ = new Set([1]);   // mouse-ul e mereu activ
+    const pierde = (id) => { if (capturat.delete(id)) el.dispatchEvent(Object.assign(new Event('lostpointercapture'), { pointerId: id })); };
+    el.setPointerCapture = (id) => { capturat.add(id); };
+    el.releasePointerCapture = (id) => {
+      if (!activ.has(id)) throw new DOMException('pointerul nu mai e activ', 'NotFoundError');
+      pierde(id);
+    };
+    const ev = (tip, { x = 800, y = 450, ...o } = {}) => Object.assign(new Event(tip), { pointerId: 1, pointerType: 'mouse', button: 0,
+      buttons: 1, clientX: x, clientY: y, pageX: x, pageY: y, ctrlKey: false, metaKey: false, shiftKey: false, ...o });
+
+    const { camera, controale } = creeazaCamera(el);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    controale.seteazaTeren(TEREN);
+    controale.enableDamping = !faraMiscare;
+    // Limita lui alpha, ca în scena.js: la `change` și în buclă.
+    const tine = () => { const t = controale.target, x = t.x, z = t.z; alpha.limiteaza(t, camera); controale.mutaApucarea(t.x - x, t.z - z); };
+    controale.addEventListener('change', tine);
+    globalThis.matchMedia = () => ({ matches: faraMiscare, addEventListener() {} });
+    const zbor = creeazaZbor({ camera, controale, cereRandare: () => {} });
+    globalThis.matchMedia = undefined;
+    let sfarsit = 0;
+    controale.addEventListener('end', () => sfarsit++);
+    return {
+      camera, controale, zbor, el, fereastra, activ,
+      get sfarsit() { return sfarsit; },
+      apasa(o = {}) {
+        const id = o.pointerId ?? 1;
+        if (o.pointerType === 'touch') { activ.add(id); capturat.add(id); }
+        el.dispatchEvent(ev('pointerdown', o));
+      },
+      misca(o = {}) { doc.dispatchEvent(ev('pointermove', o)); },
+      ridica(o = {}) {
+        const id = o.pointerId ?? 1;
+        doc.dispatchEvent(ev('pointerup', { ...o, buttons: 0 }));
+        pierde(id);
+        if (o.pointerType === 'touch') activ.delete(id);
+      },
+      pierdeCaptura: pierde,
+      blur() { fereastra.dispatchEvent(new Event('blur')); },
+      cadre(n) { for (let i = 0; i < n; i++) { ceas += 1000 / 60; zbor.pas(); controale.update(); tine(); } },
+      dispose() { zbor.dispose(); controale.dispose(); delete globalThis.addEventListener; delete globalThis.removeEventListener; },
+    };
+  };
+  // Codul de dinainte n-avea niciun ascultător de captură pierdută sau de focus.
+  const faraAscultatori = (b) => {
+    b.el.removeEventListener('lostpointercapture', b.controale._laCapturaPierduta);
+    b.fereastra.removeEventListener('blur', b.controale._laBlur);
+  };
+
+  // --- Zborul acasă (Home) cu harta ținută: apoi 1 px de mișcare și 300 de cadre.
+  const ACASA_T = new THREE.Vector3(...VEDERE_START.tinta), ACASA_P = new THREE.Vector3(...VEDERE_START.pozitie);
+  const departeDeAcasa = (b) => Math.max(b.controale.target.distanceTo(ACASA_T), b.camera.position.distanceTo(ACASA_P));
+  const acasaInTragere = ({ deget, faraMiscare, inlocuieste }) => {
+    const b = browser({ faraMiscare });
+    if (inlocuieste) b.controale.incheieGestul = inlocuieste(b.controale);
+    const p = deget ? { pointerType: 'touch', pointerId: 11 } : {};
+    // Departe de casă: deasupra farului, spre sud-est.
+    b.controale.target.set(450, 60, 900);
+    b.camera.position.set(700, 500, 1300);
+    b.controale.update();
+    b.cadre(5);
+    // Apasă pe hartă și trage 290 px; apucarea ține un punct de teren, în coordonate de lume.
+    b.apasa({ ...p, x: 800, y: 600 });
+    const apucat = Boolean(b.controale._apucat);
+    for (let x = 810; x <= 1100; x += 10) b.misca({ ...p, x, y: 600 });
+    b.cadre(1);
+    // Home, cu harta încă ținută (scena.js: acasa() → zbor.spre(VEDERE_START)), zborul dus la capăt.
+    b.zbor.spre(VEDERE_START);
+    for (let n = 0; b.zbor.activ && n < 1000; n++) b.cadre(1);
+    b.cadre(3);
+    const aterizare = departeDeAcasa(b);
+    // Un pixel, cu harta tot ținută, apoi amortizarea stinsă.
+    b.misca({ ...p, x: 1101, y: 600 });
+    b.cadre(300);
+    const salt = departeDeAcasa(b);
+    b.ridica({ ...p, x: 1101, y: 600 });
+    const sfarsit = b.sfarsit;
+    // O apăsare nouă apucă din nou terenul și trage harta: punctul rămâne sub cursor.
+    const q = deget ? { pointerType: 'touch', pointerId: 12 } : {};
+    const c0 = b.camera.position.clone();
+    b.apasa({ ...q, x: 800, y: 450 });
+    const P = b.controale._apucat?.clone();
+    b.misca({ ...q, x: 850, y: 420 });
+    const [px, py] = P ? proiect(b.camera, P) : [Infinity, Infinity];
+    const din_nou = { apucat: Boolean(P), sub: Math.hypot(px - 850, py - 420), mutat: b.camera.position.distanceTo(c0) };
+    b.ridica({ ...q, x: 850, y: 420 });
+    b.dispose();
+    return { apucat, aterizare, salt, sfarsit, din_nou };
+  };
+  for (const deget of [false, true]) {
+    const r = [false, true].map((faraMiscare) => acasaInTragere({ deget, faraMiscare }));
+    const nume = deget ? 'un deget' : 'mouse-ul';
+    proba(r.every((x) => x.apucat && x.aterizare < 1e-9 && x.salt < 1e-9 && x.sfarsit === 1),
+      `${nume}, tras 290 px, Home cu harta ținută, zbor animat și sub reduced-motion: aterizează la `
+      + `${Math.max(...r.map((x) => x.aterizare)).toExponential(1)} m, iar 1 px și 300 de cadre îl lasă la `
+      + `${Math.max(...r.map((x) => x.salt)).toExponential(1)} m de acasă; ${r.map((x) => x.sfarsit).join(' / ')} \`end\``);
+    proba(r.every((x) => x.din_nou.apucat && x.din_nou.sub < 0.5 && x.din_nou.mutat > 1),
+      `${nume}, apoi o apăsare nouă: apucă din nou terenul, mută harta cu ${r[0].din_nou.mutat.toFixed(1)} m, `
+      + `punctul la ${Math.max(...r.map((x) => x.din_nou.sub)).toExponential(1)} px de cursor`);
+    const vechi = acasaInTragere({ deget, faraMiscare: false, inlocuieste: () => () => {} });
+    const numaiPunct = acasaInTragere({ deget, faraMiscare: false, inlocuieste: (k) => () => { k._apucat = null; } });
+    proba(vechi.salt > 1000 && numaiPunct.salt > 100,
+      `control, ${nume}: fără gestul încheiat la zbor, 1 px aruncă harta la ${vechi.salt.toFixed(1)} m de acasă; `
+      + `uitând numai punctul apucat, la ${numaiPunct.salt.toFixed(1)} m (\`_panStart\` rămâne cel de la apăsare) — pică`);
+  }
+
+  // --- Tragerea „lipită”: fără `pointerup`, 200 px de mișcare cu `buttons: 0`.
+  const lipita = ({ declansator, buton = 0, vechi = false }) => {
+    const b = browser();
+    if (vechi) faraAscultatori(b);
+    b.apasa({ x: 800, y: 500, button: buton, buttons: buton === 2 ? 2 : 1 });
+    b.misca({ x: 820, y: 500, buttons: buton === 2 ? 2 : 1 });
+    if (declansator === 'blur') b.blur(); else b.pierdeCaptura(1);
+    // Inerția rotirii se stinge cu 0,92 pe cadru: după 300 de cadre mai mută camera cu 10⁻⁹ m.
+    b.cadre(600);
+    const p0 = b.camera.position.clone(), stare = b.controale.state;
+    for (let x = 840; x <= 1020; x += 20) b.misca({ x, y: 500, buttons: 0 });
+    b.cadre(300);
+    const r = { mutat: b.camera.position.distanceTo(p0), sfarsit: b.sfarsit, stare };
+    b.dispose();
+    return r;
+  };
+  for (const declansator of ['blur', 'lostpointercapture']) for (const buton of [0, 2]) {
+    const r = lipita({ declansator, buton }), v = lipita({ declansator, buton, vechi: true });
+    proba(r.mutat === 0 && r.sfarsit === 1 && r.stare === STARE.NIMIC && v.mutat > 10 && v.sfarsit === 0,
+      `\`${declansator}\` în mijlocul unei ${buton ? 'rotiri' : 'mutări'}, fără \`pointerup\`: 200 px fără buton mută camera cu `
+      + `${r.mutat} m, ${r.sfarsit} \`end\` (control, fără ascultătorii noi: ${v.mutat.toFixed(1)} m, ${v.sfarsit} \`end\`, starea ${v.stare} — pică)`);
+  }
+
+  // O tragere obișnuită: un singur `end`, iar captura pierdută după `pointerup` nu mai adaugă unul.
+  {
+    const b = browser();
+    b.apasa({ x: 800, y: 500 });
+    for (let x = 820; x <= 900; x += 20) b.misca({ x, y: 500 });
+    b.ridica({ x: 900, y: 500 });
+    b.blur();
+    const p0 = b.camera.position.clone();
+    b.misca({ x: 1000, y: 500, buttons: 0 });
+    proba(b.sfarsit === 1 && b.controale.state === STARE.NIMIC && b.camera.position.distanceTo(p0) === 0,
+      `tragere obișnuită, apoi \`blur\`: ${b.sfarsit} \`end\`, starea ${b.controale.state}`);
+    b.dispose();
+  }
+
+  // Două degete: ridicarea lui A, cu captura lui pierdută după, îl lasă pe B să mute harta.
+  const doua = (gresit) => {
+    const b = browser();
+    if (gresit) {
+      // Greșeala de evitat: captura pierdută încheie `_pointers[0]`, nu pointerul ei.
+      faraAscultatori(b);
+      b.el.addEventListener('lostpointercapture', () => { const k = b.controale; if (k._pointers.length) k._onPointerUp({ pointerId: k._pointers[0] }); });
+    }
+    const A = { pointerType: 'touch', pointerId: 21 }, B = { pointerType: 'touch', pointerId: 22 };
+    b.apasa({ ...A, x: 700, y: 500 });
+    b.apasa({ ...B, x: 900, y: 500 });
+    b.ridica({ ...A, x: 700, y: 500 });
+    b.cadre(300);
+    const p0 = b.camera.position.clone(), inainte = b.sfarsit;
+    for (let x = 920; x <= 1100; x += 20) b.misca({ ...B, x, y: 500 });
+    const r = { mutat: b.camera.position.distanceTo(p0), inainte };
+    b.ridica({ ...B, x: 1100, y: 500 });
+    r.dupa = b.sfarsit;
+    b.dispose();
+    return r;
+  };
+  const d2 = doua(false), d2g = doua(true);
+  proba(d2.mutat > 10 && d2.inainte === 0 && d2.dupa === 1 && d2g.mutat === 0,
+    `două degete, ridicat A: B mută harta cu ${d2.mutat.toFixed(1)} m, ${d2.inainte} \`end\` până la ridicarea lui B, apoi ${d2.dupa} `
+    + `(control, captura pierdută încheie \`_pointers[0]\`: B mută ${d2g.mutat} m — pică)`);
+
+  // Două degete, iar A își pierde captura FĂRĂ să se ridice: numai A iese din gest. Proba de
+  // deasupra nu ajunge aici — acolo `pointerup` îl scoate pe A înaintea capturii pierdute.
+  const capturaA = (mutatie) => {
+    const b = browser();
+    if (mutatie) {
+      faraAscultatori(b);
+      b.el.addEventListener('lostpointercapture', (e) => { const k = b.controale; if (mutatie === 'tot' && k._isTrackingPointer(e)) k.incheieGestul(); });
+    }
+    const A = { pointerType: 'touch', pointerId: 21 }, B = { pointerType: 'touch', pointerId: 22 };
+    b.apasa({ ...A, x: 700, y: 500 });
+    b.apasa({ ...B, x: 900, y: 500 });
+    b.pierdeCaptura(21);
+    b.cadre(300);
+    const p0 = b.camera.position.clone();
+    const r = { inainte: b.sfarsit, pointeri: [...b.controale._pointers].join(','), stare: b.controale.state };
+    for (let x = 920; x <= 1100; x += 20) b.misca({ ...B, x, y: 500 });
+    r.mutat = b.camera.position.distanceTo(p0);
+    b.dispose();
+    return r;
+  };
+  const ca = capturaA(), caTot = capturaA('tot'), caNimic = capturaA('nimic');
+  proba(ca.pointeri === '22' && ca.stare === STARE.DEGET_MUTARE && ca.mutat > 10 && ca.inainte === 0
+    && caTot.mutat === 0 && caTot.inainte === 1 && caNimic.pointeri === '21,22',
+    `două degete, A își pierde captura fără să se ridice: rămâne B (${ca.pointeri}), starea ${ca.stare}, mută harta cu `
+    + `${ca.mutat.toFixed(1)} m, ${ca.inainte} \`end\` (control: încheiat tot gestul, ${caTot.mutat} m și ${caTot.inainte} \`end\`; `
+    + `fără ascultător, pointerii ${caNimic.pointeri} — pică)`);
+
+  // Un deget rămas pe sticlă după un gest încheiat de zbor sau de `blur` nu mai e al hărții:
+  // un deget nou o apucă, iar mișcările celui vechi, care urcă tot la document, n-o mai mută.
+  const fantoma = ({ declansator, nefiltrat }) => {
+    const b = browser();
+    if (nefiltrat) b.controale._onPointerMove = b.controale._onPointerMoveOrbit;
+    const A = { pointerType: 'touch', pointerId: 41 }, C = { pointerType: 'touch', pointerId: 43 };
+    b.apasa({ ...A, x: 800, y: 600 });
+    for (let x = 810; x <= 1100; x += 10) b.misca({ ...A, x, y: 600 });
+    b.cadre(1);
+    if (declansator === 'zbor') {
+      b.zbor.spre(VEDERE_START);
+      for (let n = 0; b.zbor.activ && n < 1000; n++) b.cadre(1);
+    } else b.blur();
+    b.cadre(300);
+    b.apasa({ ...C, x: 700, y: 450 });
+    const P = b.controale._apucat?.clone(), c0 = b.camera.position.clone();
+    b.misca({ ...A, x: 1101, y: 600 });
+    b.cadre(300);
+    const [px, py] = P ? proiect(b.camera, P) : [Infinity, Infinity];
+    const r = { salt: b.camera.position.distanceTo(c0), sub: Math.hypot(px - 700, py - 450) };
+    b.dispose();
+    return r;
+  };
+  for (const declansator of ['zbor', 'blur']) {
+    const r = fantoma({ declansator }), v = fantoma({ declansator, nefiltrat: true });
+    proba(r.salt < 1e-6 && r.sub < 0.5 && v.salt > 100,
+      `un deget rămas pe sticlă după ${declansator === 'zbor' ? 'zborul acasă' : '`blur`'}, apoi altul pus pe hartă: mișcarea celui vechi `
+      + `mută camera cu ${r.salt.toExponential(1)} m, punctul apucat la ${r.sub.toExponential(1)} px de degetul nou `
+      + `(control, fără filtrul mișcării: ${v.salt.toFixed(1)} m — pică)`);
+  }
+
+  // Un deget pus pe busolă, jos-dreapta ca pe telefon, cât altul ține harta: apăsarea lui nu
+  // ajunge la canvas, mișcarea da. (Mai sus, pe cer, mutarea n-ar avea plan de apucat.)
+  const strain = (nefiltrat) => {
+    const b = browser();
+    if (nefiltrat) b.controale._onPointerMove = b.controale._onPointerMoveOrbit;
+    b.apasa({ pointerType: 'touch', pointerId: 51, x: 800, y: 500 });
+    b.cadre(5);
+    const c0 = b.camera.position.clone();
+    for (let x = 1300; x <= 1400; x += 20) b.misca({ pointerType: 'touch', pointerId: 52, x, y: 650 });
+    b.cadre(300);
+    const salt = b.camera.position.distanceTo(c0);
+    b.dispose();
+    return salt;
+  };
+  const st = strain(false), stv = strain(true);
+  proba(st < 1e-6 && stv > 100,
+    `un deget ține harta, altul se mișcă pe busolă: camera se mută cu ${st.toExponential(1)} m `
+    + `(control, fără filtrul mișcării: ${stv.toFixed(1)} m — pică)`);
+
+  // Un deget care nu mai e activ: eliberarea capturii aruncă NotFoundError, iar gestul tot se încheie.
+  {
+    const b = browser();
+    const D = { pointerType: 'touch', pointerId: 31 };
+    b.apasa({ ...D, x: 800, y: 500 });
+    b.misca({ ...D, x: 820, y: 500 });
+    b.activ.delete(31);
+    let eroare = null;
+    try { b.blur(); } catch (e) { eroare = e; }
+    const bun = !eroare && b.sfarsit === 1 && b.controale.state === STARE.NIMIC && !b.controale._pointers.length;
+    b.dispose();
+    // Control: fiecare pointer ridicat prin `_onPointerUp`, cu eliberarea lui OrbitControls neprinsă.
+    const c = browser();
+    c.apasa({ ...D, x: 800, y: 500 });
+    c.activ.delete(31);
+    let aruncat = null;
+    try { for (const id of [...c.controale._pointers]) c.controale._onPointerUp({ pointerId: id }); } catch (e) { aruncat = e; }
+    const blocat = c.controale.state !== STARE.NIMIC && c.sfarsit === 0;
+    c.dispose();
+    proba(bun && aruncat?.name === 'NotFoundError' && blocat,
+      `un deget care nu mai e activ, apoi \`blur\`: starea ${STARE.NIMIC}, un \`end\`, nimic aruncat `
+      + `(control, prin \`_onPointerUp\`: ${aruncat?.name}, gestul rămâne deschis — pică)`);
+  }
+}
+
+// ------------------------------------------------------------ 10. pagina mărită
+
+console.log('\nPagina mărită cu degetele: harta dă degetele înapoi paginii, până la micșorare');
+{
+  // Un visualViewport fals, care își ține ascultătorii, și un canvas cât le trebuie
+  // controalelor. Scara se pune ÎNAINTE de creare: pagina poate porni mărită.
+  const vvFals = (scale) => {
+    const asc = new Set();
+    return {
+      scale, get ascultatori() { return asc.size; },
+      addEventListener: (tip, f) => { if (tip === 'resize') asc.add(f); },
+      removeEventListener: (tip, f) => { if (tip === 'resize') asc.delete(f); },
+      redimensioneaza(s) { this.scale = s; for (const f of asc) f(); },
+    };
+  };
+  const canvasFals = () => {
+    const doc = new EventTarget();
+    return Object.assign(new EventTarget(), {
+      style: { removeProperty() {} }, ownerDocument: doc, getRootNode: () => doc,
+      getBoundingClientRect: () => RECT, clientWidth: W, clientHeight: H,
+      setPointerCapture() {}, releasePointerCapture() {},
+    });
+  };
+  // Ca scena.js: camera, apoi urmărirea. `fara` dă codul de dinainte, fără urmărire.
+  const porneste = (vv, urmareste = urmaresteMarireaPaginii) => {
+    const el = canvasFals();
+    const { controale } = creeazaCamera(el);
+    const scoate = urmareste ? urmareste(controale, vv) : () => {};
+    let start = 0;
+    controale.addEventListener('start', () => start++);
+    const apasa = () => {
+      el.dispatchEvent(Object.assign(new Event('pointerdown'), { pointerId: 1, pointerType: 'touch', button: 0, buttons: 1, clientX: 800, clientY: 450, pageX: 800, pageY: 450 }));
+      const r = { start, stare: controale.state };
+      el.ownerDocument.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1, pointerType: 'touch', button: 0, buttons: 0, clientX: 800, clientY: 450, pageX: 800, pageY: 450 }));
+      return r;
+    };
+    const citeste = () => ({ ta: el.style.touchAction, enabled: controale.enabled });
+    return { el, controale, apasa, citeste, dispose() { scoate(); controale.dispose(); } };
+  };
+  const scrie = (s) => `touch-action „${s.ta}”, controalele ${s.enabled ? 'pornite' : 'oprite'}`;
+
+  // 1. Pornită mărită, fără niciun `resize`.
+  {
+    const vv = vvFals(2), p = porneste(vv);
+    const s = p.citeste(), a = p.apasa();
+    proba(s.ta === 'manipulation' && s.enabled === false && a.start === 0 && a.stare === STARE.NIMIC,
+      `pornită la scara 2, fără niciun resize: ${scrie(s)}; o atingere pe hartă pornește ${a.start} gesturi`);
+    p.dispose();
+    // Controale: codul de dinainte, fără urmărire; urmărirea fără citirea de la creare.
+    const v = porneste(vvFals(2), null), sv = v.citeste();
+    v.dispose();
+    const numaiResize = (controale, vvx) => {
+      const aplica = () => { const m = vvx.scale > 1.01; controale.domElement.style.touchAction = m ? 'manipulation' : 'none'; controale.enabled = !m; };
+      vvx.addEventListener('resize', aplica);
+      return () => vvx.removeEventListener('resize', aplica);
+    };
+    const r = porneste(vvFals(2), numaiResize), sr = r.citeste();
+    r.dispose();
+    proba(sv.ta === 'none' && sv.enabled && sr.ta === 'none' && sr.enabled,
+      `control: codul de dinainte dă ${scrie(sv)}; urmărirea numai la resize, ${scrie(sr)} — pică`);
+  }
+
+  // 2. Pornită la scara 1, mărită, apoi micșorată la loc; apoi eliberarea.
+  {
+    const vv = vvFals(1), p = porneste(vv);
+    const s1 = p.citeste(), a1 = p.apasa();
+    vv.redimensioneaza(2);
+    const s2 = p.citeste(), a2 = p.apasa();
+    vv.redimensioneaza(1.005);
+    const s3 = p.citeste(), a3 = p.apasa();
+    proba(s1.ta === 'none' && s1.enabled && a1.start === 1 && a1.stare === STARE.DEGET_MUTARE,
+      `la scara 1: ${scrie(s1)}; o atingere mută harta (starea ${a1.stare})`);
+    proba(s2.ta === 'manipulation' && !s2.enabled && a2.start === 1 && a2.stare === STARE.NIMIC,
+      `mărită la 2: ${scrie(s2)}; o atingere nu mai pornește nimic`);
+    proba(s3.ta === 'none' && s3.enabled && a3.start === 2 && a3.stare === STARE.DEGET_MUTARE,
+      `micșorată la 1,005, sub prag: ${scrie(s3)}; o atingere mută din nou harta`);
+    const inainte = vv.ascultatori;
+    p.dispose();
+    proba(inainte === 1 && vv.ascultatori === 0, `ascultători pe visualViewport: ${inainte} cât trăiește scena, ${vv.ascultatori} după eliberare`);
+  }
+
+  // 3. Fără visualViewport — un browser vechi —, harta rămâne cum era.
+  {
+    const p = porneste(undefined), s = p.citeste();
+    p.dispose();
+    proba(s.ta === 'none' && s.enabled, `fără visualViewport: ${scrie(s)}`);
+  }
+
+  // 4. Scena o cheamă după creeazaCamera și o eliberează prin aceeași listă.
+  const sursa = readFileSync('src/scene/scena.js', 'utf8');
+  const iCam = sursa.indexOf('creeazaCamera(canvas)'), iUrm = sursa.indexOf('deEliberat.push(urmaresteMarireaPaginii(controale))');
+  proba(iCam > 0 && iUrm > iCam, `scena.js: \`deEliberat.push(urmaresteMarireaPaginii(controale))\` după \`creeazaCamera\` (${iUrm > iCam ? 'da' : 'nu'})`);
 }
 
 console.log(picate ? `\n${picate} probe au picat` : '\ntoate probele au trecut');

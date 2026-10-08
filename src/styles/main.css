@@ -17,6 +17,15 @@
   --gold: #d3b063;
   --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Cambria, "Times New Roman", serif;
   --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Înălțimea vizibilă, pentru înălțimile maxime ale panoului punctului: `dvh` unde
+     există, altfel `vh`. Nu o linie cu `vh` pusă înaintea celei cu `dvh`: declarațiile au
+     `env()` și `var()`, deci se acceptă la parsare și devin invalide abia la calcul —
+     `max-height` ajunge `none`, iar linia de dinainte e deja suprascrisă. Așa, în Chrome
+     94–107 și în Firefox 93–100, cutia urca la 844 × 390 până la 25 px de marginea de sus. */
+  --vizibil: 100vh;
+}
+@supports (height: 100dvh) {
+  :root { --vizibil: 100dvh; }
 }
 
 * { box-sizing: border-box; }
@@ -31,7 +40,14 @@ html, body {
 }
 
 /* Scena ocupă ecranul; textul curge peste ea. Canvasul e decor, nu conținut,
-   deci nu primește nimic de citit de către tehnologiile asistive. */
+   deci nu primește nimic de citit de către tehnologiile asistive.
+
+   Degetul ținut pe hartă — o mutare lentă, o atingere lungă — nu pornește selecția:
+   pe iOS `contextmenu` nu vine la atingere (din cunoștințe; neîncercat pe iPhone),
+   deci OrbitControls n-o oprește, iar `touch-action` acoperă numai mutarea și
+   ciupirea. Canvasul n-are text de selectat.
+   `-webkit-touch-callout` lucrează pe linkuri și imagini; aici e o gardă. Fără
+   evidențierea atingerii: harta răspunde ea însăși. */
 #scena {
   position: fixed;
   inset: 0;
@@ -39,6 +55,23 @@ html, body {
   height: 100%;
   display: block;
   z-index: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Butoanele hărții nu se selectează la o atingere lungă. Evidențierea atingerii
+   rămâne: n-au stare `:active`, deci pe iOS ea e singurul semn al atingerii. Textele
+   fișei, ale panoului „Coordonate”, ale capitolelor și rândul cu sursele rămân
+   selectabile, iar linkurile surselor își păstrează previzualizarea. */
+#busola .roza,
+#straturi button,
+#punct .activeaza,
+#punct .minimizeaza,
+#sanctuar-eticheta .poi {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Cursorul hărții, numai unde există un mouse (cu `hover` și `pointer: fine`): o
@@ -401,8 +434,14 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * Satelit și panoul. Fără versiune, coboară la loc. Text, nu buton: fără fundal,
  * prin contur, ca rândul cu sursele, cu `--muted` pe inelul din `--bg` — 7,1:1.
  * Clicurile trec la hartă.
+ *
+ * `--versiune` stă pe ce vine după versiune în <body>: panourile, pe care scena le
+ * adaugă la sfârșitul lui, și copiii lor, care îl moștenesc. Nu `:root:has(#versiune)`:
+ * Firefox are `:has()` abia de la 121, iar 115 ESR, ultimul pentru Windows 7–8.1 și
+ * macOS 10.12–10.14, rula pagina fără el, cu „Coordonate” peste versiune pe 13 px din 16.
+ * Depinde de ordinea din DOM; o păzește proba din pagină (CLAUDE.md, „Flux de lucru”).
  */
-:root:has(#versiune) { --versiune: 1.15rem; }
+#versiune ~ * { --versiune: 1.15rem; }
 
 #versiune {
   position: fixed;
@@ -503,7 +542,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   pointer-events: auto;
   width: min(17rem, calc(100vw - 2rem));
   /* sub coloana busolei: 1rem + rozeta 6rem + citirea ~2rem, un gol și marginea de jos */
-  max-height: calc(100dvh - 10.75rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(var(--vizibil) - 10.75rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
   overflow: auto;
   overscroll-behavior: contain;   /* defilarea ajunsă la capăt nu trece la pagină */
   padding: 0.7rem 0.85rem;
@@ -586,12 +625,20 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   border-top: 1px solid var(--line);
 }
 
+/* Axele sunt elemente (`.axa`) pe rând, despărțite de un spațiu lărgit cu `word-spacing`
+   cât două spații (un spațiu are ~0,27em): în text, două spații la rând se strângeau
+   într-unul. Rămân în linie, nu itemi flex: un item flex e bloc, iar o selecție făcută de
+   mână peste rând scotea atunci axele câte una pe rând. Pe un rând prea îngust — telefonul,
+   cu valorile cele mai lungi, sau o bară de defilare clasică — o axă trece întreagă pe
+   rândul următor, nu iese din cutie, iar litera nu se desparte de cifra ei. */
 #punct .mici dd {
+  text-align: right;
+  word-spacing: 0.28em;
   font-size: 0.78rem;
   color: var(--muted);
   line-height: 1.5;
-  white-space: nowrap;
 }
+#punct .mici .axa { white-space: nowrap; word-spacing: normal; }
 
 #punct .copiaza {
   pointer-events: auto;
@@ -638,7 +685,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 @media not all and (max-width: 34rem) {
   @media (max-height: 32rem) {
     #punct { right: 8rem; }
-    #punct .cutie { max-height: calc(100dvh - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px)); }
+    #punct .cutie { max-height: calc(var(--vizibil) - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px)); }
   }
 }
 
@@ -649,7 +696,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #punct { right: 7.25rem; }
   #punct .cutie {
     width: min(14.5rem, calc(100vw - 8rem));
-    max-height: calc(100dvh - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(var(--vizibil) - 4.5rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
     padding: 0.55rem 0.7rem;
   }
   #punct .mari dd { font-size: 1rem; }
@@ -669,10 +716,10 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
     bottom: calc(11rem + var(--versiune, 0rem) + env(safe-area-inset-bottom, 0px));
     width: auto;
     /* 11rem jos, 6,25rem sus: rândul cu sursele, care aici are două rânduri */
-    max-height: calc(100dvh - 17.25rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
+    max-height: calc(var(--vizibil) - 17.25rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
   }
   #punct .mici { grid-template-columns: 1fr; }
-  #punct .mici dd { text-align: left; white-space: normal; }
+  #punct .mici dd { text-align: left; }
 }
 
 /* Îngust și scund — pagina mărită de patru ori, 1280 × 1024 → 320 × 256: deasupra
@@ -681,10 +728,11 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 @media (max-width: 22.5rem) and (max-height: 30rem) {
   #punct .cutie {
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    max-height: calc(100dvh - 7rem - env(safe-area-inset-bottom, 0px));
+    max-height: calc(var(--vizibil) - 7rem - env(safe-area-inset-bottom, 0px));
   }
-  /* versiunea, sub cutie, ar ieși cu o fâșie de 3 px de sub marginea ei */
-  :root:has(#punct .cutie:not([hidden])) #versiune { visibility: hidden; }
+  /* versiunea, sub cutie, ar ieși cu o fâșie de 3 px de sub marginea ei; atributul îl
+     scrie punct.js cât panoul e deschis */
+  html[data-punct-deschis] #versiune { visibility: hidden; }
 }
 
 /* Sub 17rem butonul minimizat nu mai încape cu numele lângă coloana busolei:
@@ -844,12 +892,14 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
      24rem lasă loc și unui nume pe două rânduri, plus un gol;
    - mai jos de ~56rem (900 px) nu mai rămâne destul pentru amândouă: își împart
      înălțimea dintre 10rem și marginea de jos, cu un gol de 1rem, și defilează
-     fiecare. Antetul panoului și butonul „Închide" al fișei rămân la vedere. */
+     fiecare. Antetul panoului și butonul „Închide" al fișei rămân la vedere.
+   Cine e deschis spun atributele de pe <html>, scrise de punct.js și eticheta.js, nu
+   `:has()`: în Firefox 115 ESR, fără el, fișa acoperea 250 px din panou, cu antetul. */
 @media not all and (max-width: 34rem) {
-  body:has(#punct .cutie:not([hidden])) #sanctuar-fisa {
+  html[data-punct-deschis] #sanctuar-fisa {
     max-height: max(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), calc(100vh - 34rem - var(--versiune, 0rem)));
   }
-  body:has(#sanctuar-fisa:not([hidden])) #punct .cutie {
+  html[data-fisa-deschisa] #punct .cutie {
     max-height: calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2);
   }
 }

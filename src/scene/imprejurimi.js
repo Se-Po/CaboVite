@@ -99,9 +99,21 @@ export function creeazaImprejurimi({ niveluri, margineAlpha, paleta, culoare, ce
   const plase = [];
   const fa = (plat) => {
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: plat });
+    // Fără codul umbrelor. r186 definește USE_SHADOWMAP pe renderer, nu pe obiect
+    // (WebGLPrograms.js:363), deci orice material luminat calcula pe fiecare vârf
+    // poziția în harta de umbre (un mat4 × vec4 și un varying vec4) — și împrejurimile, care n-au
+    // `receiveShadow` și stau toate în afara hărții. După prefixul cu `#define`, deci
+    // îl anulează; `ceataCer` își calculează singură poziția în lume.
+    const faraUmbre = (sh) => {
+      sh.vertexShader = '#undef USE_SHADOWMAP\n' + sh.vertexShader;
+      sh.fragmentShader = '#undef USE_SHADOWMAP\n' + sh.fragmentShader;
+    };
     if (cer) {
-      m.onBeforeCompile = (sh) => ceataCer(sh, cer, { lege: 'scena' });
+      m.onBeforeCompile = (sh) => { faraUmbre(sh); ceataCer(sh, cer, { lege: 'scena' }); };
       m.customProgramCacheKey = () => 'teren-imprejurimi';
+    } else {
+      m.onBeforeCompile = faraUmbre;
+      m.customProgramCacheKey = () => 'teren-imprejurimi-fara-cer';
     }
     return m;
   };

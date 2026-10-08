@@ -163,6 +163,14 @@ function sensul(poli) {
   for (let k = 0; k < poli.length; k++) { const p = poli[k], q = poli[(k + 1) % poli.length]; s += p[0] * q[1] - q[0] * p[1]; }
   return s > 0 ? 1 : -1;
 }
+/**
+ * Media colțurilor unui contur, oricâte ar fi: centrul unui poligon regulat, nu
+ * centroidul ariei. Turnul împărțea suma la 4, iar la un contur cu alt număr de
+ * colțuri flișa ar fi ieșit tăcut la zeci de metri de el (34 m la 5 colțuri).
+ */
+function mediaColturi(contur) {
+  return [contur.reduce((a, p) => a + p[0], 0) / contur.length, contur.reduce((a, p) => a + p[1], 0) / contur.length];
+}
 
 /**
  * Un corp: pereți de la talpă până la acoperiș și acoperișul din plane.
@@ -220,7 +228,7 @@ export function placa(s, { o, d, n, contur, iesire: [v0, v1] }, rgb) {
   const nOut = [n[0], 0, n[1]];
   s.poligon(contur.map(([u, y]) => P(u, y, v1)), rgb, nOut);
   if (v0 > 1e-3) s.poligon(contur.map(([u, y]) => P(u, y, v0)), rgb, [-n[0], 0, -n[1]]);
-  const cu = contur.reduce((a, q) => a + q[0], 0) / contur.length, cy = contur.reduce((a, q) => a + q[1], 0) / contur.length;
+  const [cu, cy] = mediaColturi(contur);
   for (let k = 0; k < contur.length; k++) {
     const [u0, y0] = contur[k], [u1, y1] = contur[(k + 1) % contur.length];
     const mu = (u0 + u1) / 2 - cu, my = (y0 + y1) / 2 - cy;
@@ -366,9 +374,9 @@ export function cupola(s, centru, profil, laturi, rotatie, rgb, peSegment = null
   }
 }
 
-/** O piramidă pe o bază pătrată (x, z) de la y0, cu vârful la y1. */
+/** O piramidă pe o bază convexă (x, z) de la y0, cu vârful la y1, deasupra mediei colțurilor. */
 export function piramida(s, contur, y0, y1, rgb) {
-  const cx = contur.reduce((a, p) => a + p[0], 0) / contur.length, cz = contur.reduce((a, p) => a + p[1], 0) / contur.length;
+  const [cx, cz] = mediaColturi(contur);
   const v = [cx, y1, cz];
   for (let k = 0; k < contur.length; k++) {
     const p = contur[k], q = contur[(k + 1) % contur.length];
@@ -404,14 +412,15 @@ export function placaVerticala(s, a, b, interior, profil, talpa, rgb, rgbSus = r
 
 /** Poligonul (x, z) micșorat spre centroid cu `d` metri (convex, aproximativ). */
 export function micsorat(contur, d) {
-  const cx = contur.reduce((a, p) => a + p[0], 0) / contur.length, cz = contur.reduce((a, p) => a + p[1], 0) / contur.length;
+  const [cx, cz] = mediaColturi(contur);
   return contur.map(([x, z]) => { const r = Math.hypot(x - cx, z - cz) || 1; const k = Math.max(0, (r - d) / r); return [cx + (x - cx) * k, cz + (z - cz) * k]; });
 }
 
 /**
  * Un turn-clopotniță: corpul până la cornișă, cornișa ieșită în afară, parapetul
- * plin până la platformă, patru pinaclii la colțuri și flișa piramidală până la
- * vârful măsurat. Registrul de sus (`registru` → cornișă) e în cantaria.
+ * plin până la platformă, câte un pinaclu pe fiecare colț și flișa piramidală până
+ * la vârful măsurat. Registrul de sus (`registru` → cornișă) e în cantaria. Turnurile
+ * din date au 4 colțuri, dar conturul poate avea oricâte (convex).
  */
 export function turn(s, contur, talpa, { registru, cornisa, platforma, varf, goluri = [], adancimeGol = 0.6 }, c) {
   corp(s, contur, talpa, [[0, 0, registru]], c.var, c.var);
@@ -443,12 +452,13 @@ export function turn(s, contur, talpa, { registru, cornisa, platforma, varf, gol
   corp(s, iesit, cornisa, [[0, 0, cornisa + 0.3]], c.cantaria, c.cantaria);
   corp(s, micsorat(contur, 0.1), cornisa + 0.3, [[0, 0, platforma]], c.cantaria, c.cantaria);
   // pinaclii: piramide mici pe colțuri, puțin spre interior
-  const cx = contur.reduce((a, p) => a + p[0], 0) / 4, cz = contur.reduce((a, p) => a + p[1], 0) / 4;
   for (const [x, z] of micsorat(contur, 0.45)) {
     const pin = [[x - 0.22, z - 0.22], [x + 0.22, z - 0.22], [x + 0.22, z + 0.22], [x - 0.22, z + 0.22]];
     piramida(s, pin, platforma, platforma + 1.2, c.cantaria);
   }
-  // flișa: bază pătrată de ~1,8 m, orientată ca turnul
+  // flișa: colțurile turnului strânse la 1,27 m de centru, deci orientată ca el; la un
+  // turn pătrat, o bază de ~1,8 m
+  const [cx, cz] = mediaColturi(contur);
   const f = contur.map(([x, z]) => { const r = Math.hypot(x - cx, z - cz); const k = 1.27 / r; return [cx + (x - cx) * k, cz + (z - cz) * k]; });
   corp(s, f, platforma - 0.2, [[0, 0, platforma + 0.3]], c.cantaria, c.cantaria);
   piramida(s, f, platforma + 0.3, varf, c.cantaria);
