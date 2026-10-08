@@ -13,12 +13,11 @@
 // vede marea. Controlul negativ: același nivel construit fără fâșia de cusătură
 // trebuie să le aibă.
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { creeazaCer } from '../src/scene/cer.js';
 import { creeazaLumini } from '../src/scene/lights.js';
-import { IN_DOUA_TREPTE } from '../src/scene/satelit.js';
 import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
 import { campNeted, creeazaTeren, INELE_APA, mascaBazei } from '../src/scene/terrain.js';
 import { culoareTeren, incarcaPaleta, paletaCurenta, SPRE_LINIAR } from '../src/scene/palette.js';
@@ -133,19 +132,18 @@ for (const p of imp.plase) {
 const atribute = imp.plase.reduce((a, p) => a + Object.values(p.teren.obiect.geometry.attributes).reduce((b, at) => b + at.array.byteLength, 0), 0);
 proba(total <= BUGET.triunghiuri, `împrejurimile: ${total} triunghiuri (+${(100 * total / TRIUNGHIURI_ALPHA).toFixed(1)}% față de alpha), buget ${BUGET.triunghiuri}; ${(atribute / 1048576).toFixed(1)} MB de atribute; construite în ${ms.toFixed(0)} ms`);
 {
+  // Fiecare nivel are în public/data exact ce cere pagina — relieful, stratul NDVI, textura
+  // Satelit întreagă —, deci nici varianta mică a lui harta_v9 (`-orto_v1-mic`), scoasă când
+  // Satelit a trecut pe o singură încărcare (satelit.js).
+  const FISIERE = ['-dem.bin', '-dem.json', '-ndvi.bin', '-ndvi.json', '-orto_v1.ktx2', '-orto_v1.json'];
+  const peDisc = readdirSync('public/data');
   let oct = 0;
-  for (const n of NIVELURI_IMPREJURIMI) for (const s of ['-dem.bin', '-dem.json', '-ndvi.bin', '-ndvi.json', '-orto_v1.ktx2', '-orto_v1.json']) oct += statSync(`public/data/${n}${s}`).size;
-  for (const n of IN_DOUA_TREPTE) for (const s of ['-orto_v1-mic.ktx2', '-orto_v1-mic.json']) oct += statSync(`public/data/${n}${s}`).size;
-  proba(oct <= BUGET.octeti_fisiere, `fișierele împrejurimilor, cu texturile mici ale primei trepte: ${(oct / 1048576).toFixed(2)} MB necomprimate, buget ${BUGET.octeti_fisiere / 1048576} MB`);
-  // Textura mică a primei trepte e aceeași cutie, mai grosieră, și chiar fișierul descris.
-  for (const n of IN_DOUA_TREPTE) {
-    const mare = JSON.parse(readFileSync(`public/data/${n}-orto_v1.json`, 'utf8')), mic = JSON.parse(readFileSync(`public/data/${n}-orto_v1-mic.json`, 'utf8'));
-    const bin = readFileSync(`public/data/${n}-orto_v1-mic.ktx2`), k = Math.log2(mic.pas_m / mare.pas_m);
-    const cutie = ['xMin', 'xMax', 'yMin', 'yMax'].every((c) => mic.bbox_tm06[c] === mare.bbox_tm06[c]);
-    const ok = cutie && Number.isInteger(k) && k > 0 && mic.latime === mare.latime >> k && mic.inaltime === mare.inaltime >> k
-      && bin.length === mic.octeti && createHash('sha256').update(bin).digest('hex') === mic.sha256;
-    proba(ok, `${n}: textura primei trepte are cutia celei întregi, ${mic.pas_m} m pe texel față de ${mare.pas_m}, ${mic.latime} × ${mic.inaltime}, ${(mic.octeti / 1048576).toFixed(2)} MB; sha256 se potrivește`);
+  for (const n of NIVELURI_IMPREJURIMI) {
+    for (const s of FISIERE) oct += statSync(`public/data/${n}${s}`).size;
+    const inPlus = peDisc.filter((f) => f.startsWith(`${n}-`) && !FISIERE.includes(f.slice(n.length)));
+    proba(inPlus.length === 0, `${n}: în public/data numai cele ${FISIERE.length} fișiere cerute de pagină${inPlus.length ? `; ÎN PLUS: ${inPlus.join(', ')}` : ''}`);
   }
+  proba(oct <= BUGET.octeti_fisiere, `fișierele împrejurimilor: ${(oct / 1048576).toFixed(2)} MB necomprimate, buget ${BUGET.octeti_fisiere / 1048576} MB`);
 }
 
 // ------------------------------------------------------------ 3. crăpăturile

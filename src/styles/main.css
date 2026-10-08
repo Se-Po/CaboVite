@@ -235,67 +235,107 @@ html, body {
   .surse-modala .inchide { border-color: ButtonText; }
 }
 
-/* Mesajul de încărcare, până la primul cadru: în mijlocul ecranului, departe de colțurile
-   busolei, ale lui Satelit și ale panoului „Coordonate”. Panourile apar înaintea primului
-   cadru (`data-panouri` pe <html>, scena.js), iar pe un ecran îngust sau scund — și pe o
-   pagină mărită: 195 × 422, 320 × 256 — mesajul ar sta peste ele cât ține compilarea; acolo
-   pleacă odată cu ele, iar butonul Satelit ocupat rămâne semnul încărcării. Altfel
-   pleacă odată cu `data-scena` pe <body> — scena a pornit (main.js) sau nu poate porni
-   (main.js, plasa.js); pe calea activă, în aceeași actualizare a ecranului cu primul cadru:
-   bucla îl desenează în primul ei requestAnimationFrame, înaintea zugrăvirii.
-   `--ink` pe `--surface`, 13,7:1; roata `--gold`, 8,3:1. Roata se mișcă numai prin `transform`, iar sub
-   reduced-motion stă. Fără JavaScript n-ar avea cine să-l scoată: `scripting: none` îl
-   ascunde (browserele fără interogarea asta îl lasă). */
+/* Pornirea: harta apare o singură dată, cu panourile ei, când `<body>` primește `data-scena` —
+   scena a pornit (main.js) sau nu poate porni (main.js, plasa.js). Până atunci tot ce stă
+   direct în <body>, în afară de mesajul de încărcare, de capitole și de canvas — busola,
+   Satelit, „Coordonate”, eticheta și fișa sanctuarului, sursele, versiunea — e ascuns:
+   `visibility`, nu `display`, ca panourile să-și păstreze mărimea, deci și ocolirile
+   etichetei, și să iasă din arborele de accesibilitate. Canvasul rămâne, cu mărimea lui, dar
+   nu primește mouse-ul sau degetele: o tragere pe ecranul încă gol ar fi mutat camera
+   nevăzut, iar harta n-ar mai fi apărut pe vederea de pornire. `:where()` ține regula ușoară,
+   ca fără JavaScript versiunea să se poată arăta (mai jos). */
+body:not([data-scena]) > :where(:not(#incarcare):not(#continut):not(#scena)) { visibility: hidden; }
+body:not([data-scena]) #scena { pointer-events: none; }
+
+/* Mesajul de încărcare, în mijlocul ecranului: „Se încarcă harta 3D…”, apoi, cât mai lipsește
+   numai fotografia aeriană, „Se încarcă fotografia aeriană…” cu procentul și, sub el, butonul
+   „Arată relieful acum” (main.js). Pleacă odată cu `data-scena`, pe calea activă în aceeași
+   actualizare a ecranului cu primul cadru: bucla îl desenează în primul ei
+   requestAnimationFrame, înaintea zugrăvirii. Numai butonul primește clicuri. `--ink` pe
+   `--surface`, 13,7:1; roata `--gold`, 8,3:1. Roata se mișcă numai prin `transform`, iar sub
+   reduced-motion stă. Fără JavaScript n-ar avea cine să-l scoată: `scripting: none` îl ascunde
+   (browserele fără interogarea asta îl lasă). */
 #incarcare {
   position: fixed;
   left: 50%;
   top: 50%;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.75rem;
   /* `max-content`: cu `left: 50%`, lățimea disponibilă ar fi numai jumătatea din dreapta a
      ecranului, iar la 390 px textul trecea pe două rânduri. */
   width: max-content;
   max-width: calc(100vw - 2rem);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+/* Pe un rând, o pastilă; pe mai multe — la 390 px, pe o pagină mărită —, un dreptunghi rotunjit:
+   colțurile unei pastile de două rânduri ar fi tăiat din text. Roata, textul și procentul curg
+   ca un rând de text, nu ca elemente flex: la 195 px, cu flex, procentul ieșea din pastilă
+   (cuvântul cel mai lung, roata și procentul nu mai încăpeau alături). */
+#incarcare p {
+  max-width: 100%;
   margin: 0;
   padding: 0.65rem 1.15rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 1.5rem;
   background: var(--surface);
   box-shadow: 0 4px 18px rgb(0 0 0 / 0.22);
   color: var(--ink);
   font: 600 1.05rem/1.3 var(--sans);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
+  text-align: center;
 }
-#incarcare::before {
+#incarcare p::before {
   content: "";
-  flex: none;
+  display: inline-block;
   width: 1.1rem;
   height: 1.1rem;
+  margin-right: 0.7rem;
+  vertical-align: -0.3em;
   border: 2px solid var(--gold);
   border-right-color: transparent;
   border-radius: 50%;
   animation: roata 1s linear infinite;
 }
+/* Procentul: cifre de aceeași lățime și loc pentru „100%” — trei cifre și semnul, care e mai
+   lat decât o cifră —, ca pastila centrată să nu se miște la fiecare pas. Gol, nu ocupă nimic —
+   nici golul dinaintea lui. */
+#incarcare p span {
+  display: inline-block;
+  min-width: calc(3ch + 1em);
+  margin-left: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+#incarcare p span:empty { display: none; }
+#incarcare button { max-width: 100%; pointer-events: auto; }
+#incarcare button:disabled { cursor: progress; }
 @keyframes roata { to { transform: rotate(360deg); } }
 body[data-scena] #incarcare { display: none; }
-@media (max-width: 22.5rem), (max-height: 30rem) {
-  [data-panouri] #incarcare { display: none; }
-}
 @media (scripting: none) {
   #incarcare { display: none; }
+  body:not([data-scena]) > #versiune { visibility: visible; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #incarcare::before { animation: none; }
+  #incarcare p::before { animation: none; }
+}
+/* Contrast forțat: umbra dispare, deci pastila primește chenarul sistemului; roata își păstrează
+   sfertul gol, altfel n-ar mai părea că se învârte. */
+@media (forced-colors: active) {
+  #incarcare p { border-color: CanvasText; }
+  #incarcare p::before { forced-color-adjust: none; border-color: CanvasText; border-right-color: transparent; }
+  #incarcare button { border-color: ButtonText; }
 }
 
 /* Fără scenă, pagina rămâne o pagină obișnuită. */
 body[data-scena="indisponibila"] #continut { background: var(--bg); }
-/* „Reîncearcă”, sub anunț, când datele n-au mai sosit (main.js). Ca butoanele hărții, dar
-   cu marginea --muted: pe fondul gol al paginii, --line abia se vedea. */
-#continut .reincearca {
+/* „Reîncearcă”, sub anunț, când datele n-au mai sosit (main.js), și „Arată relieful acum”, sub
+   mesajul de încărcare. Ca butoanele hărții, dar cu marginea --muted: pe fondul gol al
+   paginii, --line abia se vedea. */
+#continut .reincearca,
+#incarcare button {
   min-height: 2.9rem;
   padding: 0.45rem 1.2rem;
   border: 1px solid var(--muted);
@@ -307,7 +347,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   font-weight: 600;
   cursor: pointer;
 }
-#continut .reincearca:hover { border-color: var(--gold); }
+#continut .reincearca:hover,
+#incarcare button:hover { border-color: var(--gold); }
 
 /* Un contur de focus vizibil, pentru linkurile din text. Fără el, pagina rămâne
    cu inelul implicit al browserului, care pe fond cald aproape nu se vede. */

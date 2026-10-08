@@ -46,10 +46,10 @@ se poartă în română.
 | `npm run surse-imprejurimi` | aduce o singură dată, prin HTTP pe intervale, ferestrele Copernicus DEM și Sentinel-2 ale împrejurimilor → `date-sursa/copernicus/`, `date-sursa/sentinel/`, cu manifestul `scripts/imprejurimi/surse.json` |
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
-| `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul, culoarea peste cusături, netezirea, shaderul fără codul umbrelor |
+| `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul și fișierele fiecărui nivel, culoarea peste cusături, netezirea, shaderul fără codul umbrelor |
 | `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate”, harta cu pagina mărită |
 | `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate, blocurile `static {}` din `dist/assets` și plasa ES5; `-- --live` le compară cu sebastians.life |
-| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit devreme (prima treaptă cerută înaintea construcției, fără petic; peticul primul în a doua, necerut fără compresie; butonul vizibil de la creare, iar un clic în timpul descărcării rămâne pe Relief); compilarea înaintea buclei (pe sursă) |
+| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit la pornire (cele șase texturi întregi cerute înaintea construcției, procentul, garda fotografiei, ieșirea fără Satelit; peticul oprit fără compresie); harta o singură dată (pe sursă: compilarea, apoi așteptarea fotografiei, apoi bucla; panourile ascunse și canvasul fără pointer până la `data-scena`; mesajul cu procentul și butonul „Arată relieful acum”) |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
@@ -124,7 +124,8 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
   commit are un număr `0.1.N.xx`, scris ca prefix în subiect. Numărătoarea
   `0.1` pornește de la `v0.1.0` (2026-09-30), aceeași cifră ca `version` din
   `package.json`; până atunci etichetele au fost `v0.0.N`, până la `v0.0.11`.
-- Pagina își arată versiunea, `v0.1.N`, mereu în colțul din dreapta-jos (`#versiune`).
+- Pagina își arată versiunea, `v0.1.N`, în colțul din dreapta-jos (`#versiune`), odată cu harta
+  — cât se încarcă stă ascunsă, cu celelalte panouri (vezi „Pornirea”) — și, fără JavaScript, imediat.
   N-o scrie nimeni de mână: build-ul (`vite.config.js`) o ia din prefixul subiectului
   ultimului commit — pe Vercel din `VERCEL_GIT_COMMIT_MESSAGE`, altfel din `git log` —,
   deci prefixul `0.1.N.xx` e obligatoriu. Fără niciun subiect cu prefix, pagina nu scrie
@@ -148,7 +149,7 @@ revalidau 45 de fișiere, în lanț — HTML, JS, apoi cele trei niveluri de dat
   le schimbă conținutul fără să le schimbe numele. Un fișier nou în `/assets`, de alt tip,
   pică proba până i se hotărăște regula.
 - `/data/`: imutabile un an numai numele cu versiune: `harta_vN-dem.*`,
-  `harta_vN-orto_vM[-mic].*`, `sanctuar_vN.json`, `cladiri_vN.json`. Cine a deschis
+  `harta_vN-orto_vM.*`, `sanctuar_vN.json`, `cladiri_vN.json`. Cine a deschis
   pagina o dată nu mai cere un nume publicat timp de un an, deci un conținut nou
   primește un nume nou. Scripturile build-* refuzau deja un nume urmărit de git;
   `textura-ortofoto` și `textura-imprejurimi` îl rescriu acum numai cu aceiași octeți
@@ -181,7 +182,7 @@ numai scrie în consolă. Fiecare sursă are un motiv:
 un fișier în lucru rescris sub același nume ar rămâne un an vechi în browserul de probă.
 `npm run preview -- --mode csp-impus` (configurația `cabo-espichel-csp-impus`, portul 4174)
 trimite politica impusă. Proba din 2026-10-08, în Chromium, cu politica impusă:
-- Satelit cu ambele trepte, Relief, „Coordonate” cu Copiază, modala surselor și
+- Satelit, Relief, „Coordonate” cu Copiază, modala surselor și
   `?previzualizare=ndvi` merg toate, cu 0 încălcări;
 - un worker din `blob:` cu `new Function` și `WebAssembly.compile` merge;
 - controlul, un atribut style pus din cod, e blocat.
@@ -211,7 +212,8 @@ până când autorul alege o imagine.
 - 0 blocuri `static {}` în `dist/assets` (parserul lui Vite), `plasa.js` numai cu forme ES5 —
   o listă de noduri PERMISE, deci o formă pe care n-o știe pică; nu se vede numai ce nu lasă
   urmă în arbore, virgula de după ultimul parametru (ES2017) —, cu `defer` și fără `type`, semnul `__modulPornit` în intrare și în plasă, mesajul de
-  încărcare cu `role="status"` (vezi „Pornirea”).
+  încărcare: `role="status"` pe paragraf, procentul `aria-hidden`, butonul „Arată relieful
+  acum” ascuns (vezi „Pornirea”); marcajul de dinainte și butonul fără `hidden` pică.
 
 Controalele:
 - `/data/(.*)` imutabil pică pe paletă și pe NDVI;
@@ -244,22 +246,24 @@ de impunere, `cabo-espichel-csp-impus` se încearcă de mână și în Firefox �
 
 ## Pornirea: mesajul de încărcare și plasa
 
-**Mesajul.** `<p id="incarcare" role="status">Se încarcă harta 3D…</p>`, frate al lui
-`#continut`, în mijlocul ecranului; roata se mișcă numai prin `transform` și stă sub
-reduced-motion. Îl ascunde foaia de stil când `<body>` are `data-scena` (`activa` sau
-`indisponibila`), iar fără JavaScript `@media (scripting: none)` (browserele fără interogarea
-asta îl lasă). Contrast `--ink` pe `--surface` 13,7:1. Până la el, ecranul stătea gol până la
-primul cadru. Măsurat pe build: `data-scena` se pune cu `frame` 0, iar primul
-requestAnimationFrame de după vede deja `frame` 1, deci mesajul pleacă în aceeași zugrăvire cu
-primul cadru. Cu `harta_v4-dem.bin` întârziat 5 s (server de probă local): la 1 s mesajul se
-vede, după primul cadru nu. La 390 × 844, 844 × 390, 320 × 568 și 1600 × 900 nu atinge busola,
-Satelit, „Coordonate”, rândul cu sursele sau versiunea (cel puțin 69 px), fără defilare
-orizontală. Pe codul de dinainte: niciun element, iar `#straturi` ascuns după primul cadru.
-Panourile apar însă înaintea primului cadru, cât ține compilarea, iar pe o pagină mărită
-recenzia a găsit mesajul peste Satelit la 195 × 422 și peste busolă la 320 × 256, câteva
-cadre. De aceea, pe un ecran îngust sau scund (≤ 22,5rem lățime sau ≤ 30rem înălțime), mesajul
-pleacă odată cu panourile (`data-panouri` pe `<html>`, pus de scena.js înaintea compilării);
-butonul Satelit ocupat rămâne semnul încărcării.
+**Mesajul.** `#incarcare`, frate al lui `#continut`, în mijlocul ecranului: `<p role="status">`
+„Se încarcă harta 3D…” și butonul ascuns „Arată relieful acum”. Roata se mișcă numai prin
+`transform` și stă sub reduced-motion; contrast `--ink` pe `--surface` 13,7:1. Când pornirea mai
+așteaptă numai fotografia, scena.js cheamă `laIncarcare({ faza: 'fotografie' })` (main.js): „Se
+încarcă fotografia aeriană…”, procentul într-un `<span aria-hidden="true">` — cititorul de ecran
+aude numai faza <!-- NEVERIFICAT: cu un cititor de ecran adevărat --> — și butonul. Clicul pe el
+abandonează `faraSatelit`: harta apare pe loc, pe Relief, cu focusul pe butonul Satelit, iar
+preferința rămâne. Pastila e text, nu flex: ca flex, la 195 px procentul ieșea din ea. Mesajul
+pleacă la `data-scena` pe `<body>` (`activa` sau `indisponibila`); fără JavaScript, prin
+`@media (scripting: none)`.
+
+**Panourile** — busola, Satelit, „Coordonate”, sursele, versiunea, eticheta și fișa, pivotul —
+au `visibility: hidden` până la `data-scena`: apar toate odată cu harta și nu iau focus până
+atunci. Canvasul n-are pointer până atunci: o tragere de 400 px în timpul încărcării muta camera
+cu 560 m înaintea primului cadru (control, în pagină). Măsurat pe build: `data-scena` se pune cu
+`frame` 0, cu Satelit deja aplicat, iar primul cadru e Satelit (5 din 5 încărcări). La
+1600 × 900, 390 × 844, 844 × 390, 320 × 568 și 195 × 422, cu „5%” și cu „100%”, pastila și
+butonul stau în ecran, fără defilare orizontală.
 
 **Browserele vechi.** three r186 are șase blocuri `static {}`, pe care Safari/iOS le
 parsează abia de la 16.4. Un modul care nu se parsează oprește tot graful, deci nici
@@ -335,9 +339,10 @@ după fiecare așteptare (altfel harta ar fi pornit tăcut fără sanctuar), iar
 reîncarcă pagina. Un termen în care pagina a fost ascunsă, sau al cărui temporizator sună
 cu peste 1 s întârziere — o filă înghețată; după ultima dată, o construcție care trece de
 termen cu ceasul încă armat —, nu se numără. `curata()` oprește cererile încă în zbor la
-orice eșec; ceasul se oprește când pornirea s-a terminat. Satelit nu e sub gardă: prima lui
-treaptă pleacă în timpul pornirii (`descarcaSatelit`), dar abia după ce au sosit toate datele
-pe care le așteaptă pornirea, deci nu le poate ține la coadă; are abandonul și limita lui.
+orice eșec. Ceasul se oprește imediat după ce au sosit toate datele (`garda.opreste()` în
+`construieste`): cât se construiește și cât se așteaptă fotografia ar fi expirat fals, iar o
+excepție de mai târziu ar fi ieșit drept „datele n-au mai sosit”. Fotografia are garda ei
+(vezi „Vederea Satelit”); cererile ei pleacă abia după datele pornirii, deci nu le țin la coadă.
 
 Proba, `verifica-pagina`, pe ceas virtual: corpul bazei tace după 1 KB — în așteptare la
 19,999 s, TimeoutError la 20 s, 0 avertismente (control, fără gardă: în așteptare după
@@ -347,7 +352,8 @@ curge: 20 s); paleta, sanctuarul, clădirile și un strat blocate dau `null` cu 
 avertismente (control, aceleași cu 404: 5); pagina ascunsă 10–35 s: abandon la 60 s
 (control: 20); firul ocupat 15–26 s: la 46 s (control: 26); datele citite pe bucăți sunt
 identice cu cele fără gardă; `scena.js` dă garda celor 5 încărcători și verifică fiecare
-așteptare (codul vechi: 5 fără gardă, 5 neverificate). În pagină (dev, `fetch` înlocuit),
+așteptare (codul vechi: 5 fără gardă, 5 neverificate) și o oprește după date (lipsă pe
+scena.js de la `30a22c9`). În pagină (dev, `fetch` înlocuit),
 cu `harta_v4-dem.bin` tăcut după 1 KB și, separat, cu `sanctuar_v2.json` fără antet:
 anunțul și butonul la 20,1 s, fără avertismente; butonul reîncarcă și harta pornește; la
 390 px butonul are 118 × 46 px, fără defilare orizontală. `harta_v4-dem.bin` citit pe
@@ -1282,14 +1288,16 @@ după ultima plasă și chiar înaintea buclei —: cu KHR_parallel_shader_compi
 paralel, fără să blocheze firul. Fără extensie programele trec drept gata (WebGLProgram.js:995),
 iar promisiunea se rezolvă după un temporizator de ~10 ms (WebGLRenderer.js:1567), cu legarea tot
 pe primul cadru <!-- NEVERIFICAT: calea fără extensie, citită în cod -->. Programul umbrei
-rămâne pe primul cadru (`compile()` nu face trecerea de umbre), iar Satelit își compilează
-materialele tot după primul cadru. Pe un context pierdut Chromium dă `COMPLETION_STATUS_KHR`
+rămâne pe primul cadru (`compile()` nu face trecerea de umbre). Satelit își compilează
+materialele pe plase-proxy, înaintea lui: între `compileAsync` și buclă stă numai așteptarea
+fotografiei (vezi „Vederea Satelit”). Pe un context pierdut Chromium dă `COMPLETION_STATUS_KHR`
 adevărat, deci așteptarea nu se agață.
 
 Măsurat pe build, în panou, cu fila în față (Intel UHD 770, ANGLE D3D11, canvas 916 × 914),
-din Long Animation Frames, câte 4 încărcări alternate. „Rece” = programe noi pentru cache-ul
-ANGLE: un script injectat de serverul de probă pune în fiecare shader un `#define` unic; codul
-vechi dă așa cam cât auditul pe un profil nou de browser (391–393 ms).
+din Long Animation Frames, câte 4 încărcări alternate, când primul cadru era încă Relief.
+„Rece” = programe noi pentru cache-ul ANGLE: un script injectat de serverul de probă pune în
+fiecare shader un `#define` unic; codul vechi dă așa cam cât auditul pe un profil nou de browser
+(391–393 ms).
 
 | | primul cadru | din el, legarea | cadrul gata, de la ultima dată sosită |
 |---|---|---|---|
@@ -1302,7 +1310,7 @@ La prima vizită imaginea apare cu ~0,2 s mai devreme; la reveniri, cam la fel: 
 din cadru în așteptarea de dinaintea lui. Construcția, ~0,3 s, e altă sarcină, neatinsă.
 Probele, în pagină: primul cadru citit din canvas și vederea de pornire în țintă fixă
 640 × 400, pe Relief, **0 pixeli diferiți** față de codul de dinainte (control: Satelit în
-aceeași țintă, 255 639); 7 programe la primul cadru și 11 după Satelit, ca înainte; contextul
+aceeași țintă, 255 639); 7 programe la primul cadru Relief și 11 după Satelit; contextul
 pierdut în timpul compilării și refăcut după 0,5 s: harta pe ecran, 0 erori; 0 încălcări CSP pe
 `cabo-espichel-productie`. `npm run verifica-pagina` păzește ordinea, pe sursă: pică pe scena.js
 de la `30a22c9` și cu compilarea mutată după buclă. Pe telefon nemăsurat
@@ -1339,13 +1347,12 @@ nu se măsoară pe ele.
 | nivel | sursă | pas | noduri de uscat | triunghiuri | textura Satelit |
 |---|---|---|---|---|---|
 | `harta_v6` | dalele DGT de 2 m, filtru cort 1-2-1 | 4 m | 109 248 | 216 105 | ortofoto, 2 m, 0,62 MB |
-| `harta_v9` | dalele DGT de 2 m, filtru cort 1-2-…-6-…-2-1 | 12 m | 69 151 | 138 203 | ortofoto, 2 m, 3,09 MB; la pornire 4 m, 0,79 MB |
+| `harta_v9` | dalele DGT de 2 m, filtru cort 1-2-…-6-…-2-1 | 12 m | 69 151 | 138 203 | ortofoto, 2 m, 3,09 MB |
 | `harta_v7` | Copernicus GLO-30 | 32 m | 37 853 | 75 834 | ortofoto unde acoperă, altfel Sentinel-2; 16 m, 0,22 MB |
 | `harta_v8` | Copernicus GLO-30, media a 8 × 8 eșantioane, pe un disc de 50 km | 256 m | 30 931 | 64 457 | Sentinel-2, 64 m, 0,59 MB |
 
 În total +494 599 de triunghiuri (+25,7%), 27,9 MB de atribute (cu normalele nivelurilor
-netezite), 7,93 MB de fișiere — din care 3,09 MB textura de 2 m a lui `harta_v9` și 0,79 MB
-varianta ei de 4 m, pentru pornire (vezi „În pagină”, mai jos). ETC1S ar fi
+netezite), 7,14 MB de fișiere — din care 3,09 MB textura de 2 m a lui `harta_v9`. ETC1S ar fi
 dat 0,62 MB, cu ΔE_OK×100 1,35 după decodare față de 0,22 (p99 6,0 față de 1,6); s-a păstrat
 UASTC, alegerea autorului pentru alpha.
 De ce până la 50 km: ceața three e PLANĂ (`vFogDepth = −mvPosition.z`), camera poate
@@ -1499,38 +1506,17 @@ vederi (țintă fixă 640 × 400). Timpul GPU, alternat vechi/nou, mediana a 15:
 16,54; în 1600 × 900 cu MSAA 4, −0,23…−0,33 ms. Același câștig în toate vederile: e în
 vârfuri. Satelit nu e atins — materialul lui e neiluminat.
 
-**Textura lui `harta_v9` vine în două trepte** (`IN_DOUA_TREPTE` din `satelit.js`,
-`TEXTURA_MICA` din `textura-imprejurimi`), la cererea autorului: să fie descărcată de la
-pornire și la detaliul întreg, dar fără să întârzie Satelit. Întâi `harta_v9-orto_v1-mic`,
-nivelurile de mip 1–4 ale celei întregi (4 m pe texel, aceeași cutie, 0,79 MB), odată cu
-restul; textura de 2 m (3,09 MB) se cere în a doua treaptă, după ce Satelit e pe ecran și
-după petic, și ia locul celei mici în același material — programul nu se schimbă. Prima
-treaptă are astfel 6,10 MB, nu 8,40; totalul crește cu 0,79 MB. Din vederea de pornire
-banda e o fâșie la orizont, în spatele capului: ~1% din ecran pe desktop, 0,1% pe telefon.
-Schimbul, măsurat acolo în țintă fixă (ieșire sRGB, fără MSAA; diferența unui pixel e
-maximul pe canal), față de
-varianta de 8 m pe texel (0,20 MB) — nivelurile 2–4 ale celei întregi; nivelurile 1–4 sunt,
-octet cu octet, fișierul mic:
-
-| ținta | textura mică | diferă cu ceva | peste 2 niveluri | peste 8 | maximum |
-|---|---|---|---|---|---|
-| 1600 × 900 | 4 m | 0,89% | 3 526 | 205 | 43 |
-| 1600 × 900 | 8 m | 0,96% | 7 333 | 1 259 | 61 |
-| 3200 × 1800 | 4 m | 0,95% | 21 101 | 1 809 | 35 |
-| 3200 × 1800 | 8 m | 0,98% | 36 172 | 8 831 | 71 |
-
-Banda ocupă 0,99% din ecran, deci „diferă cu ceva” e aproape toată banda. La ~4 km un pixel
-are ~3,7 m: 8 m se vedeau mai moi. Cifrele de dinainte (107 peste 8 la 4 m, 4 433 peste 2 la
-8 m) amestecau praguri și măsurători; recenzia le-a prins. Fără
-compresie, unde cea întreagă ar ieși oricum la 4 m, a doua treaptă se sare.
-Încărcătorul KTX2 al primei trepte trece la a doua: workerii primei se opresc, iar a doua își
-face unul singur, din transcodorul deja adus (`workerPool`); cu un încărcător nou,
-transcodorul se cerea de două ori. `dispose()` anulează cererile în zbor ale ambelor trepte
-(un `AbortController` până la `fetch`), iar un fișier sosit nu se mai transcodează: înainte,
-o eliberare chiar la `gata` mai aducea și transcoda cei 3,1 MB. Textura fină își trece și ea
-sursele prin `laSursa`, pentru calea în care cea mică lipsește. Compresia n-ar fi
-ajutat: setarea UASTC e deja cea implicită, iar cu RDO mai tare fișierul scade cu 5% (2,93
-MB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MB, cu ΔE de șase ori mai mare.
+**Textura lui `harta_v9`** se cere întreagă, la 2 m pe texel (3,09 MB), odată cu celelalte.
+De la 0.1.3.02 până pe 2026-10-08 venea în două trepte: întâi `harta_v9-orto_v1-mic`,
+nivelurile de mip 1–4 ale celei întregi (4 m, 0,79 MB), apoi cea de 2 m, după ce Satelit era
+pe ecran. Pe 2026-10-08 autorul a văzut harta încărcându-se în etape și a cerut s-o vadă o
+singură dată, direct pe Satelit, cu tot la detaliul întreg (vezi „Vederea Satelit”).
+Varianta mică a ieșit din depozit, cu `TEXTURA_MICA` din `textura-imprejurimi`; regula ei din
+`vercel.json`, `(?:-mic)?`, a rămas și nu mai prinde nimic, iar pentru `verifica-livrare` un
+`-mic` revenit e un fel necunoscut și pică (încercat cu fișierele încă în `dist/`). Compresia
+n-ar fi ajutat: setarea UASTC e deja cea implicită, iar cu RDO mai tare fișierul scade cu 5%
+(2,93 MB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MB, cu ΔE de șase ori mai
+mare.
 Cine revine nu le mai cere deloc: `vercel.json` le ține un an în cache (vezi „Livrarea”). În
 `?previzualizare` nu se încarcă. Satelit le comută materialele cu ale lui alpha, pe
 același program. `inaltimeRandata` din scenă — alpha unde e alpha, împrejurimile în
@@ -1576,8 +1562,9 @@ busola (`acasa()`) și tasta Home. Rozeta poartă eticheta „Acasă — vederea
   `harta_v8`, orice normală aproape verticală ar trece): mediană 0,42° / 0,56° / 0,56°, p99
   4,32° / 3,30° / 3,42° (`harta_v9` / `harta_v7` / `harta_v8`), prag 1°; control: normala
   nodului de la est dă 2,10° / 2,52° / 2,10°;
-- bugetul: 600 000 de triunghiuri, 8 MB de fișiere, cu texturile mici ale primei trepte (azi
-  7,93); textura mică are cutia celei întregi, pasul dublu și sha256-ul din sidecar;
+- bugetul: 600 000 de triunghiuri, 8 MB de fișiere (azi 7,14); fiecare nivel are în
+  `public/data` numai cele șase fișiere pe care le cere pagina — cu varianta mică încă acolo,
+  `harta_v9` pica;
 - la bit: sha256 pe fiecare atribut al celor patru plase, cu fâșiile, cât în `AMPRENTA`
   (citită pe codul de dinainte de `plasaPlata` și de `tot()` cel nou), și cel mult 160 000
   de normale de nod (`Math.hypot`) la construcție — codul vechi cere 645 357 și pică.
@@ -1618,8 +1605,8 @@ rămâne, ca la falezele lui alpha.
 
 Butonul „Satelit”, jos-stânga (pe telefon deasupra busolei), comută între
 fotografia aeriană pe relief și vederea Relief — culorile din albedo, de mai sus.
-Pornește pe Satelit; alegerea se ține în `localStorage`, în try/catch. Până sosește prima
-treaptă se vede Relief, cu butonul deja pe ecran — vezi „Butonul, de la creare”, mai jos.
+Pornește pe Satelit, iar harta apare abia cu fotografia întreagă pe placă — vezi „O singură
+încărcare”, mai jos. Alegerea se ține în `localStorage`, în try/catch.
 
 ### Texturile: `npm run textura-ortofoto`
 
@@ -1703,85 +1690,103 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
   cele vii (un cadru desenat între timp ar fi arătat o stare amestecată), iar
   texturile urcă pe placă cu `initTexture`, înainte de prima comutare. Baza și
   peticul împart un program. Pe un GPU fără niciun format comprimat transcodarea ar
-  da RGBA (~71 MB): peticul nici nu se cere (`cuCompresie`, din `workerConfig`, înaintea
-  oricărei cereri), iar plasa lui rămâne pe textura bazei; formatul bazei rămâne a doua
-  plasă. `pregateste()` nu respinge —
+  da RGBA (~71 MB): cererea peticului, pornită devreme, se oprește înaintea primei transcodări
+  (`cuCompresie`, din `workerConfig`), iar plasa lui rămâne pe textura bazei;
+  formatul bazei rămâne a doua plasă. `pregateste()` nu respinge —
   un import eșuat al încărcătorului, după un deploy, lasă Relief și un avertisment,
   nu un buton blocat. Cu preferința Relief nu se descarcă nimic până la primul
   clic; butonul are `aria-busy` cât se încarcă. `?previzualizare` forțează Relief,
   fără buton. Crearea e în `try`, ca la cer și la umbre.
   Recenzia three.js a găsit exact aceste șase lucruri; sunt reparate.
-- **Devreme, în două trepte** (2026-10-08). Prima treaptă — baza și împrejurimile, 6,10 MB
-  (MB = 2^20 octeți) — o cere scena.js după TOATE datele pornirii și înaintea construcției
-  plaselor (`descarcaSatelit`); înainte pleca după construcție și după primul cadru. Sidecarul
-  și fișierul pleacă deodată (`cereOrto`), iar transcodorul odată cu texturile, nu după prima
-  sosită: după sidecarul bazei, deci un deploy fără texturi nu-l mai descarcă degeaba (proba,
-  cu control). Pornit, nu se mai poate opri: `init()` din r186 nu primește semnal. Un încărcător
-  eliberat cu transcodorul în drum îi revocă URL-ul workerului la sosire (`elibereazaKtx2`);
-  `dispose()` singur îl lăsa, ~60 KB, cât trăiește pagina (recenzia; proba numără URL-urile).
-  `detectSupport` rulează la sosirea încărcătorului; pe un context pierdut atunci, extensiile
-  ieșeau toate lipsă, iar Satelit rămânea RGBA (~71 MB), fără petic, toată sesiunea — observat
-  în pagină la proba compilării. Acum `pregateste()` așteaptă refacerea contextului și reface
-  configurația înaintea primei transcodări: proba, cu un context pierdut și refăcut, dă BC7 și
-  peticul; codul de dinainte, RGBA. Materialele, compilarea și `initTexture` așteaptă primul cadru
-  (`primulCadru`, rezolvat în buclă). A doua treaptă: întâi peticul (6,03 MB; până sosește,
-  plasa lui stă pe textura bazei — alegerea autorului), apoi `harta_v9` întreagă. Construcția
-  rămâne pe firul principal (decizia autorului: fără workeri, deocamdată). Măsurat pe build:
-  - localhost, din cache cu 304, mediana a 5 încărcări: `.ktx2` pornesc la 105 ms, odată cu
-    construcția (înainte la 530, după primul cadru); primul cadru 511 față de 506 ms;
-    Satelit 763 față de 810 ms. 4 din 5 fișiere sosesc în timpul construcției, baza abia
-    după: cererea nu-și golește conducta cât firul principal e ocupat;
-  - un server de probă local, 9 Mbit/s și 40 ms pe cerere, fără cache, 2 încărcări:
-    Satelit la 6,65–6,69 s după primul cadru, față de 12,64–12,69 s; primul cadru, de la
-    sosirea datelor, 446–471 ms față de 439–452; peticul întreg cu 1,0–1,1 s mai târziu decât
-    înainte. Pe o rețea mobilă adevărată câștigul nu e măsurat
-    <!-- NEVERIFICAT: telefon, rețea mobilă -->;
-  - după a doua treaptă, Satelit și Relief în țintă fixă 640 × 400, acasă, pe sanctuar și de
-    sus pe petic: **0 pixeli diferiți** față de codul de dinainte. Control, plasa peticului
-    lăsată pe textura bazei: 41 233 / 50 851 / 123 515 pixeli diferiți (maximum 73);
-  - fără niciun format comprimat (`getExtension` acoperit): 10 cereri, niciuna a peticului,
-    Satelit pornit; codul de dinainte cerea peticul, 6 325 030 de octeți, și-l arunca;
-  - `?previzualizare` nu cere nimic; cu preferința Relief, numai sidecarul bazei până la
-    clic, apoi peticul înaintea lui `harta_v9`.
+- **O singură încărcare** (2026-10-08, la cererea autorului: harta o singură dată, direct pe
+  Satelit, cu tot la detaliul întreg). `descarcaSatelit`, chemată de scena.js după TOATE datele
+  pornirii și înaintea construcției plaselor, cere deodată cele șase texturi întregi — baza,
+  peticul și cele patru împrejurimi, 14,44 MB (15 138 469 de octeți; MB = 2^20). Sidecarul și
+  fișierul pleacă deodată (`cereOrto`); transcodorul, după sidecarul bazei, deci un deploy fără
+  texturi nu-l descarcă. Pornit, nu se mai poate opri: `init()` din r186 nu primește semnal. Un
+  încărcător eliberat cu transcodorul în drum îi revocă URL-ul workerului la sosire
+  (`elibereazaKtx2`); `dispose()` singur îl lăsa, ~60 KB, cât trăiește pagina. `detectSupport`
+  rulează la sosirea încărcătorului: pe un context pierdut atunci ieșea RGBA, fără petic, toată
+  sesiunea, deci `pregateste()` așteaptă refacerea contextului și reface configurația înaintea
+  primei transcodări. Urmează materialele, compilarea pe proxy, `initTexture` și eliberarea
+  încărcătorului. Construcția rămâne pe firul principal (decizia autorului: fără workeri).
+  După `compileAsync`, numai pe calea automată (`satelit.automat`: fără `?previzualizare`, fără
+  preferința Relief, fără ieșirea dată înainte), scena.js cheamă `laIncarcare({ faza:
+  'fotografie' })` și așteaptă `asteaptaSatelitul(gata, faraSatelit)` — o cursă care nu respinge
+  și își scoate ascultătorul —, abia apoi bucla. Primul cadru e deci Satelit, cu tot. Un eșec
+  arată harta pe Relief, fără butonul Satelit; „Fotografia aeriană nu s-a putut încărca.” e numai
+  pentru cititorul de ecran. Scris cât panourile erau ascunse, anunțul nu ajungea la nimeni:
+  regiunea live era în afara arborelui de accesibilitate, iar la apariție textul deja prezent nu
+  se anunță (recenzia, măsurat în Edge cu evenimentele de accesibilitate). La fel primul anunț
+  al busolei. Acum main.js cheamă `scena.arata()` după `data-scena`, iar după două cadre ale
+  paginii busola și Satelit își golesc anunțul și îl scriu din nou (`reanunta`)
+  <!-- NEVERIFICAT: cu un cititor de ecran adevărat -->.
+  - **Baza căzută oprește tot, pe loc** — fișierul lipsă sau stricat, sidecarul fără soarele
+    zborului și fără mare (`areSoareSiMare`): `garda.abandoneaza()` oprește cererile, citirile și
+    încărcarea. Înainte, celelalte cinci texturi se descărcau și se transcodau degeaba, cu harta
+    ținută pe mesaj: recenzia a măsurat 66 s pe o legătură lentă, pentru un eșec știut de la 0 s.
+  - **Procentul:** suma lui `octeti` din sidecarurile de încărcat, luată după ce s-au așezat
+    toate (să nu sară pe un total parțial), și octeții din `laOcteti`, pe fiecare bucată
+    (`citesteOcteti`). `laProgres` se cheamă numai când crește procentul întreg, de la 0 la 1.
+  - **Garda fotografiei**, aceeași `creeazaGardaPornirii`, cu ceasul ei: 20 s fără niciun octet
+    pe nicio cerere Satelit le opresc pe toate, iar `gata` iese `false`, cu un `console.warn`. Se
+    oprește când fiecare textură și-a citit fișierul și are transcodorul (`laDescarcat`):
+    transcodarea rămâne pe limita ei de 30 s. Importul încărcătorului și încercarea veche se
+    așteaptă prin `panaLa`, deci nici un import agățat nu ține `gata` pe vecie.
+  - **Ieșirea**, `faraSatelit`: cât se încarcă, o renunțare fără preferință; înaintea creării,
+    cererile devreme se opresc. Butonul rămâne vizibil, neapăsat și liber.
 
-  `npm run verifica-pagina`, pe `descarcaSatelit` și `creeazaSatelit` cu fișierele adevărate
-  și un `fetch` fals: cele 5 `.ktx2` ale primei trepte cerute înaintea construcției, fără
-  petic; 0 texturi pe placă înaintea primului cadru; 6,10 MB transcodați până la Satelit;
-  peticul cerut după prima treaptă și înaintea lui `harta_v9`; fără compresie, necerut;
-  `dispose()` oprește cererile în zbor; `cuCompresie` față de `getTranscoderFormat` din
-  three: 0 nepotriviri pe 96 de configurații × 7 texturi. Controale: Satelit fără prima
-  treaptă devreme (0 din 5 înaintea construcției), fără `primulCadru` (5 texturi urcate
-  înaintea lui), satelit.js de la `30a22c9` (12,14 MB până la Satelit, peticul cerut și fără
-  compresie, transcodorul abia după prima textură), scena.js de la el, „oricare format”
-  (7 nepotriviri: PVRTC cere laturi putere a lui 2).
-- **Butonul, de la creare.** Înainte stătea ascuns până la aplicarea lui Satelit, deci omul nu
-  putea refuza descărcarea. Acum, cât se încarcă — singur sau după un clic —, e apăsat
-  (starea spre care merge), `aria-busy`, cu roata în locul bifei și „se încarcă…” pe al doilea
-  rând (din CSS, `/ ""`, deci nu intră în nume acolo unde browserul știe forma: Chrome 77+,
+  Măsurat pe build, cu fila în față (916 × 914, DPR 1): la `data-scena`, în 5 din 5 încărcări,
+  `frame` 0, Satelit activ, peticul pe 2176 de texeli, `harta_v9` pe 2432; primul cadru e Satelit.
+  Mediane, `data-scena` / primul cadru: 705 / 768 ms pe `cabo-espichel-productie` (cache cu
+  revalidare), 701 / 766 ms pe `cabo-espichel-csp-impus` (0 încălcări), 684 / 754 ms fără cache,
+  pe loopback. Cu preferința Relief, harta la ~400 ms, fără nicio cerere `.ktx2`. Cu `.ktx2` la
+  500 KB/s pe cerere (server de probă): procentul urcă de la 1% (416 ms) la 100% (13 202 ms), harta
+  apare la 13 359 ms, pe Satelit; „Arată relieful acum” la 75% o arată după 2 ms, pe Relief, cu
+  cererile bazei și peticului oprite și preferința neatinsă; Satelit cerut apoi din buton se aplică
+  după 13,3 s, fără avertisment. Pe un telefon prima imagine vine abia după 14,44 MB: ~13,5 s la
+  9 Mbit/s <!-- NEVERIFICAT: calculat; telefon și rețea mobilă nemăsurate -->.
+
+  `npm run verifica-pagina`, cu fișierele adevărate, un `fetch` fals și ceasul virtual: 6 din 6
+  `.ktx2` cerute înaintea construcției, 0 `-mic`; la `gata` peticul pe `harta_v5-orto_v1`,
+  `harta_v9` la 2432 de texeli, 14,44 MB transcodate; cu baza sosită singură procentul e 0,26 =
+  ⌊100 × 4 069 665 / 15 138 469⌋ / 100, iar 1 vine o dată, înaintea compilării; baza tăcută după
+  1 KB e în așteptare la 19,999 s și `false` la 20 s, cu un avertisment și 0 temporizatoare, dar o
+  bază în 10 bucăți la 15 s și o transcodare de 25 s după ultimul octet trec; ieșirea în descărcare
+  oprește 6 din 6, cu preferința neatinsă, iar un clic apoi aplică tot; fără compresie peticul e
+  oprit și `harta_v9` la 1216 (4 m); `cuCompresie` față de `getTranscoderFormat`, 0 nepotriviri pe
+  96 de configurații × 6 texturi. Pe sursă, ordinea din scena.js: date → garda oprită →
+  `descarcaSatelit` cu peticul → `creeazaTeren` → `creeazaSatelit` → `compileAsync` → faza și
+  așteptarea, numai pe calea automată → bucla. Controale: satelit.js de la `30a22c9` (2 cereri
+  `-mic`, `harta_v9` la 1216; fără gardă și fără `faraSatelit`, tot în așteptare după 300 s);
+  mutațiile de azi (fără `laOcteti` procentul rămâne 0; garda nerearmată pierde baza lentă, cea
+  oprită numai în `finally` transcodarea de 25 s; fără `panaLa`, un import agățat ține 300 s);
+  scena.js de la `30a22c9` și așteptarea mutată după buclă; `Promise.race` simplu (1 ascultător
+  rămas); „oricare format” (6 nepotriviri: PVRTC cere laturi putere a lui 2). Controalele de la
+  `30a22c9` cer varianta mică: o primesc din git (`DIN_ISTORIC`), altfel ar pica din alt motiv.
+  Din recenzie: baza cu 404, cu celelalte cinci lente, dă `false` la 0 s, cu 5 din 5 cereri oprite și
+  0 transcodate (control, fără oprire: 66 s și 5 transcodate); `reanunta` golește anunțul eșecului și
+  îl scrie din nou la +150 ms, busola la +600 ms, iar `arata()` le cheamă la al doilea cadru (controale:
+  fără golire, 0 schimbări; chemate pe loc; main.js fără `arata`). Textul citit din `src/` se aduce la
+  LF, iar o mutație care nu se aplică pică singură: probele trec și pe o clonă LF, și pe una CRLF.
+  Fiecare caz își numără numai încărcătoarele lui: o probă pica în ~1 din 3 rulări, din cauza unui
+  control pe codul vechi care se elibera în cazul următor; acum 20 de rulări la rând, 0 eșecuri.
+- **Butonul.** La pornire nu se vede: panourile apar odată cu harta. Cât se încarcă după un clic,
+  e apăsat (starea spre care merge), `aria-busy`, cu roata în locul bifei și „se încarcă…” pe al
+  doilea rând (din CSS, `/ ""`, deci nu intră în nume acolo unde browserul știe forma: Chrome 77+,
   Firefox 128+, Safari 17.4+; pe Firefox 115 ESR numele devine „Satelit se încarcă…”), fără
-  estompare; anunțul e pentru cititoarele de ecran <!-- NEVERIFICAT: fără cititoare de ecran;
-  pe pornirea automată regiunea apare și își primește textul în aceeași sarcină -->. Un clic atunci înseamnă „rămân pe Relief” (`renunta`): preferința `relief`, prima
-  treaptă oprită (`oprireUnu`, legat de `abandon`), iar un clic următor o cere de la capăt.
-  După ultima ei așteptare, se termină, dar nu se aplică. A doua treaptă pleacă la prima
-  aplicare (`aplica`), nu la capătul primei, deci cine renunță nu descarcă nici peticul;
-  `dispose()` eliberează încărcătorul păstrat. Un eșec la pornire scoate butonul, cu anunțul.
-  Cu preferința Relief, butonul apare tot după sidecar. `verifica-pagina`: la creare vizibil,
-  ocupat, apăsat; clicul oprește 5 din 5 `.ktx2`, 0 transcodate și 0 cereri după el, a doua
-  treaptă nepornită, 0 avertismente; al doilea clic aplică Satelit; renunțarea cu compilarea în
-  curs nu aplică și nu cere a doua treaptă, iar clicul următor aplică pe loc; baza 404 scoate
-  butonul. Un dublu-clic cu compilarea încă în curs aplica Satelit fără a doua treaptă, pe toată
-  sesiunea — peticul pe textura bazei, `harta_v9` pe cea mică (recenzia): clicul ocolea
-  încărcarea, fiindcă `materiale` există de dinaintea compilării. Acum decide `pregatit`, pus
-  abia la capătul primei trepte, deci clicul așteaptă aceeași încărcare și aplică la capăt, cu a
-  doua treaptă; pe codul de dinainte proba pică. O încercare nouă o așteaptă întâi pe cea oprită
-  de renunțare (`incarcareOprita`): în pagină, cu `.ktx2` întârziate 2,5 s, pornit–oprit–pornit
-  dădea avertismentul three „Multiple active KTX2 loaders”, fiindcă încărcătorul vechi se elibera
-  abia când i se opreau cererile. Acum, 0 avertismente; proba, pe o rețea care oprește încet
-  cererile, cere cel mult un încărcător viu, iar un al patrulea clic, dat cât cea nouă încă
-  așteaptă, o oprește fără nicio cerere (pe codul de dinainte: două încărcătoare, 5 cereri). Controale, satelit.js de la `30a22c9`: butonul ascuns la creare; apăsat totuși,
-  aplică Satelit și scrie preferința `satelit`. În pagină, cu fișierele `.ktx2` întârziate 8 s:
-  după primul cadru butonul se vede ocupat; clicul lasă cele 5 cereri cu 0 octeți, Satelit
-  neaplicat, 3 texturi pe placă (cât Relief); al doilea clic aplică.
+  estompare; anunțul e pentru cititoarele de ecran <!-- NEVERIFICAT: fără cititoare de ecran -->.
+  Un clic atunci înseamnă „rămân pe Relief” (`renunta`): preferința `relief`, cererile oprite, iar
+  un clic următor le cere de la capăt; după ultima așteptare a texturilor încărcarea se termină,
+  dar nu se aplică. Un eșec scoate butonul, cu anunțul; cu preferința Relief, butonul apare după
+  sidecar. Un dublu-clic cu compilarea încă în curs aplica Satelit pe jumătate (recenzia): acum
+  decide `pregatit`, pus abia la capătul încărcării. O încercare nouă o așteaptă întâi pe cea
+  oprită (`incarcareOprita`): pornit–oprit–pornit dădea avertismentul three „Multiple active KTX2
+  loaders”. `verifica-pagina`, pe calea Relief → clic: al doilea clic rămâne pe Relief, cu 6 din 6
+  cereri oprite, al treilea aplică; renunțarea cu compilarea în curs, apoi un clic, aplică pe loc,
+  cu 0 cereri noi; pe o rețea care oprește încet cererile, cel mult un încărcător viu, iar un al
+  patrulea clic oprește încercarea nouă fără nicio cerere; baza 404 scoate butonul. Control,
+  satelit.js de la `30a22c9`: al doilea clic în descărcare aplică Satelit și scrie `satelit`.
 - **Transcodorul care nu pornește.** Workerul Basis cere WebAssembly și `new Function`
   (embind). Fără ele — un CSP fără `'unsafe-eval'`, WebAssembly oprit de un mod de
   securitate — workerul se agață tăcut: își așteaptă transcodorul la nesfârșit,
@@ -1799,10 +1804,9 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
     temporizatorul ar suna primul <!-- NEVERIFICAT: dedus, nemăsurat pe un telefon -->.
     Un termen atins de o ascundere pornește din nou, întreg. Descărcările nu intră în
     limită: pe o legătură lentă ar fi oprit încărcări bune. Trecută, `null` cu un
-    avertisment; un abandon (`dispose()`), `null` pe loc, fără avertisment. Aceeași
-    gardă ține și a doua treaptă a lui `harta_v9`: acolo rămâne textura mică.
-  Pe desktop (Chrome, 20 de fire) toate cele șapte texturi trec printr-un singur
-  worker, cu pornirea lui, în 0,40 s (BC7) și 0,29 s (RGBA); cu patru, 0,21 s. Pe
+    avertisment; un abandon (`dispose()`), `null` pe loc, fără avertisment.
+  Pe desktop (Chrome, 20 de fire) cele șapte texturi de atunci, cu varianta mică, trec
+  printr-un singur worker, cu pornirea lui, în 0,40 s (BC7) și 0,29 s (RGBA); cu patru, 0,21 s. Pe
   telefon limita lasă o margine de cel puțin patru ori dacă el e de 10–20 de ori mai
   lent <!-- NEVERIFICAT: nemăsurat pe un telefon -->. `init()` e public în r186, dar
   marcat „TODO: Make this method private”: `npm run verifica-pagina` pică dacă dispare
@@ -1817,8 +1821,7 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
   pierde textura; fără semnalul de vizibilitate, pagina ascunsă dă `null`. Pe
   `loaders.js` de dinainte pică 9 probe din 18.
 
-Probele, în pagină (panoul Browser); cele care privesc peticul — înregistrarea, culoarea
-terreiro-ului — se fac după `satelit.treaptaDoua`:
+Probele, în pagină (panoul Browser):
 - **Relief rămâne la octet:** trei vederi 640 × 400 în țintă fixă, înainte de orice
   comutare și după Relief → Satelit → Relief: **0 pixeli diferiți** în toate trei.
   Control: cu soarele lăsat pe al zborului, ~255 000 diferă pe fiecare;
@@ -1839,14 +1842,11 @@ terreiro-ului — se fac după `satelit.treaptaDoua`:
 - **transcodorul care nu răspunde** (2026-10-08), cu preferința Relief și workerii
   înlocuiți cu unii care nu răspund niciodată: după clic, la 30,1 s butonul pleacă,
   `aria-busy` se scoate, anunțul spune „Fotografia aeriană nu s-a putut încărca.”,
-  câte un avertisment pe fiecare din cele șase texturi (azi prima treaptă are cinci),
-  4 workeri porniți și 4 opriți,
+  câte un avertisment pe fiecare din cele șase texturi, 4 workeri porniți și 4 opriți,
   3 texturi pe placă, cât Relief. `dispose()` cu cei 4 workeri agățați îi oprește în
   7 ms, fără avertisment. Controlul, cu `loaders.js` de dinainte: la 36 s butonul
   e tot `aria-busy`, cu „Se încarcă fotografia aeriană…”, niciun avertisment, iar la
-  5 s după `dispose()` 0 workeri opriți din 4. A doua treaptă, cu workerul ei mort
-  imediat după prima: la 30,0 s un avertisment pentru `harta_v9-orto_v1`, workerul
-  oprit, iar `harta_v9` rămâne pe textura mică, 1216 × 1376. Cu un CSP pus prin `<meta>`: fără
+  5 s după `dispose()` 0 workeri opriți din 4. Cu un CSP pus prin `<meta>`: fără
   `'unsafe-eval'`, clicul eșuează în 11 ms pe WebAssembly, iar numai cu
   `'wasm-unsafe-eval'`, tot în 11 ms, pe `new Function`, amândouă fără niciun octet
   de textură sau de transcodor descărcat. Ocolind verificarea, workerul adevărat sub
@@ -2351,20 +2351,16 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
   - cutia unită, dacă texelul ei stă sub TEXEL_MAXIM (0,3 m) sau nu trece de
     pixelul ecranului la țintă. Pixelul e al canvasului (`canvas.height`), nu CSS și nu
     neapărat de dispozitiv: raportul e plafonat la 2, iar canvasul la 2560 × 1440;
-  - la pornire ținta e la 611 m. Primul cadru are soarele Relief — Satelit își pune
-    soarele abia când i-a sosit textura —, deci cutia unită rămâne numai pe un
-    canvas înalt de cel mult ~922 px de canvas; sub Satelit histerezisul
-    păstrează alegerea (întoarcerea la cutia unită cere ≤ ~917 px). ~1 121 px e
-    pragul de ieșire din cutia unită cu soarele zborului deja pus. Pe telefoanele în
-    portret și pe ecranele dense harta pornește pe sanctuar — măsurat: 1440 × 900 la
-    DPR 1 dă „toate”, la DPR 2 „sanctuar”, cu 0,216 m pe texel sub soarele zborului —,
-    iar farul își primește umbra când te apropii de el. Un telefon în PEISAJ pornește
-    pe cutia unită: raportul de pixeli e plafonat la 2 (vezi „Mărimea canvasului”),
-    deci 844 × 390 la 3× dă un canvas de 1688 × 780, sub ~922 px. Măsurat în pagină,
-    cu scena repornită pe fereastra emulată și `devicePixelRatio` 3: „toate” la primul
-    cadru și după Satelit, 0,497 m pe texel; 390 × 844 la 3× (780 × 1688) dă
-    „sanctuar”. Control: același canvas pe care l-ar fi avut înainte, 2532 × 1170
-    (1266 × 585 la 2×), dă „sanctuar”. Cutia unită, forțată, ar fi
+  - la pornire ținta e la 611 m, iar primul cadru are de acum soarele zborului (harta apare
+    direct pe Satelit): cutia unită rămâne pe un canvas înalt de cel mult ~1 121 px
+    (1120 → „toate”, 1122 → „sanctuar”); cu preferința Relief, cu soarele Relief, ~922 px
+    (920 / 925). Se alege la primul cadru: la creare canvasul are încă 300 × 150. Măsurat în
+    pagină, la primul cadru, pe Satelit: 1440 × 900 la DPR 1 dă „toate”, 0,497 m pe texel; la
+    DPR 2 (canvas 2428 × 1517) „sanctuar”, 0,216 m; telefonul în portret, 390 × 844 la 3×
+    (780 × 1688), „sanctuar”; în PEISAJ, 844 × 390 la 3× (1688 × 780), „toate”, 0,497 m —
+    raportul de pixeli e plafonat la 2 (vezi „Mărimea canvasului”), iar fără plafon canvasul
+    ar avea 1170 px înălțime, peste prag. Farul își primește umbra când te apropii de el.
+    Cutia unită, forțată, ar fi
     făcut umbrele sanctuarului, din mijlocul imaginii, de 2,3 ori mai difuze sub
     Satelit și de 2,9 ori sub Relief;
   - altfel, grupul cel mai apropiat de țintă.
@@ -2507,7 +2503,8 @@ OpenStreetMap” e o formă acceptată, iar legătura duce la pagina lor de copy
 „© DGT” deschide o modală cu tot restul — textul SNIG, atribuțiile, licențele,
 prelucrările —, un `<dialog>` deschis cu `showModal()`: focusul rămâne înăuntru,
 Escape o închide, pagina de dedesubt e inertă. Rândul și modala se fac o singură
-dată; sursa Satelit, care sosește după pornire, rescrie numai textele, deci o
+dată. Pe calea automată sursele Satelit sosesc înaintea lui `data-scena` și intră în prima
+scriere a subsolului; Satelit cerut din buton, după pornire, rescrie numai textele, deci o
 modală deschisă rămâne deschisă. Cât e deschisă, Escape-ul e al ei: fișa
 sanctuarului, inertă dedesubt, nu-l mai fură.
 

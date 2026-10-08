@@ -234,6 +234,15 @@ export function creeazaBusola({ gazda, controale, colturi, laClic }) {
     azimutNordAdevarat,
     /** γ, dedus din date. Expus pentru verificare. */
     convergenta: gamma,
+    /**
+     * Harta a apărut (scena.js, `arata`). Primul anunț s-a scris cât busola era ascunsă până la
+     * `data-scena` (main.css), deci nu l-a auzit nimeni: se scrie din nou, după aceeași pauză.
+     */
+    reanunta() {
+      if (!viu) return;
+      anunt.textContent = '';
+      programeazaAnunt();
+    },
     dispose() {
       if (!viu) return;
       viu = false;

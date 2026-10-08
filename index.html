@@ -20,7 +20,10 @@
   <body>
     <canvas id="scena"></canvas>
     <main id="continut"></main>
-    <p id="incarcare" role="status">Se încarcă harta 3D…</p>
+    <div id="incarcare">
+      <p role="status">Se încarcă harta 3D…<span aria-hidden="true"></span></p>
+      <button type="button" hidden>Arată relieful acum</button>
+    </div>
     <footer id="surse" hidden></footer>
     <!-- versiune -->
     <script defer src="/plasa.js"></script>

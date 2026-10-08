@@ -399,10 +399,6 @@ const alpha = incarcaHarta('harta_v4');
 const LANT = Object.keys(GRILE);
 const harti = Object.fromEntries(LANT.map((n) => [n, incarcaHarta(n)]));
 const PAS_TEX = { harta_v6: 2, harta_v9: 2, harta_v7: 16, harta_v8: 64 };
-// Texturile cu o variantă mică, pentru prima treaptă a paginii (IN_DOUA_TREPTE din
-// src/scene/satelit.js): de la ce nivel de mip încep. harta_v9 de la primul, 4 m: cu 8 m
-// schimbul se vedea pe desktop (vezi satelit.js).
-const TEXTURA_MICA = { harta_v9: 1 };
 // Hărțile care spun unde e uscat pe texelii unui cadru, de la cea dinăuntru spre
 // exterior: fiecare are cota apei în gaura ei, deci întâi trebuie întrebată cea care
 // chiar se vede acolo.
@@ -633,27 +629,6 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
   };
   scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}.json`), JSON.stringify(sidecar, null, 1));
   console.log(`  ${IESIRE}/${nume}-${VERSIUNE}.ktx2 + .json, gata`);
-
-  // Textura mică, pentru prima treaptă a paginii (IN_DOUA_TREPTE din satelit.js): aceleași
-  // niveluri de mip, de la al TEXTURA_MICA[nume]-lea încolo, deci aceeași cutie și aceeași
-  // culoare, la alt pas.
-  if (TEXTURA_MICA[nume]) {
-    const k0 = TEXTURA_MICA[nume], nm = NIVELURI_MIP - k0;
-    const fm = join('date-sursa/derivate/textura', `${nume}-${VERSIUNE}`, 'uastc-mic.ktx2');
-    const bm = codeazaKtx(pnguri.slice(k0), fm, 'uastc', nm);
-    const pm = pierdere(fm, niveluri[k0].b, c.W >> k0, c.H >> k0);
-    console.log(`  mică, la ${c.pas << k0} m: ${(bm.length / 1048576).toFixed(2)} MB, ${nm} niveluri; după decodare ΔE medie ${pm.medie}, p99 ${pm.p99}`);
-    scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}-mic.ktx2`), bm);
-    scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}-mic.json`), JSON.stringify({
-      ...sidecar,
-      nume: `${nume}-${VERSIUNE}-mic`,
-      format: `KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, ${nm} niveluri de mip`,
-      pas_m: c.pas << k0, latime: c.W >> k0, inaltime: c.H >> k0, niveluri: nm,
-      octeti: bm.length, sha256: createHash('sha256').update(bm).digest('hex'),
-      pierdere_dE: pm,
-      treapta: `prima treaptă a paginii: nivelurile ${k0}–${NIVELURI_MIP - 1} ale lui ${nume}-${VERSIUNE}, care o înlocuiește imediat după ce Satelit e pe ecran`,
-    }, null, 1));
-  }
 
   // NDVI-ul, pentru harta_v9, harta_v7 și harta_v8.
   if (nume === 'harta_v6') continue;

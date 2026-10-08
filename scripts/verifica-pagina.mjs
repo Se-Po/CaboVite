@@ -4,9 +4,13 @@
 //
 //   npm run verifica-pagina
 //
-// Nu scrie nimic și nu cere rețea. Iese cu cod 1 dacă pică vreo probă. Fiecare probă de
-// fond are un control negativ: aceeași măsurătoare pe o greșeală cunoscută trebuie să
-// pice. Ce verifică azi:
+// Nu scrie nimic în depozit și nu cere rețea; modulele mutate stau o clipă în directorul
+// temporar al sistemului. Iese cu cod 1 dacă pică vreo probă. Fiecare probă de fond are un
+// control negativ: aceeași măsurătoare pe o greșeală cunoscută — codul de la REPER_VECHI sau o
+// mutație a celui de azi — trebuie să pice; o mutație care nu se mai aplică pică și ea
+// („MUTAȚIA NU S-A APLICAT”), iar fără git controalele pe REPER_VECHI pică fiecare cu mesajul
+// lui, fără să oprească probele pe codul de azi. Textul paginii se citește cu capetele de rând
+// aduse la LF (`textSursa`, `textVechi`): proba nu depinde de core.autocrlf. Ce verifică azi:
 //   - textura Satelit când transcodorul KTX2 nu răspunde (loaders.js): limita de timp,
 //     abandonul, pagina ascunsă, verificarea dinaintea descărcării și API-ul lui
 //     KTX2Loader pe care se sprijină;
@@ -20,17 +24,36 @@
 //   - garda pornirii (loaders.js, scena.js): un corp blocat abandonează pornirea după 20 s
 //     fără niciun octet nicăieri; unul lent care curge și o cerere la coadă nu; opționalele
 //     tac la abandon; pagina ascunsă și firul ocupat nu se numără; aceleași date ca fără ea;
-//   - Satelit devreme (satelit.js, loaders.js, scena.js): prima treaptă cerută înaintea
-//     construcției, fără petic, și urcată pe placă abia după primul cadru; peticul primul în a
-//     doua treaptă, necerut fără compresie (`cuCompresie` față de alegerea transcodorului);
-//     nimic cu preferința Relief; abandonul la dispose(); butonul arătat de la creare, ocupat,
-//     iar un clic în timpul descărcării rămâne pe Relief, fără a doua treaptă;
-//   - foaia de stil, și animațiile: numai transform/opacity, oprite sub reduced-motion;
+//   - Satelit la pornire (satelit.js, loaders.js, scena.js): o singură treaptă — baza, peticul
+//     și împrejurimile, toate întregi, cerute înaintea construcției și aplicate abia toate pe
+//     placă —; progresul pe procente întregi, din octeții citiți; garda fotografiei, 20 s fără
+//     niciun octet, care nu păzește și transcodarea; ieșirea `faraSatelit`, fără preferință;
+//     peticul oprit fără compresie (`cuCompresie` față de alegerea transcodorului); nimic cu
+//     preferința Relief; abandonul la dispose(); pe calea Relief → clic, un clic în timpul
+//     descărcării rămâne pe Relief; `automat`, după care scena.js așteaptă fotografia; baza
+//     căzută — fișierul sau sidecarul fără soarele zborului — oprește tot, pe loc;
+//     `reanunta()`, care scrie din nou anunțul eșecului când harta apare;
+//   - harta o singură dată (scena.js, pe sursă): datele → garda pornirii oprită →
+//     descarcaSatelit → creeazaTeren → creeazaSatelit, cu progresul și ieșirea legate ca text
+//     exact → compileAsync → așteptarea lui Satelit → bucla, iar așteptarea
+//     (`asteaptaSatelitul`) se hotărăște la ieșire, nu respinge și nu lasă ascultători;
+//   - foaia de stil, și animațiile: numai transform/opacity, oprite sub reduced-motion; panourile
+//     ascunse și canvasul fără pointer până la `data-scena`; fără JavaScript versiunea se arată,
+//     judecat pe cascadă (specificitatea și ordinea), nu pe textul regulii;
+//   - mesajul de încărcare (main.js): faza fotografiei cu procentul, butonul care oprește
+//     așteptarea, focusul mutat pe Satelit când harta apare, apoi `scena.arata()` o dată;
 //   - compilarea înaintea primului cadru (scena.js): `compileAsync` după ultimul `scena.add`
-//     și înaintea buclei, pe sursă; timpii, în pagină (CLAUDE.md).
+//     și înaintea buclei, pe sursă; timpii, în pagină (CLAUDE.md);
+//   - anunțurile după apariția hărții (scena.js, busola.js): `arata()` cheamă `reanunta()` pe
+//     busolă și pe Satelit după două cadre ale paginii; busola, construită cu un DOM fals,
+//     golește anunțul și îl scrie din nou.
 
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { WebGLRenderLists } from 'three/src/renderers/webgl/WebGLRenderLists.js';
@@ -47,6 +70,51 @@ let picate = 0;
 const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
 
 // ------------------------------------------------------------ uneltele
+
+// Reperul controalelor pe codul de dinainte: 0.1.5.02, cu Satelit cerut după construcție, în două
+// trepte. Fără el — fără git, sau fără commitul acesta —, fiecare control pe el pică cu mesajul
+// lui, iar probele pe codul de azi rulează mai departe.
+const REPER_VECHI = '30a22c9';
+
+// Capetele de rând. În index toate fișierele sunt LF, dar cu core.autocrlf copia de lucru poate
+// avea, fișier cu fișier, CRLF sau LF. Textul paginii — src/ și index.html, de pe disc sau din
+// istoric — se citește numai prin funcțiile de aici, care îl aduc la LF o singură dată; probele,
+// mutațiile și inserțiile se scriu numai cu '\n'.
+const LF = (t) => t.replace(/\r\n/g, '\n');
+/** Un fișier al paginii, de pe disc, ca text cu LF. */
+const textSursa = (cale) => LF(readFileSync(cale, 'utf8'));
+/** Același fișier la REPER_VECHI, ca text cu LF; `null` fără git sau fără reper. */
+const textVechi = (cale) => {
+  try {
+    return LF(execFileSync('git', ['show', `${REPER_VECHI}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
+  } catch { return null; }
+};
+
+/**
+ * O mutație a unui text, din perechi [text sau regex, înlocuire], aplicate pe rând. `null` dacă
+ * una nu se aplică — textul de înlocuit nu mai există —, ca un control să nu treacă degeaba pe
+ * codul neschimbat: fiecare control pică atunci cu NEAPLICATA. Un text se înlocuiește ca atare
+ * (fără `$&` și rudele lui); un regex, cu grupurile lui.
+ */
+const muta = (text, ...perechi) => {
+  let s = text;
+  for (const [din, inLoc] of perechi) {
+    if (typeof din === 'string' ? !s.includes(din) : !din.test(s)) return null;
+    s = typeof din === 'string' ? s.replace(din, () => inLoc) : s.replace(din, inLoc);
+  }
+  return s;
+};
+const NEAPLICATA = 'MUTAȚIA NU S-A APLICAT';
+
+/** Un modul din text, cu importurile relative și `three` duse la fișierele de azi din src/scene. */
+let nrModul = 0;
+const modulDin = async (src) => {
+  src = src.replaceAll("from 'three'", `from '${import.meta.resolve('three')}'`)
+    .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`);
+  const f = join(tmpdir(), `cabo-proba-${process.pid}-${nrModul++}.mjs`);
+  writeFileSync(f, src);
+  try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
+};
 
 /** Starea unei promisiuni, citită fără s-o aștepte: codul vechi nu se termină deloc. */
 const urmareste = (p) => {
@@ -283,7 +351,9 @@ console.log('\nKTX2Loader: ce folosește garda');
 // aducă înapoi.
 console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă');
 {
-  const CSS = readFileSync('src/styles/main.css', 'utf8');
+  const CSS = textSursa('src/styles/main.css');
+  // Un bloc cu reguli înăuntru: @media, @supports, @keyframes.
+  const BLOC = /\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/.source;
   // Butoanele hărții și canvasul. Orice altă regulă cu `user-select: none` ar putea
   // prinde textele fișei, ale panoului, ale capitolelor sau rândul cu sursele.
   const NESELECTABILE = new Set(['#scena', '#busola .roza', '#straturi button', '#punct .activeaza', '#punct .minimizeaza', '#sanctuar-eticheta .poi']);
@@ -307,16 +377,17 @@ console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecți
   proba(r.scena && r.straine.length === 0, `canvasul neselectabil: ${r.scena ? 'da' : 'nu'}; alte reguli cu \`user-select: none\`: ${r.straine.length ? r.straine.join(', ') : 'niciuna'}`);
   // Controale: regula de dinainte a versiunii, o înălțime cu `dvh` fără rezervă, selecția
   // oprită pe tot documentul.
-  const c = verifica(CSS.replace('#versiune ~ * {', ':root:has(#versiune) {').replace('calc(var(--vizibil) ', 'calc(100dvh ') + '\nbody { user-select: none; }\n');
-  proba(c.has === 1 && c.dvh.length === 1 && c.straine.includes('body'),
-    `control, foaia cu \`:root:has(#versiune)\`, un \`100dvh\` și \`body { user-select: none }\`: ${c.has} / ${c.dvh.length} / ${c.straine.join(', ')} — pică`);
+  const cs = muta(CSS, ['#versiune ~ * {', ':root:has(#versiune) {'], ['calc(var(--vizibil) ', 'calc(100dvh ']);
+  const c = cs === null ? null : verifica(`${cs}\nbody { user-select: none; }\n`);
+  proba(c !== null && c.has === 1 && c.dvh.length === 1 && c.straine.includes('body'),
+    `control, foaia cu \`:root:has(#versiune)\`, un \`100dvh\` și \`body { user-select: none }\`: ${c === null ? NEAPLICATA : `${c.has} / ${c.dvh.length} / ${c.straine.join(', ')}`} — pică`);
 
   // Animațiile — roțile mesajului de încărcare și ale butonului Satelit: numai `transform` și
   // `opacity` în @keyframes, iar fiecare regulă animată are sub reduced-motion `animation:
   // none`. Mesajul de încărcare pleacă odată cu `data-scena` și fără JavaScript.
   const animatii = (css) => {
     const fara = css.replace(/\/\*[\s\S]*?\*\//g, '');
-    const bloc = /\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/.source;
+    const bloc = BLOC;
     const cadre = [...fara.matchAll(new RegExp(`@keyframes\\s+[\\w-]+\\s*${bloc}`, 'g'))].map((m) => m[1]);
     const proprietati = cadre.flatMap((c) => [...c.matchAll(/([\w-]+)\s*:/g)].map((m) => m[1]));
     const straine = [...new Set(proprietati.filter((p) => p !== 'transform' && p !== 'opacity'))];
@@ -325,17 +396,138 @@ console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecți
     const oprite = new Set([...fara.matchAll(new RegExp(`@media\\s*\\(prefers-reduced-motion:\\s*reduce\\)\\s*${bloc}`, 'g'))]
       .flatMap((m) => [...m[1].matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter((x) => /animation\s*:\s*none/.test(x[2])).map((x) => x[1].trim())));
     const neoprite = animate.filter((s) => !oprite.has(s));
+    const fara_js = [...fara.matchAll(new RegExp(`@media\\s*\\(scripting:\\s*none\\)\\s*${bloc}`, 'g'))].map((m) => m[1]).join('\n');
     const ascuns = /body\[data-scena\]\s+#incarcare\s*\{\s*display:\s*none;?\s*\}/.test(fara)
-      && /@media\s*\(scripting:\s*none\)\s*\{\s*#incarcare\s*\{\s*display:\s*none;?\s*\}\s*\}/.test(fara);
+      && /(^|\})\s*#incarcare\s*\{\s*display:\s*none;?\s*\}/.test(fara_js);
     return { cadre: cadre.length, straine, animate: animate.length, neoprite, ascuns };
   };
   const a = animatii(CSS);
   proba(a.cadre > 0 && a.straine.length === 0 && a.animate > 0 && a.neoprite.length === 0 && a.ascuns,
     `animațiile: ${a.cadre} @keyframes, proprietăți în afara lui transform/opacity: ${a.straine.join(', ') || 'niciuna'}; ${a.animate} reguli animate, fără \`animation: none\` sub reduced-motion: ${a.neoprite.join(', ') || 'niciuna'}; mesajul de încărcare ascuns la data-scena și fără JavaScript: ${a.ascuns ? 'da' : 'NU'}`);
-  const ca = animatii(CSS.replace(/@media \(prefers-reduced-motion: reduce\) \{\n  #incarcare::before \{ animation: none; \}\n\}/, '')
-    + '\n@keyframes pulsa { to { left: 2px; } }\n.pulsa { animation: pulsa 1s infinite; }\n');
-  proba(ca.straine.includes('left') && ca.neoprite.includes('#incarcare::before') && ca.neoprite.includes('.pulsa'),
-    `control, fără oprirea roții mesajului și cu o animație pe \`left\`: ${ca.straine.join(', ')} / ${ca.neoprite.join(', ')} — pică`);
+  const cas = muta(CSS, [/@media \(prefers-reduced-motion: reduce\) \{\n  #incarcare p::before \{ animation: none; \}\n\}/, '']);
+  const ca = cas === null ? null : animatii(`${cas}\n@keyframes pulsa { to { left: 2px; } }\n.pulsa { animation: pulsa 1s infinite; }\n`);
+  proba(ca !== null && ca.straine.includes('left') && ca.neoprite.includes('#incarcare p::before') && ca.neoprite.includes('.pulsa'),
+    `control, fără oprirea roții mesajului și cu o animație pe \`left\`: ${ca === null ? NEAPLICATA : `${ca.straine.join(', ')} / ${ca.neoprite.join(', ')}`} — pică`);
+
+  // Harta o singură dată: până la `data-scena`, panourile — tot ce stă direct în <body>, în afară
+  // de mesaj, de capitole și de canvas — sunt ascunse, iar canvasul nu primește pointerul; numai
+  // butonul mesajului primește clicuri; fără JavaScript versiunea se arată. Regula de dinainte,
+  // care ascundea mesajul pe ecranele mici odată cu panourile (`[data-panouri]`), a plecat: acum
+  // panourile vin abia cu harta. Pe selectori, nu pe text: ce ar ascunde o regulă se judecă pe
+  // copiii lui <body>, cu selectorul ei. Controale: main.css de la REPER_VECHI, o regulă prea largă
+  // și `[data-panouri]` pus la loc.
+  //
+  // Versiunea fără JavaScript se judecă pe cascadă, nu pe textul regulii: regula din @media
+  // (scripting: none) trebuie să bată, cu specificitatea și apoi cu ordinea, fiecare regulă care o
+  // ascunde până la `data-scena`. Fără `:where(…)`, regula panourilor are (3,1,1) și bate (1,1,1)
+  // a versiunii, deci versiunea rămânea ascunsă fără JavaScript, cu regula ei în foaie.
+  /**
+   * Specificitatea unui selector, [id, clasă, tip], pe subsetul din foaie: `:where()` 0,
+   * `:not()`/`:is()`/`:has()` cât argumentul lor cel mai specific, un pseudo-element ca un tip.
+   */
+  const specificitate = (sel) => {
+    const v = [0, 0, 0];
+    const maiMare = (x, y) => (x[0] - y[0] || x[1] - y[1] || x[2] - y[2]) > 0;
+    // Argumentele unei liste, despărțite numai de virgulele din afara parantezelor.
+    const desparte = (t) => {
+      const p = [];
+      let ad = 0, de = 0;
+      for (let k = 0; k < t.length; k++) {
+        if (t[k] === '(') ad++;
+        else if (t[k] === ')') ad--;
+        else if (t[k] === ',' && ad === 0) { p.push(t.slice(de, k)); de = k + 1; }
+      }
+      return [...p, t.slice(de)];
+    };
+    let i = 0;
+    const nume = () => { const n = /^[\w-]*/.exec(sel.slice(i))[0]; i += n.length; return n; };
+    const argument = () => {
+      const de = i;
+      for (let ad = 0; i < sel.length; i++) {
+        if (sel[i] === '(') ad++;
+        else if (sel[i] === ')' && --ad === 0) { i++; break; }
+      }
+      return sel.slice(de + 1, i - 1);
+    };
+    while (i < sel.length) {
+      const ch = sel[i];
+      if (ch === '#') { i++; nume(); v[0]++; } else if (ch === '.') { i++; nume(); v[1]++; } else if (ch === '[') { i = sel.indexOf(']', i) + 1; v[1]++; } else if (sel.startsWith('::', i)) {
+        i += 2; nume();
+        if (sel[i] === '(') argument();
+        v[2]++;
+      } else if (ch === ':') {
+        i++;
+        const n = nume().toLowerCase(), arg = sel[i] === '(' ? argument() : null;
+        if (n === 'where') continue;
+        if (arg !== null && ['not', 'is', 'has'].includes(n)) {
+          const m = desparte(arg).map((s) => specificitate(s.trim())).reduce((a, x) => (maiMare(x, a) ? x : a), [0, 0, 0]);
+          v[0] += m[0]; v[1] += m[1]; v[2] += m[2];
+        } else v[1]++;
+      } else if (/[\w-]/.test(ch)) { nume(); v[2]++; } else i++;
+    }
+    return v;
+  };
+  const pornirea = (css) => {
+    const fara = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const reguli = [...fara.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim().split(/\s*,\s*/), bloc: m[2], poz: m.index }));
+    const cu = (re) => reguli.filter((r) => re.test(r.bloc)).flatMap((r) => r.sel);
+    // Copiii lui <body>: cei din index.html și cei puși de scenă (gazda lor e <body>).
+    const COPII = ['#scena', '#continut', '#incarcare', '#surse', '#versiune', '#busola', '#straturi', '#punct', '#sanctuar-eticheta', '#sanctuar-fisa', '.pivot-rotire'];
+    // Un selector de forma `body:not([data-scena]) > X` ascunde copilul `c` dacă `c` se potrivește cu X:
+    // un `:not(#id)` exclude acel id, un `:where(…)` se desface.
+    const ascunde = (sel, c) => {
+      const m = /^body:not\(\[data-scena\]\)\s*>\s*(.+)$/.exec(sel);
+      if (!m) return false;
+      const x = m[1].replace(/^:where\((.*)\)$/, '$1');
+      const excluse = [...x.matchAll(/:not\(([^()]+)\)/g)].map((q) => q[1]);
+      const rest = x.replace(/:not\([^()]+\)/g, '');
+      if (rest !== '' && rest !== '*') return rest === c;
+      return !excluse.includes(c);
+    };
+    const ascunse = cu(/(^|[;\s])visibility:\s*hidden/);
+    const ascunsLa = (c) => ascunse.some((s) => ascunde(s, c));
+    const faraPointer = cu(/pointer-events:\s*none/), cuPointer = cu(/pointer-events:\s*auto/);
+    // Versiunea fără JavaScript: regulile care o arată, din @media (scripting: none) — cu poziția
+    // blocului —, față de cele care o ascund până la data-scena, cu poziția lor.
+    const tintesc = (lista, re) => lista.filter((r) => re.test(r.bloc)).flatMap((r) => r.sel.filter((s) => ascunde(s, '#versiune')).map((sel) => ({ sel, poz: r.poz })));
+    const aratate = [...fara.matchAll(new RegExp(`@media\\s*\\(scripting:\\s*none\\)\\s*${BLOC}`, 'g'))]
+      .flatMap((m) => tintesc([...m[1].matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((x) => ({ sel: x[1].trim().split(/\s*,\s*/), bloc: x[2], poz: m.index })), /visibility:\s*visible/));
+    const ascunzatoare = tintesc(reguli, /(^|[;\s])visibility:\s*hidden/);
+    const sp = (x) => specificitate(x.sel), text = (v) => `(${v.join(',')})`;
+    const bate = (a, h) => { const x = sp(a), y = sp(h), d = x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; return d > 0 || (d === 0 && a.poz > h.poz); };
+    return {
+      panouri: COPII.filter((c) => !['#scena', '#continut', '#incarcare'].includes(c) && ascunsLa(c)),
+      straine: ['#scena', '#continut', '#incarcare'].filter(ascunsLa),
+      canvas: faraPointer.includes('body:not([data-scena]) #scena'),
+      mesaj: faraPointer.includes('#incarcare') && cuPointer.includes('#incarcare button'),
+      panouriVechi: /\[data-panouri\]/.test(fara),
+      versiune: {
+        ok: aratate.length > 0 && ascunzatoare.every((h) => aratate.some((a) => bate(a, h))),
+        aratata: aratate.map((a) => text(sp(a))).join(', ') || 'nicio regulă',
+        ascunsa: ascunzatoare.map((h) => text(sp(h))).join(', ') || 'nicio regulă',
+      },
+    };
+  };
+  const p = pornirea(CSS);
+  proba(p.panouri.length === 8 && p.straine.length === 0 && p.canvas && p.mesaj && !p.panouriVechi,
+    `până la data-scena: ascunse ${p.panouri.length} din 8 panouri (${p.panouri.join(', ')}), mesajul, capitolele și canvasul ${p.straine.length ? `ASCUNSE: ${p.straine.join(', ')}` : 'nu'}; canvasul fără pointer: ${p.canvas ? 'da' : 'NU'}; numai butonul mesajului cu clicuri: ${p.mesaj ? 'da' : 'NU'}; regula [data-panouri]: ${p.panouriVechi ? 'ÎNCĂ ACOLO' : 'scoasă'}`);
+  const descrieVersiunea = (x) => `regula din @media (scripting: none) ${x.versiune.aratata}, regulile care o ascund până la data-scena ${x.versiune.ascunsa}`;
+  proba(p.versiune.ok, `fără JavaScript, versiunea se arată — câștigă cascada: ${descrieVersiunea(p)}`);
+  // Control: regula panourilor fără `:where(…)`.
+  const faraWhereCss = muta(CSS, ['> :where(:not(#incarcare):not(#continut):not(#scena))', '> :not(#incarcare):not(#continut):not(#scena)']);
+  const faraWhere = faraWhereCss === null ? null : pornirea(faraWhereCss);
+  proba(faraWhere !== null && !faraWhere.versiune.ok && faraWhere.panouri.length === 8,
+    `control, regula panourilor fără \`:where(…)\`: ${faraWhere === null ? NEAPLICATA : `${descrieVersiunea(faraWhere)}; versiunea ${faraWhere.versiune.ok ? 'se arată' : 'RĂMÂNE ASCUNSĂ'}`} — pică`);
+  const bun = (x) => x.panouri.length === 8 && x.straine.length === 0 && x.canvas && x.mesaj && !x.panouriVechi;
+  const css0 = textVechi('src/styles/main.css');
+  const v = css0 === null ? null : pornirea(css0);
+  proba(v !== null && !bun(v), `control, main.css de la ${REPER_VECHI}: ${v === null ? 'NECITIT' : `ascunse ${v.panouri.length} din 8 panouri, canvasul fără pointer: ${v.canvas ? 'da' : 'nu'}`} — pică`);
+  // O regulă prea largă — tot <body> — ar ascunde și mesajul, capitolele și canvasul.
+  const largCss = muta(CSS, [':where(:not(#incarcare):not(#continut):not(#scena))', '*']);
+  const larg = largCss === null ? null : pornirea(largCss);
+  proba(larg !== null && !bun(larg) && larg.straine.length === 3, `control, \`body:not([data-scena]) > *\`: ${larg === null ? NEAPLICATA : `ascunde și ${larg.straine.join(', ')}`} — pică`);
+  const cuVechi = pornirea(`${CSS}\n@media (max-width: 22.5rem) {\n  [data-panouri] #incarcare { display: none; }\n}\n`);
+  proba(!bun(cuVechi), `control, regula \`[data-panouri] #incarcare\` pusă la loc: ${cuVechi.panouriVechi ? 'găsită' : 'NEGĂSITĂ'} — pică`);
 }
 
 // ------------------------------------------------------------ ordinea de desenare
@@ -442,7 +634,7 @@ console.log('\nMărimea canvasului: raportul de pixeli cel mult 2, cel mult 2560
 // răspund toate cererile pornite până atunci.
 console.log('\nCascada încărcării: stratul NDVI pleacă odată cu sidecarul hărții');
 {
-  const INDEX = readFileSync('index.html');
+  const INDEX = textSursa('index.html');
   const disc = (url) => (existsSync('public' + url)
     ? new Response(readFileSync('public' + url), { status: 200 })
     : new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } }));   // ca Vite
@@ -576,7 +768,7 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
     globalThis.setTimeout = (f, ms = 0, ...a) => { const id = ceas.urm++; ceas.t.set(id, { la: ceas.acum + ms, f: () => f(...a) }); return id; };
     globalThis.clearTimeout = (id) => { ceas.t.delete(id); };
     const F0 = globalThis.fetch;
-    const INDEX = readFileSync('index.html');
+    const INDEX = textSursa('index.html');
     const deDisc = (url) => (existsSync('public' + url)
       ? new Response(readFileSync('public' + url), { status: 200 })
       : new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } }));
@@ -807,12 +999,13 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
         const goale = [...src.matchAll(/await\s+(incarcaPaleta\([^)]*\)|reliefGata|sanctuarGata|cladiriGata|imprejurimiGata)/g)].map((m) => m[1]);
         return { apeluri: apeluri.length, faraGarda, goale };
       };
-      const SRC = readFileSync('src/scene/scena.js', 'utf8');
+      const SRC = textSursa('src/scene/scena.js');
       const s = verificaScena(SRC);
       proba(s.apeluri === 5 && s.faraGarda.length === 0 && s.goale.length === 0,
         `scena.js: ${s.apeluri} încărcători ai pornirii, ${s.faraGarda.length} fără gardă${s.faraGarda.length ? ` (${s.faraGarda.join(', ')})` : ''}, ${s.goale.length} așteptări fără verificare`);
-      const c = verificaScena(SRC.replace('await asteapta(sanctuarGata)', 'await sanctuarGata').replace('incarcaCladiri(undefined, { garda })', 'incarcaCladiri()'));
-      proba(c.faraGarda.length === 1 && c.goale.length === 1, `control, sanctuarul așteptat fără verificare și clădirile fără gardă: ${c.faraGarda.length} / ${c.goale.length} — pică`);
+      const cs = muta(SRC, ['await asteapta(sanctuarGata)', 'await sanctuarGata'], ['incarcaCladiri(undefined, { garda })', 'incarcaCladiri()']);
+      const c = cs === null ? null : verificaScena(cs);
+      proba(c !== null && c.faraGarda.length === 1 && c.goale.length === 1, `control, sanctuarul așteptat fără verificare și clădirile fără gardă: ${c === null ? NEAPLICATA : `${c.faraGarda.length} / ${c.goale.length}`} — pică`);
     }
 
     globalThis.fetch = F0;
@@ -821,38 +1014,35 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
   }
 }
 
-// ------------------------------------------------------------ Satelit devreme
+// ------------------------------------------------------------ Satelit la pornire
 
-// Prima treaptă Satelit — baza și împrejurimile — pleacă înaintea construcției plaselor, nu
-// după ea, și fără peticul de 6,33 MB; peticul vine primul în a doua treaptă, înaintea texturii
-// fine a lui harta_v9, iar pe un GPU fără niciun format comprimat nu se mai cere deloc. Pe codul
-// paginii — `descarcaSatelit` și `creeazaSatelit` —, cu un DOM, un renderer și un `fetch`
-// falși, cu fișierele adevărate din public/data și cu transcodarea lui KTX2Loader înlocuită.
-// Construcția cere WebGL: ordinea din scena.js se păzește pe sursă, iar timpii, în pagină
-// (CLAUDE.md). Controalele rulează satelit.js și scena.js de la REPER_VECHI, din git.
-console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul în a doua');
+// Texturile Satelit pleacă înaintea construcției plaselor, toate deodată și întregi — baza,
+// peticul de 0,25 m și împrejurimile, cu harta_v9 de 2 m —, iar Satelit se aplică abia cu toate
+// pe placă: harta apare o singură dată, direct pe Satelit (cererea autorului, 2026-10-08). Pe
+// codul paginii — `descarcaSatelit` și `creeazaSatelit` —, cu un DOM, un renderer și un `fetch`
+// falși, cu fișierele adevărate din public/data, cu transcodarea lui KTX2Loader înlocuită și pe
+// ceasul virtual de mai sus. Construcția cere WebGL: ordinea din scena.js se păzește pe sursă,
+// iar timpii, în pagină (CLAUDE.md). Controalele rulează satelit.js și scena.js de la
+// REPER_VECHI, din git, și mutații plauzibile ale lui satelit.js de azi.
+console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotografiei, ieșirea');
 {
-  // 0.1.5.02: ultimul commit cu Satelit cerut după construcție și cu peticul în prima treaptă.
-  const REPER_VECHI = '30a22c9';
-  const { execFileSync } = await import('node:child_process');
-  const { writeFileSync, rmSync, readdirSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const { join } = await import('node:path');
-  const { pathToFileURL } = await import('node:url');
+  // REPER_VECHI (0.1.5.02): Satelit cerut după construcție, în două trepte, cu harta_v9 mică în prima.
+  const NUME_V = `satelit.js de la ${REPER_VECHI}`;
   const S = await import('../src/scene/satelit.js');
   const BF = KTX2Loader.BasisFormat, EF = KTX2Loader.EngineFormat;
 
-  /** Un modul de la REPER_VECHI, cu importurile relative și `three` duse la fișierele de azi. */
+  /** Un modul de la REPER_VECHI; `null` fără git sau fără reper. */
   const deLaReper = async (cale) => {
-    let src;
-    try { src = execFileSync('git', ['show', `${REPER_VECHI}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; }
-    src = src.replaceAll("from 'three'", `from '${import.meta.resolve('three')}'`)
-      .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`);
-    const f = join(tmpdir(), `cabo-reper-${process.pid}-${cale.replace(/\W/g, '_')}.mjs`);
-    writeFileSync(f, src);
-    try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
+    const src = textVechi(cale);
+    return src === null ? null : modulDin(src);
   };
   const V = await deLaReper('src/scene/satelit.js');
+  // O mutație plauzibilă a lui satelit.js de azi (`muta`): `null` dacă nu se mai aplică.
+  const SRC_S = textSursa('src/scene/satelit.js');
+  const mutatie = async (...perechi) => {
+    const s = muta(SRC_S, ...perechi);
+    return s === null ? null : modulDin(s);
+  };
 
   // (a) `cuCompresie` față de alegerea transcodorului însuși: tabelul FORMAT_OPTIONS și
   //     getTranscoderFormat, scoase din KTX2Loader.BasisWorker, pe toate configurațiile și pe
@@ -864,11 +1054,28 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     alege = new Function('config', 'EngineFormat', 'EngineType', 'TranscoderFormat', 'BasisFormat', `${m[0]}\nreturn getTranscoderFormat;`)(
       cfg, EF, KTX2Loader.EngineType, KTX2Loader.TranscoderFormat, BF);
   } catch (e) { alege = null; console.log(`    alegerea transcodorului nu s-a putut scoate: ${e.message}`); }
-  const antete = readdirSync('public/data').filter((n) => n.endsWith('.ktx2')).map((n) => {
-    const b = readFileSync(`public/data/${n}`), dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const antet = (n, b) => {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
     const dfd = dv.getUint32(48, true), model = dv.getUint8(dfd + 12), mostre = (dv.getUint16(dfd + 10, true) - 24) / 16, canal = dv.getUint8(dfd + 31) & 15;
     return { n, w: dv.getUint32(20, true), h: dv.getUint32(24, true), basis: model === 166 ? BF.UASTC : BF.ETC1S, alfa: model === 166 ? canal === 3 || canal === 4 : mostre > 1, octeti: b.byteLength };
-  });
+  };
+  const antete = readdirSync('public/data').filter((n) => n.endsWith('.ktx2')).map((n) => antet(n, readFileSync(`public/data/${n}`)));
+  // Fișierele din public/data de la REPER_VECHI pe care depozitul nu le mai are: varianta mică a
+  // lui harta_v9 (`-orto_v1-mic`). Controalele rulează satelit.js de atunci, care o cere, deci
+  // o primesc din git, ca pe datele lor; altfel ar pica din alt motiv decât cel probat. Fără git
+  // sau fără reper rămâne gol: controalele pe REPER_VECHI pică atunci fiecare cu mesajul lui, iar
+  // probele pe codul de azi rulează mai departe.
+  const DIN_ISTORIC = new Map();
+  try {
+    const git = { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 };
+    for (const c of execFileSync('git', ['ls-tree', '-r', '--name-only', REPER_VECHI, 'public/data'], { ...git, encoding: 'utf8' }).split('\n')) {
+      if (c && !existsSync(c)) DIN_ISTORIC.set(c.slice('public'.length), execFileSync('git', ['show', `${REPER_VECHI}:${c}`], git));
+    }
+  } catch (e) {
+    DIN_ISTORIC.clear();
+    console.log(`    datele de la ${REPER_VECHI} nu s-au putut citi din git (${e.code ?? e.status ?? e.message}): controalele pe el vor pica`);
+  }
+  const istorice = [...DIN_ISTORIC].filter(([u]) => u.endsWith('.ktx2')).map(([u, b]) => antet(u.slice('/data/'.length), b));
   const CHEI = ['astcSupported', 'etc1Supported', 'etc2Supported', 'dxtSupported', 'bptcSupported', 'pvrtcSupported'];
   const configuratii = [];
   for (let m = 0; m < 64; m++) for (const hdr of [false, true]) {
@@ -889,22 +1096,27 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
   proba(CHEI.every((k) => chei.includes(k)), `workerConfig are câmpurile citite de cuCompresie: ${CHEI.filter((k) => !chei.includes(k)).join(', ') || 'toate'} ${CHEI.every((k) => chei.includes(k)) ? '' : 'LIPSĂ'}`);
   if (alege) {
     const n = nepotriviri(L.cuCompresie);
-    proba(n === 0 && configuratii.length === 96 && antete.length >= 7,
+    proba(n === 0 && configuratii.length === 96 && antete.length >= 6,
       `cuCompresie față de getTranscoderFormat: ${n} nepotriviri pe ${configuratii.length} configurații × ${antete.length} texturi`);
     const naiv = nepotriviri((c) => CHEI.some((k) => c[k]));
     proba(naiv > 0, `control, „oricare format” (și PVRTC, care cere laturi putere a lui 2): ${naiv} nepotriviri — pică`);
   } else proba(false, 'getTranscoderFormat din KTX2Loader.BasisWorker');
 
-  // (b) Pornirea, pe codul paginii. Un jurnal comun: cererile, mărcile scenariului, texturile
-  //     transcodate și cele urcate pe placă, în ordine.
-  const OCTETI = new Map(antete.map((f) => [f.n.replace('.ktx2', ''), f.octeti]));
-  const DUPA_MARIME = new Map(antete.map((f) => [f.octeti, f.n.replace('.ktx2', '')]));
-  let jurnal = [], retinute = () => false, lipsa = () => false;
+  // Hamul. Un jurnal comun: cererile, mărcile scenariului, texturile transcodate și cele urcate
+  // pe placă, în ordine. Ceasul virtual de mai sus ține temporizatoarele paginii — garda
+  // fotografiei, limita transcodării —, deci 20 s se încearcă fără să se aștepte 20 s.
+  globalThis.setTimeout = (f, ms = 0, ...a) => { const id = ceas.urm++; ceas.t.set(id, { la: ceas.acum + ms, f: () => f(...a) }); return id; };
+  globalThis.clearTimeout = (id) => { ceas.t.delete(id); };
+  const OCTETI = new Map([...antete, ...istorice].map((f) => [f.n.replace('.ktx2', ''), f.octeti]));
+  const DUPA_MARIME = new Map([...antete, ...istorice].map((f) => [f.octeti, f.n.replace('.ktx2', '')]));
+  const SIDECAR = (n) => JSON.parse(readFileSync(`public/data/${n}.json`, 'utf8'));
+  let jurnal = [], retinute = () => false, lipsa = () => false, special = () => null;
   // `abortLent`: o cerere reținută nu ascultă de oprire până nu e eliberată — o rețea care
   // oprește încet cererile.
   let abortLent = false;
   // Cererile reținute nu răspund decât oprite — sau la `raspundeRetinutelor()`, care le dă
-  // fișierul, ca unei legături lente care ajunge totuși.
+  // fișierul, ca unei legături lente care ajunge totuși. `special(url)` poate da alt răspuns:
+  // un corp care tace, unul care curge încet.
   let amanate = [];
   const raspundeRetinutelor = () => { const a = amanate; amanate = []; for (const f of a) f(); };
   const marca = (m) => jurnal.push({ marca: m });
@@ -914,36 +1126,81 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     const oprita = () => rej(new DOMException('cerere oprită', 'AbortError'));
     if (opt.signal?.aborted) return oprita();
     opt.signal?.addEventListener('abort', () => { if (!abortLent || !retinute(url)) oprita(); }, { once: true });
-    const raspunde = () => (opt.signal?.aborted ? oprita()
-      : res(existsSync('public' + url) ? new Response(readFileSync('public' + url), { status: 200 }) : new Response('', { status: 404 })));
+    const raspunde = () => {
+      if (opt.signal?.aborted) return oprita();
+      const corp = existsSync('public' + url) ? readFileSync('public' + url) : DIN_ISTORIC.get(url);
+      res(corp ? new Response(corp, { status: 200 }) : new Response('', { status: 404 }));
+    };
     if (retinute(url)) { amanate.push(raspunde); return; }
     if (lipsa(url)) return res(new Response('', { status: 404 }));
+    const sp = special(url);
+    if (sp) return res(sp);
     raspunde();
   });
-  // Transcodarea: textura iese în formatul pe care l-ar alege transcodorul pentru placa asta.
+  // Transcodarea: textura iese în formatul pe care l-ar alege transcodorul pentru placa asta,
+  // după `intarziere(nume)` ms virtuali.
   const numeTextura = new WeakMap();
-  const P = KTX2Loader.prototype, init0 = P.init, parse0 = P.parse, dispose0 = P.dispose;
-  let dispuse = 0;
+  const P = KTX2Loader.prototype, init0 = P.init, parse0 = P.parse, dispose0 = P.dispose, detect0 = P.detectSupport;
+  let dispuse = 0, intarziere = () => 0;
+  // Generația cazului: crește la fiecare `deLaZero`. Un încărcător o primește la creare, prin
+  // `detectSupport` — prin care trece orice încărcător din creeazaIncarcatorKtx2 —, iar `dispuse`,
+  // `vii` și jurnalul numără numai încărcătoarele cazului curent. Unul al cazului de dinainte,
+  // eliberat abia acum — codul de la REPER_VECHI își elibera a doua treaptă după o verificare
+  // sha256 pe timp real, care putea trece de `deLaZero` —, nu se mai numără aici.
+  let generatie = 0;
+  const alCazului = (k) => k.generatieProba === generatie;
   // Încărcătoarele pornite (`init`) și încă neeliberate: three avertizează când sunt două.
   const vii = new Set();
   let maxVii = 0;
+  P.detectSupport = function (r) { this.generatieProba ??= generatie; return detect0.call(this, r); };
   P.init = function () {
-    if (!this.transcoderPending) { marca('transcodor'); this.transcoderPending = Promise.resolve(); vii.add(this); maxVii = Math.max(maxVii, vii.size); }
+    if (!this.transcoderPending) {
+      this.transcoderPending = Promise.resolve();
+      if (alCazului(this)) { marca('transcodor'); vii.add(this); maxVii = Math.max(maxVii, vii.size); }
+    }
     return this.transcoderPending;
   };
   P.parse = function (buf, onLoad) {
     const dv = new DataView(buf), w = dv.getUint32(20, true), h = dv.getUint32(24, true), nume = DUPA_MARIME.get(buf.byteLength) ?? '?';
-    jurnal.push({ parse: nume });
+    // Jurnalul cazului în care a început transcodarea: una întârziată nu intră în al altuia.
+    const j = jurnal;
+    j.push({ parse: nume });
     this.init().then(() => {
-      Object.assign(cfg, this.workerConfig);
-      const format = alege ? alege(BF.UASTC, w, h, false).engineFormat : EF.RGBA_BPTC_Format;
-      const t = new THREE.CompressedTexture([{ data: new Uint8Array(0), width: w, height: h }, { data: new Uint8Array(0), width: w >> 1, height: h >> 1 }], w, h, format);
-      numeTextura.set(t, nume);
-      jurnal.push({ transcodata: nume });
-      onLoad(t);
+      const gata = () => {
+        Object.assign(cfg, this.workerConfig);
+        const format = alege ? alege(BF.UASTC, w, h, false).engineFormat : EF.RGBA_BPTC_Format;
+        const t = new THREE.CompressedTexture([{ data: new Uint8Array(0), width: w, height: h }, { data: new Uint8Array(0), width: w >> 1, height: h >> 1 }], w, h, format);
+        numeTextura.set(t, nume);
+        j.push({ transcodata: nume });
+        onLoad(t);
+      };
+      const ms = intarziere(nume);
+      if (ms > 0) setTimeout(gata, ms); else gata();
     });
   };
-  P.dispose = function () { dispuse++; vii.delete(this); return dispose0.call(this); };
+  P.dispose = function () { if (alCazului(this)) dispuse++; vii.delete(this); return dispose0.call(this); };
+  /** Până la eliberarea tuturor încărcătoarelor cazului, cu limită: o încercare veche se termină. */
+  const elibereazaToate = () => curge(() => vii.size === 0, 200_000);
+  /** Antetul vine, corpul trimite 1 KB și tace. */
+  const blocat = () => new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(1024)); } }), { status: 200 });
+  /** Un fișier din public/ în `bucati` bucăți, câte una la `pasMs`, pe ceasul virtual; închis după încă un pas. */
+  const lent = (url, bucati, pasMs) => {
+    const buf = readFileSync('public' + url), m = Math.ceil(buf.length / bucati);
+    let i = 0;
+    return new Response(new ReadableStream({
+      start(c) {
+        const urm = () => {
+          try {
+            if (i * m >= buf.length) return c.close();
+            c.enqueue(buf.subarray(i * m, (i + 1) * m));
+            i++;
+            setTimeout(urm, pasMs);
+          } catch { /* citirea s-a oprit */ }
+        };
+        setTimeout(urm, pasMs);
+      },
+    }), { status: 200 });
+  };
   const element = () => ({
     hidden: false, textContent: '', id: '', className: '', type: '', title: '', copii: [], atribute: {}, asc: {},
     append(...c) { this.copii.push(...c); }, appendChild(c) { this.copii.push(c); return c; },
@@ -967,154 +1224,402 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     initTexture: (t) => jurnal.push({ urcata: numeTextura.get(t) ?? '?' }),
   });
   const NUME_IMP = NIVELURI_IMPREJURIMI;
-  const deschide = ({ M, compresie = true, devreme = true, cuPrimulCadru = true, r = renderer(compresie) }) => {
+  const deschide = ({ M, compresie = true, devreme = true, r = renderer(compresie), laProgres, faraSatelit }) => {
     const teren = plasa(), petic = plasa(), mare = plasa();
     const soare = new THREE.DirectionalLight();
     soare.position.set(300, 120, -400);
     marca('date');   // toate datele pornirii au sosit
-    const h = devreme && M.descarcaSatelit ? M.descarcaSatelit({ renderer: r, numeBaza: 'harta_v4', imprejurimi: NUME_IMP, fortatRelief: false }) : null;
+    const h = devreme && M.descarcaSatelit
+      ? M.descarcaSatelit({ renderer: r, numeBaza: 'harta_v4', numePetic: 'harta_v5', imprejurimi: NUME_IMP, fortatRelief: false }) : null;
     marca('constructie');
     let laCadru = null;
     const gazda = element();
-    const primulCadru = cuPrimulCadru ? new Promise((res) => { laCadru = res; }) : undefined;
+    // `primulCadru` îl citește numai codul în două trepte, al controalelor; cel de azi nu-l mai are.
+    const primulCadru = new Promise((res) => { laCadru = res; });
+    const imp = NUME_IMP.map((nume) => ({ nume, obiect: plasa().obiect }));
     const sat = M.creeazaSatelit({
       renderer: r, scena: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), teren, petic, mare, drapaj: [], soare,
       cer: null, umbre: null, centru, numeBaza: 'harta_v4', numePetic: 'harta_v5', gazda, cereRandare: () => {},
-      laSursa: () => {}, fortatRelief: false, imprejurimi: NUME_IMP.map((nume) => ({ nume, obiect: plasa().obiect })),
-      descarcare: h, primulCadru,
+      laSursa: () => {}, fortatRelief: false, imprejurimi: imp, descarcare: h, primulCadru, laProgres, faraSatelit,
     });
-    return { sat, teren, petic, h, gazda, laCadru: () => laCadru?.() };
+    return { sat, teren, petic, imp, h, gazda, laCadru: () => laCadru?.() };
   };
-  /** Pornirea întreagă: construcția, primul cadru, Satelit, a doua treaptă. */
-  const porneste = async (o) => {
-    jurnal = []; avert = []; dispuse = 0;
-    const d = deschide(o);
-    const g = urmareste(d.sat.gata);
-    let laSatelit = null;
-    d.sat.gata.then(() => { marca('satelit'); laSatelit = { petic: numeTextura.get(d.petic.obiect.material.map), teren: numeTextura.get(d.teren.obiect.material.map) }; });
-    await curge(() => g.gata || jurnal.filter((e) => e.transcodata).length >= 1 + NUME_IMP.length, 200_000);
-    await curge(() => g.gata, 2000);
-    const inainteDeCadru = { gata: g.gata, urcate: jurnal.filter((e) => e.urcata).length, material: d.teren.obiect.material.isMeshBasicMaterial && !d.teren.obiect.material.map };
-    marca('primul-cadru');
-    d.laCadru();
-    await curge(() => g.gata, 200_000);
-    const t2 = urmareste(d.sat.treaptaDoua ?? Promise.resolve());
-    await curge(() => t2.gata, 200_000);
-    const rez = { g, inainteDeCadru, laSatelit, final: { petic: numeTextura.get(d.petic.obiect.material.map), teren: numeTextura.get(d.teren.obiect.material.map) }, jurnal, avert: [...avert], d };
-    d.sat.dispose();
-    await curge(() => false, 200);
-    rez.dispuse = dispuse;
-    return rez;
+  /** Starea de la zero a unui caz: jurnalul, avertismentele, ceasul, rețeaua și preferința. */
+  const deLaZero = (pref = null) => {
+    generatie++;
+    jurnal = []; avert = []; dispuse = 0; vii.clear(); maxVii = 0;
+    ceas.acum = 0; ceas.t.clear();
+    retinute = () => false; lipsa = () => false; special = () => null; intarziere = () => 0; abortLent = false; amanate = [];
+    preferinta = pref;
   };
   const loc = (j, f) => j.findIndex(f);
   const cerereLa = (j, re) => loc(j, (e) => e.url && re.test(e.url));
   const marcaLa = (j, m) => loc(j, (e) => e.marca === m);
-  const T1 = ['harta_v4-orto_v1', ...NUME_IMP.map((n) => `${n}-orto_v1${n === 'harta_v9' ? '-mic' : ''}`)];
+  const harta = (d, n) => d.imp.find((q) => q.nume === n).obiect;
+  const latime = (obiect) => obiect.material.map?.image?.width ?? null;
+  const T6 = ['harta_v4', 'harta_v5', ...NUME_IMP].map((n) => `${n}-orto_v1`);
+  const LAT = Object.fromEntries(T6.map((n) => [n, SIDECAR(n).latime]));
+  const S6 = T6.reduce((a, n) => a + SIDECAR(n).octeti, 0);
+  const MB = (n) => (n / 2 ** 20).toFixed(2);   // MB = 2^20 octeți, ca în CLAUDE.md
+  const butonul = (d) => { const rad = d.gazda.copii[0]; return { rad, b: rad?.copii[0], anunt: rad?.copii[1] }; };
+  const clic = (b) => { for (const f of b.asc.click ?? []) f(); };
+  const ANUNT = 'Se încarcă fotografia aeriană…', ESEC = 'Fotografia aeriană nu s-a putut încărca.';
+  /** Starea plaselor în clipa de acum. */
+  const stare = (d) => ({
+    activ: d.sat.activ, petic: numeTextura.get(d.petic.obiect.material.map), teren: numeTextura.get(d.teren.obiect.material.map),
+    v9: latime(harta(d, 'harta_v9')), v6: latime(harta(d, 'harta_v6')), urcate: jurnal.filter((e) => e.urcata).length,
+  });
+  /** Pornirea întreagă, până la `gata`, cu starea din clipa în care `gata` se rezolvă. */
+  const porneste = async (o) => {
+    deLaZero();
+    const d = deschide(o);
+    d.laCadru();   // numai pentru codul în două trepte, al controalelor
+    let la = null;
+    d.sat.gata.then((v) => { marca('satelit'); la = { v, ...stare(d) }; });
+    await curge(() => la !== null, 200_000);
+    const rez = { la, jurnal, avert: [...avert], d };
+    d.sat.dispose();
+    await elibereazaToate();
+    await curge(() => false, 200);
+    rez.dispuse = dispuse;
+    return rez;
+  };
   const descrie = (r) => {
     const j = r.jurnal, c = marcaLa(j, 'constructie'), s = marcaLa(j, 'satelit');
-    const t1 = T1.filter((n) => { const i = cerereLa(j, new RegExp(`/${n}\\.ktx2$`)); return i >= 0 && i < c; }).length;
+    const devreme = T6.filter((n) => { const i = cerereLa(j, new RegExp(`/${n}\\.ktx2$`)); return i >= 0 && i < c; }).length;
     const transcodate = j.slice(0, s < 0 ? j.length : s).filter((e) => e.transcodata).map((e) => e.transcodata);
-    const octeti = transcodate.reduce((a, n) => a + (OCTETI.get(n) ?? 0), 0);
-    const ultimaT1 = Math.max(...T1.map((n) => loc(j, (e) => e.transcodata === n)));
-    return {
-      t1, octeti, transcodate,
-      peticInainte: cerereLa(j, /harta_v5-orto_v1/) >= 0 && cerereLa(j, /harta_v5-orto_v1/) < c,
-      peticDupaT1: cerereLa(j, /harta_v5-orto_v1/) > ultimaT1,
-      peticCereri: j.filter((e) => e.url?.includes('harta_v5-orto_v1')).length,
-      peticInaintedeV9: cerereLa(j, /harta_v5-orto_v1\.ktx2$/) >= 0 && cerereLa(j, /harta_v5-orto_v1\.ktx2$/) < cerereLa(j, /harta_v9-orto_v1\.ktx2$/),
-      v9: cerereLa(j, /harta_v9-orto_v1\.ktx2$/) >= 0,
-    };
+    return { devreme, mic: j.filter((e) => e.url?.includes('-mic')).length, transcodate, octeti: transcodate.reduce((a, n) => a + (OCTETI.get(n) ?? 0), 0) };
   };
-  const MB = (n) => (n / 2 ** 20).toFixed(2);   // MB = 2^20 octeți, ca în CLAUDE.md
 
+  // (b) O singură treaptă: cele șase fișiere — baza, peticul, cele patru împrejurimi, harta_v9
+  //     întreagă — cerute înaintea construcției, niciun `-mic`; la `gata`, Satelit aplicat cu
+  //     toate la detaliul întreg și urcate pe placă. Control: satelit.js de la REPER_VECHI.
   {
     const r = await porneste({ M: S });
-    const x = descrie(r);
-    proba(r.g.v === true && x.t1 === T1.length && !x.peticInainte,
-      `cererile primei trepte, înaintea construcției: ${x.t1} din ${T1.length} .ktx2, peticul ${x.peticInainte ? 'ȘI EL' : 'nu'}; Satelit ${r.g.v ? 'pornit' : 'NEPORNIT'}`);
-    proba(!r.inainteDeCadru.gata && r.inainteDeCadru.urcate === 0 && r.inainteDeCadru.material,
-      `înaintea primului cadru, cu texturile sosite: Satelit ${r.inainteDeCadru.gata ? 'APLICAT' : 'neaplicat'}, ${r.inainteDeCadru.urcate} texturi urcate pe placă`);
-    proba(x.octeti === T1.reduce((a, n) => a + OCTETI.get(n), 0) && !x.transcodate.includes('harta_v5-orto_v1'),
-      `transcodate până la Satelit: ${x.transcodate.length} texturi, ${MB(x.octeti)} MB (${x.transcodate.includes('harta_v5-orto_v1') ? 'cu' : 'fără'} petic)`);
-    proba(r.laSatelit?.petic === 'harta_v4-orto_v1' && r.laSatelit?.teren === 'harta_v4-orto_v1',
-      `la aplicarea Satelit, plasa peticului pe textura ${r.laSatelit?.petic}, baza pe ${r.laSatelit?.teren}`);
-    proba(x.peticDupaT1 && x.peticInaintedeV9 && r.final.petic === 'harta_v5-orto_v1' && r.final.teren === 'harta_v4-orto_v1',
-      `a doua treaptă: peticul cerut ${x.peticDupaT1 ? 'după prima treaptă' : 'ÎN prima treaptă'}, ${x.peticInaintedeV9 ? 'înaintea' : 'DUPĂ'} lui harta_v9; la capăt peticul pe ${r.final.petic}, baza pe ${r.final.teren}`);
+    const x = descrie(r), la = r.la ?? {};
+    proba(la.v === true && x.devreme === T6.length && x.mic === 0,
+      `cererile înaintea construcției: ${x.devreme} din ${T6.length} .ktx2 (baza, peticul, ${NUME_IMP.join(', ')}), ${x.mic} cereri -mic; Satelit ${la.v ? 'pornit' : 'NEPORNIT'}`);
+    proba(la.activ && la.petic === 'harta_v5-orto_v1' && la.teren === 'harta_v4-orto_v1' && la.v9 === LAT['harta_v9-orto_v1'] && la.urcate === T6.length,
+      `la gata: Satelit ${la.activ ? 'aplicat' : 'NEAPLICAT'}, peticul pe ${la.petic}, baza pe ${la.teren}, harta_v9 la ${la.v9} texeli lățime (întreaga are ${LAT['harta_v9-orto_v1']}), ${la.urcate} texturi urcate pe placă`);
+    proba(x.transcodate.length === T6.length && x.octeti === S6, `transcodate până la Satelit: ${x.transcodate.length} texturi, ${MB(x.octeti)} MB (${x.octeti} octeți)`);
     proba(r.avert.length === 0 && r.dispuse === 1, `avertismente ${r.avert.length}${r.avert[0] ? ` („${r.avert[0]}”)` : ''}, încărcătorul eliberat de ${r.dispuse} ori`);
-
-    // Controale: Satelit fără prima treaptă pornită devreme — calea de la primul clic, cu
-    // timpii de dinainte —, fără `primulCadru`, și satelit.js de la REPER_VECHI.
-    const c1 = descrie(await porneste({ M: S, devreme: false }));
-    proba(c1.t1 === 0, `control, cererile pornite din creeazaSatelit, ca înainte: ${c1.t1} din ${T1.length} înaintea construcției — pică`);
-    const c2 = await porneste({ M: S, cuPrimulCadru: false });
-    proba(c2.inainteDeCadru.urcate > 0, `control, fără așteptarea primului cadru: ${c2.inainteDeCadru.urcate} texturi urcate înaintea lui — pică`);
     if (V) {
       const rv = await porneste({ M: V });
-      const xv = descrie(rv);
-      proba(xv.t1 === 0 && xv.transcodate.includes('harta_v5-orto_v1') && !xv.peticDupaT1,
-        `control, satelit.js de la ${REPER_VECHI}: ${xv.t1} cereri înaintea construcției, ${xv.transcodate.length} texturi și ${MB(xv.octeti)} MB până la Satelit, peticul în prima treaptă — pică`);
-      const rvf = descrie(await porneste({ M: V, compresie: false }));
-      proba(rvf.peticCereri > 0, `control, satelit.js de la ${REPER_VECHI}, fără compresie: peticul cerut de ${rvf.peticCereri} ori — pică`);
-    } else proba(false, `satelit.js de la ${REPER_VECHI} nu s-a putut citi din git`);
+      const xv = descrie(rv), lv = rv.la ?? {};
+      const bun = lv.v === true && xv.devreme === T6.length && xv.mic === 0 && lv.v9 === LAT['harta_v9-orto_v1'] && lv.petic === 'harta_v5-orto_v1';
+      proba(!bun, `control, ${NUME_V}: ${xv.devreme} cereri înaintea construcției, ${xv.mic} cereri -mic, la gata harta_v9 la ${lv.v9} texeli și peticul pe ${lv.petic} — pică`);
+    } else proba(false, `control, ${NUME_V}, o singură treaptă: nu s-a putut citi din git`);
   }
 
-  // (c) Fără niciun format comprimat, peticul nu se cere: plasa lui rămâne pe textura bazei.
+  // (c) Progresul: crește, numai pe procente întregi, și ajunge la exact 1 când au sosit toți
+  //     octeții, înaintea compilării. Totalul e suma lui `octeti` din cele șase sidecaruri: cu
+  //     numai baza sosită, procentul e al ei din total. Control: fără `laOcteti`, nimic.
   {
-    const r = await porneste({ M: S, compresie: false });
-    const x = descrie(r);
-    proba(r.g.v === true && x.peticCereri === 0 && r.final.petic === 'harta_v4-orto_v1' && !x.v9,
-      `fără compresie: Satelit ${r.g.v ? 'pornit' : 'NEPORNIT'}, peticul cerut de ${x.peticCereri} ori, plasa lui pe ${r.final.petic}, harta_v9 întreagă ${x.v9 ? 'CERUTĂ' : 'necerută'}`);
+    const masoara = async (M) => {
+      deLaZero();
+      const valori = [];
+      let gataCompilarea = null;
+      const r = { ...renderer(true), compileAsync: () => new Promise((res) => { gataCompilarea = res; }) };
+      retinute = (u) => u.endsWith('.ktx2') && !u.endsWith('/harta_v4-orto_v1.ktx2');
+      const d = deschide({ M, r, laProgres: (f) => valori.push(f) });
+      const g = urmareste(d.sat.gata);
+      await curge(() => jurnal.some((e) => e.transcodata === 'harta_v4-orto_v1'), 200_000);
+      await curge(() => false, 500);
+      const cuBaza = [...valori];
+      retinute = () => false;
+      raspundeRetinutelor();
+      await curge(() => gataCompilarea !== null || g.gata, 200_000);
+      await curge(() => false, 500);
+      const laCompilare = [...valori];
+      gataCompilarea?.();
+      await curge(() => g.gata, 200_000);
+      const rez = { cuBaza, laCompilare, final: [...valori], g, avert: [...avert] };
+      d.sat.dispose();
+      await curge(() => false, 200);
+      return rez;
+    };
+    const ob = OCTETI.get('harta_v4-orto_v1'), asteptat = Math.floor((100 * ob) / S6) / 100;
+    const m = await masoara(S);
+    const crescator = m.final.every((v, i) => i === 0 || v > m.final[i - 1]);
+    const intregi = m.final.every((v) => Number.isInteger(Math.round(v * 100)) && Math.abs(v * 100 - Math.round(v * 100)) < 1e-9);
+    proba(m.g.v === true && crescator && intregi && m.cuBaza.at(-1) === asteptat && m.laCompilare.at(-1) === 1 && m.final.filter((v) => v === 1).length === 1 && m.avert.length === 0,
+      `progresul: ${m.final.length} valori, ${crescator ? 'crescătoare' : 'NU crescătoare'}, ${intregi ? 'pe procente întregi' : 'NU pe procente întregi'}; cu baza sosită singură ${m.cuBaza.at(-1) ?? 'nimic'} (așteptat ${asteptat} = ⌊100 × ${ob} / ${S6}⌋ / 100, suma celor 6 sidecaruri); ${m.laCompilare.at(-1) ?? 'nimic'} cu toți octeții, înaintea compilării; ${m.final.filter((v) => v === 1).length} × 1`);
+    const fara = await mutatie(['garda, laOcteti, laDescarcat }', 'garda, laDescarcat }']);
+    if (fara) {
+      const c = await masoara(fara);
+      const zero = (v) => v.every((x) => x === 0);
+      proba(zero(c.cuBaza) && zero(c.laCompilare),
+        `control, fără laOcteti: cu baza sosită ${c.cuBaza.at(-1) ?? 'nimic'}, cu toți octeții ${c.laCompilare.at(-1) ?? 'nimic'} — contorul rămâne la 0, pică`);
+    } else proba(false, `control, fără laOcteti: ${NEAPLICATA}`);
   }
 
-  // (d) Preferința Relief și `?previzualizare`: nimic nu pleacă devreme, iar Satelit cere numai
+  // (d) Garda fotografiei, pe ceasul virtual. Corpul bazei trimite 1 KB și tace: la 19,999 s
+  //     încă în așteptare, la 20 s `gata` false, cu un singur avertisment și fără temporizatoare
+  //     rămase. O bază care curge încet — 10 bucăți la 15 s — nu e oprită, și nici o transcodare
+  //     de 25 s după ultimul octet: garda păzește numai rețeaua. Controale: satelit.js de la
+  //     REPER_VECHI, fără gardă, tot în așteptare după 300 s; garda oprită numai la capătul
+  //     încărcării, nu și când rețeaua și-a terminat treaba, pierde transcodarea lungă.
+  {
+    const N = L.INACTIVITATE_PORNIRE_MS;
+    const BAZA = '/data/harta_v4-orto_v1.ktx2';
+    const caz = (M, sp) => {
+      deLaZero();
+      special = sp;
+      const d = deschide({ M });
+      d.laCadru();
+      return { d, g: urmareste(d.sat.gata) };
+    };
+    // Celelalte cinci texturi sosesc și se transcodează pe loc; numai baza rămâne.
+    const restulGata = () => curge(() => jurnal.filter((e) => e.transcodata && e.transcodata !== 'harta_v4-orto_v1').length >= T6.length - 1, 200_000);
+    {
+      const { d, g } = caz(S, (u) => (u === BAZA ? blocat() : null));
+      await restulGata();
+      await curge(() => false, 500);
+      await avanseaza(N - 1);
+      const devreme = g.gata;
+      await avanseaza(1);
+      await curge(() => g.gata, 20_000);
+      const { b, anunt } = butonul(d);
+      const oprita = jurnal.find((e) => e.url === BAZA)?.semnal?.aborted;
+      proba(!devreme && g.gata && g.v === false && avert.length === 1 && /a fotografiei aeriene n-a primit vreun octet în 20 s/.test(avert[0] ?? '') && ceas.t.size === 0 && oprita,
+        `baza tace după 1 KB: la ${(N - 1) / 1000} s ${devreme ? 'terminat (prea devreme)' : 'încă în așteptare'}, la ${N / 1000} s ${g.gata ? `gata ${g.v}` : 'tot în așteptare'}; avertismente ${avert.length}${avert[0] ? ` („${avert[0]}”)` : ''}, temporizatoare rămase ${ceas.t.size}, cererea bazei ${oprita ? 'oprită' : 'NEOPRITĂ'}`);
+      proba(b.hidden && anunt.textContent === ESEC, `apoi: butonul ${b.hidden ? 'scos' : 'RĂMAS'}, anunțul „${anunt.textContent}”`);
+      d.sat.dispose();
+      await curge(() => false, 200);
+    }
+    if (V) {
+      const { d, g } = caz(V, (u) => (u === BAZA ? blocat() : null));
+      await restulGata();
+      await avanseaza(300_000);
+      proba(!g.gata, `control, ${NUME_V}, fără gardă: după 300 s ${g.gata ? `gata ${g.v}` : 'tot în așteptare'} — pică`);
+      d.sat.dispose();
+      await elibereazaToate();
+    } else proba(false, `control, ${NUME_V}, fără gardă: nu s-a putut citi din git`);
+    const incet = async (M) => {
+      const { d, g } = caz(M, (u) => (u === BAZA ? lent(BAZA, 10, 15_000) : null));
+      await restulGata();
+      // Până la închiderea corpului, la 165 s, apoi fără alt timp virtual: verificarea sha256 a
+      // celor 4 MB durează câteva ms adevărate, iar ceasul virtual, sărit mai departe, ar fi
+      // sunat garda (rearmată la 150 s) înaintea ei — un artefact al probei, nu al paginii.
+      await avanseaza(165_000);
+      await curge(() => g.gata, 200_000);
+      const rez = { g, activ: d.sat.activ, avert: [...avert], timere: ceas.t.size };
+      d.sat.dispose();
+      await curge(() => false, 200);
+      return rez;
+    };
+    {
+      const t = await incet(S);
+      proba(t.g.v === true && t.activ && t.avert.length === 0 && t.timere === 0,
+        `baza în 10 bucăți la 15 s (165 s în total): ${t.g.gata ? `gata ${t.g.v}` : 'tot în așteptare'}, Satelit ${t.activ ? 'aplicat' : 'NEAPLICAT'}, avertismente ${t.avert.length}${t.avert[0] ? ` („${t.avert[0]}”)` : ''}, temporizatoare rămase ${t.timere}`);
+      // Control: o gardă pe care bucățile nu o rearmează — un termen pe durata totală.
+      const faraRearmare = await mutatie(['cereri: cereri.get(n), garda, laOcteti',
+        'cereri: cereri.get(n), garda: { semnal: garda.semnal, get motiv() { return garda.motiv; }, progres() {} }, laOcteti']);
+      if (faraRearmare) {
+        const c = await incet(faraRearmare);
+        proba(c.g.v === false, `control, fără rearmare la bucăți: ${c.g.gata ? `gata ${c.g.v}` : 'tot în așteptare'}${c.avert[0] ? ` („${c.avert[0]}”)` : ''} — pică`);
+      } else proba(false, `control, fără rearmare la bucăți: ${NEAPLICATA}`);
+    }
+    const lunga = async (M) => {
+      deLaZero();
+      intarziere = (n) => (n === 'harta_v4-orto_v1' ? 25_000 : 0);
+      const d = deschide({ M });
+      const g = urmareste(d.sat.gata);
+      await restulGata();
+      await curge(() => false, 500);
+      await avanseaza(26_000);
+      await curge(() => g.gata, 20_000);
+      const rez = { g, avert: [...avert], activ: d.sat.activ };
+      d.sat.dispose();
+      await curge(() => false, 200);
+      return rez;
+    };
+    const t = await lunga(S);
+    proba(t.g.v === true && t.activ && t.avert.length === 0,
+      `transcodarea bazei de 25 s după ultimul octet: ${t.g.gata ? `gata ${t.g.v}` : 'tot în așteptare'}, avertismente ${t.avert.length}`);
+    const faraRetea = await mutatie(['garda, laOcteti, laDescarcat }', 'garda, laOcteti }']);
+    if (faraRetea) {
+      const c = await lunga(faraRetea);
+      proba(c.g.v === false, `control, garda oprită numai la capătul încărcării: ${c.g.gata ? `gata ${c.g.v}` : 'tot în așteptare'}${c.avert[0] ? ` („${c.avert[0]}”)` : ''} — pică`);
+    } else proba(false, `control, garda oprită numai la capătul încărcării: ${NEAPLICATA}`);
+    // Importul încărcătorului KTX2 care nu mai vine (un chunk agățat): garda tot oprește
+    // încărcarea la 20 s, fiindcă așteptarea lui trece prin `panaLa`. Control: așteptat direct,
+    // `gata` nu mai iese niciodată — iar pornirea, care îl așteaptă, ar sta pe loc.
+    const agatat = ['creeazaIncarcatorKtx2(renderer);', 'new Promise(() => {});'];
+    const importAgatat = async (M) => {
+      deLaZero();
+      const d = deschide({ M });
+      const g = urmareste(d.sat.gata);
+      await curge(() => false, 500);
+      await avanseaza(N - 1);
+      const devreme = g.gata;
+      await avanseaza(1);
+      await curge(() => g.gata, 2000);
+      await avanseaza(300_000);
+      const ktx = jurnal.filter((e) => e.url?.endsWith('.ktx2'));
+      const rez = { devreme, g, avert: [...avert], oprite: ktx.filter((e) => e.semnal?.aborted).length, ktx: ktx.length, timere: ceas.t.size };
+      d.sat.dispose();
+      await curge(() => false, 200);
+      return rez;
+    };
+    const Mi = await mutatie(agatat);
+    const Mc = await mutatie(agatat, ['ktx2 = await panaLa(incarcator, semnal);', 'ktx2 = await incarcator;']);
+    if (Mi && Mc) {
+      const t = await importAgatat(Mi);
+      proba(!t.devreme && t.g.v === false && t.avert.length === 1 && /a fotografiei aeriene/.test(t.avert[0] ?? '') && t.oprite === t.ktx && t.ktx === T6.length && t.timere === 0,
+        `importul încărcătorului agățat: la ${(N - 1) / 1000} s ${t.devreme ? 'terminat (prea devreme)' : 'încă în așteptare'}, apoi gata ${t.g.gata ? t.g.v : 'ÎN AȘTEPTARE'}; ${t.oprite} din ${t.ktx} cereri .ktx2 oprite, avertismente ${t.avert.length}, temporizatoare rămase ${t.timere}`);
+      const c = await importAgatat(Mc);
+      proba(!c.g.gata, `control, importul așteptat fără panaLa: după 300 s ${c.g.gata ? `gata ${c.g.v}` : 'tot în așteptare'} — pică`);
+    } else proba(false, `importul încărcătorului agățat și controlul lui fără panaLa: ${NEAPLICATA}`);
+  }
+
+  // (e) Ieșirea (`faraSatelit`, butonul „Arată relieful acum”): abandonată cât se descarcă,
+  //     cererile se opresc, `gata` iese false, preferința rămâne neschimbată, iar butonul Satelit
+  //     rămâne vizibil, neapăsat și neocupat, fără avertismente; un clic apoi aduce tot și aplică.
+  //     Abandonată înaintea creării, nu pleacă nimic. Control: ieșirea de dinainte, un clic pe
+  //     butonul ocupat, scrie preferința Relief.
+  {
+    const iese = async (M, cum) => {
+      deLaZero();
+      retinute = (u) => u.endsWith('.ktx2');
+      const ac = new AbortController();
+      const d = deschide({ M, faraSatelit: ac.signal });
+      d.laCadru();
+      const { rad, b, anunt } = butonul(d);
+      const g = urmareste(d.sat.gata);
+      await curge(() => false, 2000);
+      if (cum === 'faraSatelit') ac.abort(); else clic(b);
+      await curge(() => g.gata, 20_000);
+      await curge(() => false, 500);
+      const ktx = jurnal.filter((e) => e.url?.endsWith('.ktx2'));
+      const st = {
+        gata: g.gata, v: g.v, preferinta, vizibil: !rad.hidden && !b.hidden, apasat: b.atribute['aria-pressed'], ocupat: b.atribute['aria-busy'] ?? null,
+        anunt: anunt.textContent, oprite: ktx.filter((e) => e.semnal?.aborted).length, ktx: ktx.length, avert: avert.length,
+        transcodate: jurnal.filter((e) => e.transcodata).length,
+      };
+      retinute = () => false;
+      raspundeRetinutelor();
+      await curge(() => false, 2000);
+      return { d, b, st };
+    };
+    const descrieIesirea = (st) => `gata ${st.gata ? st.v : 'ÎN AȘTEPTARE'}, ${st.oprite} din ${st.ktx} cereri .ktx2 oprite, ${st.transcodate} transcodate, preferința ${st.preferinta}, butonul ${st.vizibil ? 'vizibil' : 'ASCUNS'}, aria-pressed ${st.apasat}, aria-busy ${st.ocupat}, anunțul „${st.anunt}”, avertismente ${st.avert}`;
+    const bunaIesire = (st) => st.gata && st.v === false && st.oprite === T6.length && st.ktx === T6.length && st.transcodate === 0 && st.preferinta === null
+      && st.vizibil && st.apasat === 'false' && st.ocupat === null && st.anunt === '' && st.avert === 0;
+    const { d, b, st } = await iese(S, 'faraSatelit');
+    proba(bunaIesire(st), `faraSatelit abandonat cât se descarcă: ${descrieIesirea(st)}`);
+    const inainte = jurnal.length;
+    clic(b);
+    await curge(() => d.sat.activ, 200_000);
+    const din = jurnal.slice(inainte), cerute = T6.filter((n) => din.some((e) => e.url === `/data/${n}.ktx2`)).length;
+    const s = stare(d);
+    proba(s.activ && preferinta === 'satelit' && cerute === T6.length && s.petic === 'harta_v5-orto_v1' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
+      `apoi clic pe Satelit: ${s.activ ? 'aplicat' : 'NEAPLICAT'}, ${cerute} din ${T6.length} texturi cerute din nou, peticul pe ${s.petic}, harta_v9 la ${s.v9} texeli, preferința ${preferinta}, avertismente ${avert.length}`);
+    d.sat.dispose();
+    await curge(() => false, 200);
+    const c = await iese(S, 'clic');
+    proba(!bunaIesire(c.st), `control, ieșirea de dinainte (clic pe butonul ocupat): ${descrieIesirea(c.st)} — pică`);
+    c.d.sat.dispose();
+    await curge(() => false, 200);
+    if (V) {
+      const cv = await iese(V, 'faraSatelit');
+      proba(!bunaIesire(cv.st), `control, ${NUME_V}, care nu știe de faraSatelit: ${descrieIesirea(cv.st)} — pică`);
+      cv.d.sat.dispose();
+      await elibereazaToate();
+    } else proba(false, `control, ${NUME_V}, care nu știe de faraSatelit: nu s-a putut citi din git`);
+    // Abandonată înaintea creării: cererile pornite devreme se opresc, nimic nu se transcodează.
+    deLaZero();
+    retinute = (u) => u.endsWith('.ktx2');
+    const ac = new AbortController();
+    ac.abort();
+    const d2 = deschide({ M: S, faraSatelit: ac.signal });
+    const g2 = urmareste(d2.sat.gata);
+    await curge(() => g2.gata, 20_000);
+    await curge(() => false, 1000);
+    const { rad: r2, b: b2 } = butonul(d2);
+    const ktx2 = jurnal.filter((e) => e.url?.endsWith('.ktx2'));
+    const op2 = ktx2.filter((e) => e.semnal?.aborted).length, tr2 = jurnal.filter((e) => e.transcodata).length;
+    proba(g2.v === false && op2 === T6.length && tr2 === 0 && !r2.hidden && !b2.hidden && b2.atribute['aria-pressed'] === 'false' && !b2.atribute['aria-busy'] && preferinta === null && avert.length === 0 && dispuse === 1,
+      `faraSatelit abandonat înaintea creării: gata ${g2.v}, ${op2} din ${ktx2.length} cereri devreme oprite, ${tr2} transcodate, butonul ${!r2.hidden && !b2.hidden ? 'vizibil' : 'ASCUNS'}, aria-pressed ${b2.atribute['aria-pressed']}, preferința ${preferinta}, încărcătorul eliberat de ${dispuse} ori`);
+    retinute = () => false;
+    raspundeRetinutelor();
+    d2.sat.dispose();
+    await curge(() => false, 200);
+  }
+
+  // (f) Fără niciun format comprimat: cererea peticului, pornită devreme, se oprește și nu se
+  //     transcodează nimic din ea; plasa lui rămâne pe textura bazei, iar împrejurimile de 2 m
+  //     (harta_v6, harta_v9) merg la 4 m. Control: satelit.js de la REPER_VECHI transcodează peticul.
+  for (const M of [S, V]) {
+    if (!M) { proba(false, `control, ${NUME_V}, fără compresie: nu s-a putut citi din git`); continue; }
+    const r = await porneste({ M, compresie: false });
+    const cerere = r.jurnal.find((e) => e.url === '/data/harta_v5-orto_v1.ktx2');
+    const transcodat = r.jurnal.some((e) => e.transcodata === 'harta_v5-orto_v1');
+    const la = r.la ?? {};
+    if (M === S) proba(la.v === true && cerere?.semnal?.aborted && !transcodat && la.petic === 'harta_v4-orto_v1' && la.v9 === LAT['harta_v9-orto_v1'] / 2 && la.v6 === LAT['harta_v6-orto_v1'] / 2,
+      `fără compresie: Satelit ${la.v ? 'pornit' : 'NEPORNIT'}, cererea peticului ${cerere ? (cerere.semnal?.aborted ? 'oprită' : 'NEOPRITĂ') : 'lipsă'}, ${transcodat ? 'TRANSCODAT' : 'netranscodat'}, plasa lui pe ${la.petic}; harta_v9 la ${la.v9} texeli (4 m), harta_v6 la ${la.v6}`);
+    else proba(transcodat, `control, ${NUME_V}, fără compresie: peticul ${transcodat ? 'transcodat' : 'netranscodat'} — pică`);
+  }
+
+  // (g) Preferința Relief și `?previzualizare`: nimic nu pleacă devreme, iar Satelit cere numai
   //     sidecarul bazei până la primul clic. Control: preferința Satelit.
   {
-    jurnal = [];
-    preferinta = 'relief';
-    const hr = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', imprejurimi: NUME_IMP });
+    deLaZero('relief');
+    const hr = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', numePetic: 'harta_v5', imprejurimi: NUME_IMP });
     preferinta = null;
-    const hp = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', imprejurimi: NUME_IMP, fortatRelief: true });
+    const hp = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', numePetic: 'harta_v5', imprejurimi: NUME_IMP, fortatRelief: true });
     proba(hr === null && hp === null && jurnal.length === 0, `preferința Relief și ?previzualizare: ${jurnal.length} cereri devreme`);
-    preferinta = 'relief';
-    jurnal = []; avert = [];
+    deLaZero('relief');
     const d = deschide({ M: S });
     await curge(() => false, 3000);
-    d.laCadru();
-    await curge(() => false, 3000);
     const cereri = jurnal.filter((e) => e.url).map((e) => e.url.replace('/data/', ''));
-    proba(cereri.length === 1 && cereri[0] === 'harta_v4-orto_v1.json', `preferința Relief, până la primul clic: ${cereri.join(', ') || 'nicio cerere'}`);
+    proba(cereri.length === 1 && cereri[0] === 'harta_v4-orto_v1.json' && avert.length === 0, `preferința Relief, până la primul clic: ${cereri.join(', ') || 'nicio cerere'}`);
     d.sat.dispose();
-    preferinta = 'satelit';
-    jurnal = [];
-    const hs = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', imprejurimi: NUME_IMP });
-    proba(hs && jurnal.filter((e) => e.url).length === 2 * T1.length, `control, preferința Satelit: ${jurnal.filter((e) => e.url).length} cereri devreme`);
+    deLaZero('satelit');
+    const hs = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', numePetic: 'harta_v5', imprejurimi: NUME_IMP });
+    proba(hs && jurnal.filter((e) => e.url).length === 2 * T6.length, `control, preferința Satelit: ${jurnal.filter((e) => e.url).length} cereri devreme`);
     hs?.abandoneaza();
     preferinta = null;
     await curge(() => false, 200);
   }
 
-  // (e) Transcodorul pleacă odată cu texturile, nu după prima sosită și verificată: cu fișierele
-  //     .ktx2 reținute, se cere oricum. Control: satelit.js de la REPER_VECHI, unde îl cerea
-  //     prima textură verificată.
-  for (const [M, eticheta] of [[S, 'azi'], [V, REPER_VECHI]]) {
-    if (!M) continue;
-    jurnal = [];
+  // (h) Transcodorul pleacă odată cu texturile, după sidecarul bazei, nu după prima textură
+  //     sosită și verificată: cu fișierele .ktx2 reținute, se cere oricum. Control: satelit.js
+  //     de la REPER_VECHI, unde îl cerea prima textură verificată.
+  for (const M of [S, V]) {
+    if (!M) { proba(false, `control, ${NUME_V}, transcodorul până la prima textură: nu s-a putut citi din git`); continue; }
+    deLaZero();
     retinute = (u) => u.endsWith('.ktx2');
     const d = deschide({ M });
     await curge(() => false, 2000);
     const cerut = marcaLa(jurnal, 'transcodor') >= 0;
     if (M === S) proba(cerut, `cu fișierele .ktx2 încă în drum, transcodorul ${cerut ? 'cerut' : 'NECERUT'}`);
-    else proba(!cerut, `control, satelit.js de la ${eticheta}: transcodorul ${cerut ? 'cerut' : 'necerut'} până la prima textură — pică`);
+    else proba(!cerut, `control, ${NUME_V}: transcodorul ${cerut ? 'cerut' : 'necerut'} până la prima textură — pică`);
     d.sat.dispose();
     retinute = () => false;
+    await elibereazaToate();
     await curge(() => false, 200);
   }
 
-  // (f) Abandonul: `dispose()` oprește și cererile pornite devreme, încă nepreluate sau în zbor,
-  //     fără avertismente, iar încărcătorul se eliberează o singură dată. Control: fără dispose(),
+  // (i) Un deploy fără texturi: transcodorul (~0,6 MB) pleacă numai după sidecarul bazei, deci
+  //     nu se mai descarcă degeaba. Control: cu texturile la locul lor, se cere.
+  for (const faraTexturi of [true, false]) {
+    deLaZero();
+    lipsa = faraTexturi ? (u) => /-orto_v1\.(json|ktx2)$/.test(u) : () => false;
+    const d = deschide({ M: S });
+    const g = urmareste(d.sat.gata);
+    await curge(() => g.gata, 200_000);
+    const cerut = marcaLa(jurnal, 'transcodor') >= 0;
+    if (faraTexturi) proba(g.v === false && !cerut, `fără nicio textură pe server: Satelit ${g.v ? 'PORNIT' : 'nepornit'}, transcodorul ${cerut ? 'CERUT' : 'necerut'}`);
+    else proba(g.v === true && cerut, `control, cu texturile: transcodorul ${cerut ? 'cerut' : 'necerut'}`);
+    d.sat.dispose();
+    await curge(() => false, 200);
+  }
+
+  // (j) `dispose()` oprește și cererile pornite devreme, încă nepreluate sau în zbor, fără
+  //     avertismente, iar încărcătorul se eliberează o singură dată. Control: fără dispose(),
   //     cererile reținute rămân deschise.
   for (const elibereaza of [true, false]) {
-    jurnal = []; avert = []; dispuse = 0;
+    deLaZero();
     retinute = (u) => u.endsWith('.ktx2');
     const d = deschide({ M: S });
     await curge(() => false, 2000);
@@ -1122,182 +1627,288 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     await curge(() => false, 2000);
     const ktx = jurnal.filter((e) => e.url?.endsWith('.ktx2'));
     const oprite = ktx.filter((e) => e.semnal?.aborted).length;
-    if (elibereaza) proba(ktx.length === T1.length && oprite === ktx.length && avert.length === 0 && dispuse === 1,
-      `dispose() cu fișierele primei trepte în zbor: ${oprite} din ${ktx.length} cereri oprite, avertismente ${avert.length}, încărcătorul eliberat de ${dispuse} ori`);
+    if (elibereaza) proba(ktx.length === T6.length && oprite === ktx.length && avert.length === 0 && dispuse === 1 && ceas.t.size === 0,
+      `dispose() cu fișierele în zbor: ${oprite} din ${ktx.length} cereri oprite, avertismente ${avert.length}, încărcătorul eliberat de ${dispuse} ori, temporizatoare rămase ${ceas.t.size}`);
     else proba(oprite === 0, `control, fără dispose(): ${oprite} din ${ktx.length} cereri oprite`);
     if (!elibereaza) d.sat.dispose();
     retinute = () => false;
     await curge(() => false, 200);
   }
 
-  // (g) scena.js cere prima treaptă după TOATE datele pornirii și înaintea plaselor, îi dă
-  //     mânerul lui creeazaSatelit și rezolvă `primulCadru` în buclă. Control: scena.js de la
-  //     REPER_VECHI.
+  // (k) Harta o singură dată, pe sursa lui scena.js: relieful → toate datele → garda pornirii
+  //     oprită → descarcaSatelit (cu peticul) → creeazaTeren → creeazaSatelit (cu mânerul,
+  //     progresul și ieșirea) → compileAsync → faza fotografiei → așteptarea lui Satelit, numai pe
+  //     calea automată → bucla. Fără `primulCadru` și fără `data-panouri`. Construcția cere WebGL,
+  //     deci ordinea se păzește pe sursă; că primul cadru e chiar Satelit se vede în pagină
+  //     (CLAUDE.md). Legăturile lui creeazaSatelit se cer ca text exact: progresul spre
+  //     `laIncarcare`, ieșirea `faraSatelit` ca valoare, iar `faraSatelit` trecut de `porneste` lui
+  //     `construieste`, pe aceeași poziție în apel și în semnătură. Controale: scena.js de la
+  //     REPER_VECHI, cel de azi fără peticul cerut devreme, fără garda oprită după date, cu
+  //     așteptarea mutată după buclă, cu `faraSatelit: null`, cu `laProgres: undefined` și fără
+  //     `faraSatelit` în apelul lui `construieste`.
   {
+    const LA_PROGRES = 'laProgres: laIncarcare ? (fractie) => laIncarcare({ fractie }) : undefined';
     const ordine = (src) => {
-      const i = (s) => src.indexOf(s);
+      const i = (s, de = 0) => src.indexOf(s, de);
+      const relief = i('await asteapta(reliefGata)');
       const toate = i('await asteapta(Promise.all([sanctuarGata, cladiriGata, imprejurimiGata]))');
-      const dSat = i('descarcaSatelit({'), teren = i('creeazaTeren(relief'), relief = i('await asteapta(reliefGata)');
-      return { ok: relief > 0 && toate > relief && dSat > toate && teren > dSat && i('descarcare: descarcareSatelit') > teren && /laPrimulCadru\(\)/.test(src), relief, toate, dSat, teren };
+      // garda oprită după date: prima oprire de după ele, înaintea cererilor Satelit
+      const garda = toate >= 0 ? i('garda.opreste();', toate) : -1;
+      const dSat = i('descarcaSatelit({'), teren = i('creeazaTeren(relief'), cSat = i('creeazaSatelit({');
+      // Opțiunile lui creeazaSatelit, fără acolada de deschidere și fără golul de la capăt.
+      const optSat = cSat >= 0 ? src.slice(cSat + 'creeazaSatelit({'.length, i('});', cSat)).trimEnd() : '';
+      const cuPetic = /descarcaSatelit\(\{[^}]*\bnumePetic:/.test(src);
+      const cuManer = /\bdescarcare: descarcareSatelit\b/.test(optSat);
+      const cuProgres = optSat.includes(LA_PROGRES);
+      // `faraSatelit` ca valoare: prescurtat sau `faraSatelit: faraSatelit` — nu `null`, nu altceva.
+      const cuIesire = /(?:^|,)\s*faraSatelit\s*(?::\s*faraSatelit\s*)?(?:,|$)/.test(optSat);
+      // `faraSatelit` din `porneste` în `construieste`: aceeași poziție în apel și în semnătură.
+      const argumente = (re) => re.exec(src)?.[1].split(',').map((s) => s.trim()) ?? null;
+      const apel = argumente(/\bawait construieste\(([^)]*)\)/), semn = argumente(/\basync function construieste\(([^)]*)\)/);
+      const kApel = apel?.indexOf('faraSatelit') ?? -1, kSemn = semn?.indexOf('faraSatelit') ?? -1;
+      const iesireLegata = kApel >= 0 && kApel === kSemn && apel.length === semn.length;
+      const comp = i('await renderer.compileAsync(scena, camera)');
+      const automat = i('if (satelit?.automat)', comp);
+      const faza = i("laIncarcare?.({ faza: 'fotografie' })", comp);
+      const astept = i('await asteaptaSatelitul(satelit.gata, faraSatelit)', comp);
+      const bucla = i('renderer.setAnimationLoop(() =>');
+      const vechi = /primulCadru|dataset\.panouri/.test(src);
+      const ok = relief > 0 && toate > relief && garda > toate && dSat > garda && teren > dSat && cSat > teren && cuPetic
+        && cuManer && cuProgres && cuIesire && iesireLegata
+        && comp > cSat && automat > comp && faza > automat && astept > faza && bucla > astept && !vechi;
+      return { ok, relief, toate, garda, dSat, teren, cSat, comp, automat, faza, astept, bucla, cuPetic, cuManer, cuProgres, cuIesire, kApel, kSemn, iesireLegata, vechi };
     };
-    const o = ordine(readFileSync('src/scene/scena.js', 'utf8'));
-    proba(o.ok, `scena.js: relieful (${o.relief}) → toate datele (${o.toate}) → descarcaSatelit (${o.dSat}) → creeazaTeren (${o.teren}), mânerul trecut lui creeazaSatelit, primulCadru rezolvat în buclă`);
-    let vechi = null;
-    try { vechi = execFileSync('git', ['show', `${REPER_VECHI}:src/scene/scena.js`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* fără git */ }
-    proba(vechi !== null && !ordine(vechi).ok, `control, scena.js de la ${REPER_VECHI}: ${vechi === null ? 'NECITIT' : `descarcaSatelit la ${ordine(vechi).dSat}`} — pică`);
+    const azi = textSursa('src/scene/scena.js');
+    const o = ordine(azi);
+    proba(o.ok, `scena.js: relieful (${o.relief}) → toate datele (${o.toate}) → garda oprită (${o.garda}) → descarcaSatelit (${o.dSat}, ${o.cuPetic ? 'cu' : 'FĂRĂ'} peticul) → creeazaTeren (${o.teren}) → creeazaSatelit (${o.cSat}: mânerul ${o.cuManer ? 'dat' : 'NEDAT'}, progresul ${o.cuProgres ? 'spre laIncarcare' : 'NELEGAT'}, ieșirea ${o.cuIesire ? 'faraSatelit' : 'NEDATĂ'}) → compileAsync (${o.comp}) → numai pe calea automată (${o.automat}): faza fotografiei (${o.faza}) → așteptarea lui Satelit (${o.astept}) → bucla (${o.bucla}); faraSatelit în construieste: argumentul ${o.kApel} în apel, ${o.kSemn} în semnătură; primulCadru / data-panouri: ${o.vechi ? 'ÎNCĂ ACOLO' : 'scoase'}`);
+    const vechi = textVechi('src/scene/scena.js');
+    const ov = vechi === null ? null : ordine(vechi);
+    proba(ov !== null && !ov.ok, `control, scena.js de la ${REPER_VECHI}: ${ov === null ? 'NECITIT' : `garda oprită după date la ${ov.garda}, descarcaSatelit la ${ov.dSat}, așteptarea lui Satelit la ${ov.astept}`} — pică`);
+    /** Un control pe o mutație a lui scena.js de azi: trebuie să se aplice și să strice ordinea. */
+    const control = (text, mutat, ce) => {
+      const om = mutat === null ? null : ordine(mutat);
+      proba(om !== null && !om.ok, `control, ${text}: ${om === null ? NEAPLICATA : ce(om)} — pică`);
+    };
+    control('scena.js de azi fără numePetic', muta(azi, [/(descarcaSatelit\(\{[^}]*?)\bnumePetic:[^,]*,\s*/, '$1']), () => 'peticul necerut devreme');
+    const dupaDate = o.toate > 0 ? azi.indexOf('garda.opreste();', o.toate) : -1;
+    control('fără garda oprită după date', dupaDate > 0 ? azi.slice(0, dupaDate) + azi.slice(dupaDate + 'garda.opreste();'.length) : null,
+      (om) => `prima oprire după ele la ${om.garda}`);
+    // Blocul așteptării, mutat imediat după `setAnimationLoop(...)`: bucla ar desena întâi Relief.
+    const bloc = /\n {2}if \(satelit\?\.automat\) \{[\s\S]*?\n {2}\}\n/.exec(azi)?.[0] ?? '';
+    const fara = bloc ? azi.replace(bloc, '\n') : azi;
+    const capBucla = fara.indexOf('\n', fara.indexOf('  });', fara.indexOf('renderer.setAnimationLoop(() =>'))) + 1;
+    control('așteptarea lui Satelit mutată după buclă', bloc && capBucla > 0 ? fara.slice(0, capBucla) + bloc.replace(/^\n/, '') + fara.slice(capBucla) : null,
+      (om) => `${om.astept} față de ${om.bucla}`);
+    control('`faraSatelit: null` printre opțiunile lui creeazaSatelit', muta(azi, [/(creeazaSatelit\(\{[\s\S]*?\n\s*)faraSatelit,/, '$1faraSatelit: null,']),
+      (om) => `ieșirea ${om.cuIesire ? 'dată' : 'nedată'}`);
+    control('`laProgres: undefined`', muta(azi, [LA_PROGRES, 'laProgres: undefined']), (om) => `progresul ${om.cuProgres ? 'legat' : 'nelegat'}`);
+    control('`faraSatelit` scos din apelul lui construieste', muta(azi, [/(await construieste\([^)]*?), faraSatelit\)/, '$1)']),
+      (om) => `argumentul ${om.kApel} în apel, ${om.kSemn} în semnătură`);
   }
 
-  // (h) Butonul, de la creare: cât se descarcă prima treaptă se vede, apăsat — starea spre care
-  //     merge — și ocupat, cu anunțul încărcării. Un clic în timpul ăsta înseamnă „rămân pe
-  //     Relief”: preferința 'relief', cererile primei trepte oprite, nimic transcodat după el,
-  //     Satelit neaplicat, a doua treaptă neplecată; un clic următor cere prima treaptă din nou
-  //     și aplică Satelit. Control: satelit.js de la REPER_VECHI, cu butonul ascuns până la
-  //     aplicare, iar apăsat totuși, ca un buton arătat devreme fără restul reparației.
-  const butonul = (d) => { const rad = d.gazda.copii[0]; return { rad, b: rad?.copii[0], anunt: rad?.copii[1] }; };
-  const clic = (b) => { for (const f of b.asc.click ?? []) f(); };
-  const ANUNT = 'Se încarcă fotografia aeriană…';
-  for (const [M, eticheta] of [[S, 'azi'], [V, REPER_VECHI]]) {
-    if (!M) continue;
-    jurnal = []; avert = []; dispuse = 0; preferinta = null;
-    retinute = (u) => u.endsWith('.ktx2');
+  // (k2) `asteaptaSatelitul`, așteptarea din scena.js: se hotărăște la prima dintre `gata` și
+  //      ieșire, o promisiune respinsă trece drept Satelit eșuat, iar ascultătorul de pe semnal
+  //      pleacă oricum s-ar fi hotărât. Pe semnale numărate. Control: o cursă simplă
+  //      (`Promise.race`), cu un ascultător care rămâne și o respingere care urcă.
+  {
+    const { asteaptaSatelitul } = await import('../src/scene/scena.js');
+    const semnal = () => {
+      const c = new AbortController(), s = c.signal, a0 = s.addEventListener.bind(s), r0 = s.removeEventListener.bind(s);
+      let vii = 0;
+      s.addEventListener = (t, f, o) => { vii++; a0(t, f, o); };
+      s.removeEventListener = (t, f, o) => { vii--; r0(t, f, o); };
+      return { c, s, vii: () => vii };
+    };
+    const cursa = (gata, s) => Promise.race([gata, new Promise((res) => s.addEventListener('abort', () => res(false), { once: true }))]);
+    const caz = async (f) => {
+      let laGata;
+      const gata = new Promise((res, rej) => { laGata = { res, rej }; });
+      const q = semnal();
+      const r = { v: undefined, respins: false };
+      const p = f(gata, q.s).then((v) => { r.v = v; }, () => { r.respins = true; });
+      await new Promise((res) => setImmediate(res));
+      return { gata: laGata, q, r, p, curge: () => new Promise((res) => setImmediate(res)) };
+    };
+    const scenarii = async (f) => {
+      // 1. ieșirea întâi: false pe loc, înaintea lui `gata`
+      const a = await caz(f);
+      a.q.c.abort();
+      await a.curge();
+      const iesire = a.r.v === false;
+      a.gata.res(true);
+      await a.p;
+      // 2. `gata` întâi: true, ascultătorul plecat
+      const b = await caz(f);
+      b.gata.res(true);
+      await b.p;
+      // 3. `gata` respinsă: false, fără respingere
+      const c = await caz(f);
+      c.gata.rej(new Error('Satelit căzut'));
+      await c.p.catch(() => {});
+      await c.curge();
+      return { iesire, viiDupaIesire: a.q.vii(), gata: b.r.v, viiDupaGata: b.q.vii(), respinsa: c.r.respins ? 'respinsă' : String(c.r.v) };
+    };
+    const z = await scenarii(asteaptaSatelitul);
+    proba(z.iesire && z.gata === true && z.respinsa === 'false' && z.viiDupaIesire === 0 && z.viiDupaGata === 0,
+      `asteaptaSatelitul: ieșirea întâi → false pe loc (${z.iesire ? 'da' : 'NU'}); gata întâi → ${z.gata}; gata respinsă → ${z.respinsa}; ascultători rămași pe semnal: ${z.viiDupaIesire} după ieșire, ${z.viiDupaGata} după gata`);
+    const zc = await scenarii(cursa);
+    proba(!(zc.respinsa === 'false' && zc.viiDupaGata === 0), `control, Promise.race simplu: gata respinsă → ${zc.respinsa}; ascultători rămași după gata: ${zc.viiDupaGata} — pică`);
+  }
+
+  // (k3) `automat`: Satelit se încarcă singur la pornire — numai atunci îl așteaptă scena.js. Pe
+  //      calea automată da; cu preferința Relief, cu `?previzualizare` și cu ieșirea dată înaintea
+  //      creării, nu: harta e gata, nu are ce aștepta. Control: `automat` pus înaintea verificării
+  //      preferinței — cu preferința Relief harta n-ar mai apărea până la sidecarul texturii.
+  {
+    const automat = async (M, pref, fortat, iesitInainte) => {
+      deLaZero(pref);
+      const c = new AbortController();
+      if (iesitInainte) c.abort();
+      const r = renderer(true), teren = plasa(), petic = plasa(), mare = plasa(), soare = new THREE.DirectionalLight();
+      const sat = M.creeazaSatelit({
+        renderer: r, scena: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), teren, petic, mare, drapaj: [], soare,
+        cer: null, umbre: null, centru, numeBaza: 'harta_v4', numePetic: 'harta_v5', gazda: element(), cereRandare: () => {},
+        laSursa: () => {}, fortatRelief: fortat, imprejurimi: NUME_IMP.map((nume) => ({ nume, obiect: plasa().obiect })), faraSatelit: c.signal,
+      });
+      const v = sat.automat;
+      sat.dispose();
+      await curge(() => false, 200);
+      return v;
+    };
+    const cazuri = async (M) => ({
+      automat: await automat(M, null, false, false), relief: await automat(M, 'relief', false, false),
+      previzualizare: await automat(M, null, true, false), iesit: await automat(M, null, false, true),
+    });
+    const a = await cazuri(S);
+    proba(a.automat === true && a.relief === false && a.previzualizare === false && a.iesit === false,
+      `automat: pe calea automată ${a.automat}, cu preferința Relief ${a.relief}, cu ?previzualizare ${a.previzualizare}, cu ieșirea dată înainte ${a.iesit}`);
+    const Mut = await mutatie(['    fara?.addEventListener(\'abort\', laFaraSatelit, { once: true });\n    automat = true;\n', '    fara?.addEventListener(\'abort\', laFaraSatelit, { once: true });\n'],
+      ['  const gata = (async () => {\n', '  const gata = (async () => {\n    automat = true;\n']);
+    const m = Mut ? await cazuri(Mut) : null;
+    proba(m !== null && m.relief === true, `control, \`automat\` pus înaintea preferinței: ${m === null ? NEAPLICATA : `cu preferința Relief ${m.relief}`} — pică`);
+  }
+
+  // (l) Calea Relief → clic. Cu preferința Relief, un clic pe Satelit îl face apăsat — starea spre
+  //     care merge — și ocupat, cu anunțul încărcării. Un al doilea clic, cât se descarcă,
+  //     înseamnă „rămân pe Relief”: preferința 'relief', cererile oprite, nimic transcodat după
+  //     el, Satelit neaplicat; un clic următor cere tot din nou și aplică, cu peticul. Control:
+  //     satelit.js de la REPER_VECHI, unde al doilea clic cerea tot Satelit. La capăt se așteaptă
+  //     eliberarea încărcătoarelor: codul de atunci își elibera a doua treaptă abia după o
+  //     verificare sha256 pe timp real, iar eliberarea cădea altfel în cazul următor.
+  for (const M of [S, V]) {
+    if (!M) { proba(false, `control, ${NUME_V}, al doilea clic în timpul descărcării: nu s-a putut citi din git`); continue; }
+    deLaZero('relief');
     const d = deschide({ M });
-    const { rad, b, anunt } = butonul(d);
-    const laCreare = { vizibil: !rad.hidden && !b.hidden, busy: b.atribute['aria-busy'], pressed: b.atribute['aria-pressed'], anunt: anunt.textContent };
+    d.laCadru();   // numai pentru codul în două trepte, al controalelor
+    const { b, anunt } = butonul(d);
     const g = urmareste(d.sat.gata);
+    await curge(() => g.gata, 20_000);
+    retinute = (u) => u.endsWith('.ktx2');
+    clic(b);
+    const laPrimul = { ocupat: b.atribute['aria-busy'], apasat: b.atribute['aria-pressed'], anunt: anunt.textContent };
     await curge(() => false, 2000);
     clic(b);
-    const laClic = jurnal.length;
-    const dupaClic = { preferinta, pressed: b.atribute['aria-pressed'], busy: b.atribute['aria-busy'] ?? null };
+    const laAlDoilea = jurnal.length;
+    const dupaClic = { preferinta, apasat: b.atribute['aria-pressed'], ocupat: b.atribute['aria-busy'] ?? null };
     const ktx = jurnal.filter((e) => e.url?.endsWith('.ktx2'));
     const oprite = ktx.filter((e) => e.semnal?.aborted).length;
     retinute = () => false;
     raspundeRetinutelor();
-    d.laCadru();
-    await curge(() => g.gata, 200_000);
-    await curge(() => false, 2000);
-    const dupa = jurnal.slice(laClic);
+    await curge(() => (M === S ? false : d.sat.activ), M === S ? 3000 : 200_000);
+    const dupa = jurnal.slice(laAlDoilea);
     const transcodate = dupa.filter((e) => e.transcodata).length, cereri = dupa.filter((e) => e.url).length;
     if (M === S) {
-      proba(laCreare.vizibil && laCreare.busy === 'true' && laCreare.pressed === 'true' && laCreare.anunt === ANUNT,
-        `butonul Satelit la creare: ${laCreare.vizibil ? 'vizibil' : 'ASCUNS'}, aria-busy ${laCreare.busy}, aria-pressed ${laCreare.pressed}, anunțul „${laCreare.anunt}”`);
-      proba(dupaClic.preferinta === 'relief' && dupaClic.pressed === 'false' && dupaClic.busy === null && ktx.length === T1.length && oprite === ktx.length,
-        `clic în timpul descărcării: preferința ${dupaClic.preferinta}, aria-pressed ${dupaClic.pressed}, aria-busy ${dupaClic.busy}, ${oprite} din ${ktx.length} cereri .ktx2 oprite`);
-      proba(g.v === false && !d.sat.activ && transcodate === 0 && cereri === 0 && d.sat.treaptaDoua === null && avert.length === 0 && dispuse === 1,
-        `după clic: Satelit ${d.sat.activ ? 'APLICAT' : 'neaplicat'}, ${transcodate} texturi transcodate și ${cereri} cereri noi, a doua treaptă ${d.sat.treaptaDoua ? 'PORNITĂ' : 'nepornită'}, avertismente ${avert.length}, încărcătorul eliberat de ${dispuse} ori`);
+      proba(laPrimul.ocupat === 'true' && laPrimul.apasat === 'true' && laPrimul.anunt === ANUNT,
+        `preferința Relief, clic pe Satelit: aria-busy ${laPrimul.ocupat}, aria-pressed ${laPrimul.apasat}, anunțul „${laPrimul.anunt}”`);
+      proba(dupaClic.preferinta === 'relief' && dupaClic.apasat === 'false' && dupaClic.ocupat === null && ktx.length === T6.length && oprite === ktx.length,
+        `al doilea clic, în timpul descărcării: preferința ${dupaClic.preferinta}, aria-pressed ${dupaClic.apasat}, aria-busy ${dupaClic.ocupat}, ${oprite} din ${ktx.length} cereri .ktx2 oprite`);
+      proba(!d.sat.activ && transcodate === 0 && cereri === 0 && avert.length === 0 && dispuse === 1,
+        `după el: Satelit ${d.sat.activ ? 'APLICAT' : 'neaplicat'}, ${transcodate} texturi transcodate și ${cereri} cereri noi, avertismente ${avert.length}, încărcătorul eliberat de ${dispuse} ori`);
       const inainte = jurnal.length;
       clic(b);
       await curge(() => d.sat.activ, 200_000);
-      const t2 = urmareste(d.sat.treaptaDoua ?? Promise.resolve());
-      await curge(() => t2.gata, 200_000);
-      const din = jurnal.slice(inainte), t1din = T1.filter((n) => din.some((e) => e.url === `/data/${n}.ktx2`)).length;
-      const petic = din.some((e) => e.url === '/data/harta_v5-orto_v1.ktx2');
-      proba(d.sat.activ && preferinta === 'satelit' && b.atribute['aria-pressed'] === 'true' && !b.atribute['aria-busy'] && t1din === T1.length && petic && avert.length === 0,
-        `al doilea clic: Satelit ${d.sat.activ ? 'aplicat' : 'NEAPLICAT'}, ${t1din} din ${T1.length} texturi ale primei trepte cerute din nou, apoi peticul ${petic ? 'cerut' : 'NECERUT'}; avertismente ${avert.length}`);
+      const din = jurnal.slice(inainte), cerute = T6.filter((n) => din.some((e) => e.url === `/data/${n}.ktx2`)).length;
+      const s = stare(d);
+      proba(s.activ && preferinta === 'satelit' && b.atribute['aria-pressed'] === 'true' && !b.atribute['aria-busy'] && cerute === T6.length && s.petic === 'harta_v5-orto_v1' && avert.length === 0,
+        `al treilea clic: Satelit ${s.activ ? 'aplicat' : 'NEAPLICAT'}, ${cerute} din ${T6.length} texturi cerute din nou, peticul pe ${s.petic}; avertismente ${avert.length}`);
     } else {
-      proba(!laCreare.vizibil, `control, satelit.js de la ${eticheta}: butonul la creare ${laCreare.vizibil ? 'vizibil' : 'ascuns'} — pică`);
       proba(d.sat.activ && preferinta === 'satelit',
-        `control, satelit.js de la ${eticheta}, butonul apăsat totuși în timpul descărcării: Satelit ${d.sat.activ ? 'aplicat' : 'neaplicat'}, preferința ${preferinta} — pică`);
+        `control, ${NUME_V}, al doilea clic în timpul descărcării: Satelit ${d.sat.activ ? 'aplicat' : 'neaplicat'}, preferința ${preferinta} — pică`);
     }
     d.sat.dispose();
-    preferinta = null;
+    await elibereazaToate();
     await curge(() => false, 200);
   }
 
-  // (i) Renunțarea târzie: texturile primei trepte au trecut de ultima așteptare (compilarea
-  //     ținută). Prima treaptă se termină, dar Satelit nu se aplică și a doua nu pleacă; un clic
-  //     următor aplică pe loc și o pornește, iar fără el `dispose()` eliberează încărcătorul
-  //     păstrat. Un dublu-clic CU compilarea încă în curs — renunțarea, apoi clicul — aplică la
-  //     capătul ei, tot cu a doua treaptă (recenzia: Satelit aplicat, dar peticul pe textura
-  //     bazei și harta_v9 pe cea mică, toată sesiunea). Control: satelit.js de la REPER_VECHI
-  //     aplică și pornește a doua treaptă.
-  for (const [M, eticheta, aplicaApoi] of [[S, 'azi', false], [S, 'azi', true], [S, 'azi', 'dublu'], [V, REPER_VECHI, false]]) {
-    if (!M) continue;
-    jurnal = []; avert = []; dispuse = 0; preferinta = null;
+  // (m) Renunțarea târzie, pe calea Relief → clic: texturile au trecut de ultima așteptare
+  //     (compilarea ținută). Încărcarea se termină, dar Satelit nu se aplică; un clic următor
+  //     aplică pe loc, fără nicio cerere nouă. Un dublu-clic CU compilarea încă în curs —
+  //     renunțarea, apoi clicul — aplică la capătul ei, cu peticul și harta_v9 întregi. Control:
+  //     satelit.js de la REPER_VECHI aplică la al doilea clic.
+  for (const [M, varianta] of [[S, 'renunta'], [S, 'apoi'], [S, 'dublu'], [V, 'renunta']]) {
+    if (!M) { proba(false, `control, ${NUME_V}, clic cu compilarea în curs: nu s-a putut citi din git`); continue; }
+    deLaZero('relief');
     let gataCompilarea = null;
     const r = { ...renderer(true), compileAsync: () => new Promise((res) => { gataCompilarea = res; }) };
     const d = deschide({ M, r });
+    d.laCadru();   // numai pentru codul în două trepte, al controalelor
     const { b } = butonul(d);
-    const g = urmareste(d.sat.gata);
-    d.laCadru();
+    await curge(() => false, 2000);
+    clic(b);
     await curge(() => gataCompilarea !== null, 200_000);
     clic(b);
-    if (aplicaApoi === 'dublu') {
+    if (varianta === 'dublu') {
       clic(b);
       gataCompilarea();
       await curge(() => d.sat.activ, 200_000);
-      const t2 = urmareste(d.sat.treaptaDoua ?? Promise.resolve());
-      await curge(() => t2.gata, 200_000);
-      const petic = numeTextura.get(d.petic.obiect.material.map);
-      const v9 = jurnal.some((e) => e.url === '/data/harta_v9-orto_v1.ktx2');
-      proba(d.sat.activ && preferinta === 'satelit' && d.sat.treaptaDoua !== null && petic === 'harta_v5-orto_v1' && v9 && avert.length === 0,
-        `dublu-clic cu compilarea în curs: Satelit ${d.sat.activ ? 'aplicat' : 'NEAPLICAT'}, a doua treaptă ${d.sat.treaptaDoua ? 'pornită' : 'NEPORNITĂ'}, plasa peticului pe ${petic}, harta_v9 întreagă ${v9 ? 'cerută' : 'NECERUTĂ'}`);
+      const s = stare(d);
+      proba(s.activ && preferinta === 'satelit' && s.petic === 'harta_v5-orto_v1' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
+        `dublu-clic cu compilarea în curs: Satelit ${s.activ ? 'aplicat' : 'NEAPLICAT'}, plasa peticului pe ${s.petic}, harta_v9 la ${s.v9} texeli, avertismente ${avert.length}`);
       d.sat.dispose();
       await curge(() => false, 200);
       continue;
     }
     gataCompilarea();
-    await curge(() => g.gata, 200_000);
-    await curge(() => false, 2000);
-    const fine = () => jurnal.filter((e) => e.url && /harta_v5-orto_v1|harta_v9-orto_v1\.(ktx2|json)$/.test(e.url)).length;
-    const f0 = fine(), activ0 = d.sat.activ;
+    await curge(() => false, 3000);
+    const activ0 = d.sat.activ;
     if (M !== S) {
-      proba(activ0 && f0 > 0, `control, satelit.js de la ${eticheta}, clic cu compilarea în curs: Satelit ${activ0 ? 'aplicat' : 'neaplicat'}, ${f0} cereri ale celei de-a doua trepte — pică`);
-    } else if (!aplicaApoi) {
-      d.sat.dispose();
-      proba(g.v === false && !activ0 && preferinta === 'relief' && f0 === 0 && dispuse === 1 && avert.length === 0,
-        `renunțare cu compilarea în curs: Satelit ${activ0 ? 'APLICAT' : 'neaplicat'}, ${f0} cereri ale celei de-a doua trepte; după dispose(), încărcătorul păstrat eliberat de ${dispuse} ori`);
+      proba(activ0, `control, ${NUME_V}, clic cu compilarea în curs: Satelit ${activ0 ? 'aplicat' : 'neaplicat'} — pică`);
+    } else if (varianta === 'renunta') {
+      proba(!activ0 && preferinta === 'relief' && dispuse === 1 && avert.length === 0,
+        `renunțare cu compilarea în curs: Satelit ${activ0 ? 'APLICAT' : 'neaplicat'}, preferința ${preferinta}, încărcătorul eliberat de ${dispuse} ori, avertismente ${avert.length}`);
     } else {
+      const inainte = jurnal.length;
       clic(b);
-      const peLoc = d.sat.activ;
-      const t2 = urmareste(d.sat.treaptaDoua ?? Promise.resolve());
-      await curge(() => t2.gata, 200_000);
-      proba(!activ0 && f0 === 0 && peLoc && fine() > 0 && dispuse === 1 && avert.length === 0,
-        `apoi clic pe Satelit: aplicat ${peLoc ? 'pe loc' : 'NU'}, a doua treaptă cu ${fine()} cereri, încărcătorul eliberat de ${dispuse} ori`);
+      const peLoc = d.sat.activ, noi = jurnal.slice(inainte).filter((e) => e.url).length;
+      const s = stare(d);
+      proba(!activ0 && peLoc && noi === 0 && s.petic === 'harta_v5-orto_v1' && avert.length === 0,
+        `apoi clic pe Satelit: aplicat ${peLoc ? 'pe loc' : 'NU'}, ${noi} cereri noi, peticul pe ${s.petic}`);
     }
     d.sat.dispose();
+    await elibereazaToate();
     await curge(() => false, 200);
   }
 
-  // (j) Eșecul pornirii automate (gardă, fără control: codul vechi nu arăta butonul deloc):
-  //     baza lipsă (404) — butonul arătat devreme pleacă, cu anunțul eșecului.
+  // (n) Eșecul pornirii automate: baza lipsă (404) — butonul pleacă, cu anunțul eșecului.
   {
-    jurnal = []; avert = []; preferinta = null;
+    deLaZero();
     lipsa = (u) => u === '/data/harta_v4-orto_v1.ktx2';
     const d = deschide({ M: S });
     const { b, anunt } = butonul(d);
     const g = urmareste(d.sat.gata);
-    d.laCadru();
     await curge(() => g.gata, 200_000);
-    proba(g.v === false && b.hidden && !b.atribute['aria-busy'] && anunt.textContent === 'Fotografia aeriană nu s-a putut încărca.' && avert.some((a) => a.includes('harta_v4-orto_v1 lipsește')),
-      `baza lipsă la pornire: butonul ${b.hidden ? 'scos' : 'RĂMAS'}, anunțul „${anunt.textContent}”, avertismente ${avert.length}`);
-    lipsa = () => false;
+    proba(g.v === false && b.hidden && !b.atribute['aria-busy'] && anunt.textContent === ESEC && avert.some((a) => a.includes('harta_v4-orto_v1 lipsește')) && ceas.t.size === 0,
+      `baza lipsă la pornire: butonul ${b.hidden ? 'scos' : 'RĂMAS'}, anunțul „${anunt.textContent}”, avertismente ${avert.length}, temporizatoare rămase ${ceas.t.size}`);
     d.sat.dispose();
     await curge(() => false, 200);
   }
 
-  // (k) Un deploy fără texturi: transcodorul (~0,6 MB) pleacă numai după sidecarul bazei, deci
-  //     nu se mai descarcă degeaba. Control: cu texturile la locul lor, se cere.
-  for (const faraTexturi of [true, false]) {
-    jurnal = []; avert = []; preferinta = null;
-    lipsa = faraTexturi ? (u) => /-orto_v1(-mic)?\.(json|ktx2)$/.test(u) : () => false;
-    const d = deschide({ M: S });
-    const g = urmareste(d.sat.gata);
-    d.laCadru();
-    await curge(() => g.gata, 200_000);
-    const cerut = marcaLa(jurnal, 'transcodor') >= 0;
-    if (faraTexturi) proba(g.v === false && !cerut, `fără nicio textură pe server: Satelit ${g.v ? 'PORNIT' : 'nepornit'}, transcodorul ${cerut ? 'CERUT' : 'necerut'}`);
-    else proba(g.v === true && cerut, `control, cu texturile: transcodorul ${cerut ? 'cerut' : 'necerut'}`);
-    lipsa = () => false;
-    d.sat.dispose();
-    await curge(() => false, 200);
-  }
-
-  // (l) Contextul WebGL pierdut chiar când sosește încărcătorul: `detectSupport` vede atunci
+  // (o) Contextul WebGL pierdut chiar când sosește încărcătorul: `detectSupport` vede atunci
   //     toate extensiile lipsă. Satelit așteaptă refacerea contextului și reface configurația
   //     înaintea primei transcodări, deci texturile ies comprimate, iar peticul vine. Pe codul
   //     de dinainte (recenzia): RGBA, ~71 MB pe placă, fără petic, toată sesiunea.
   {
-    jurnal = []; avert = []; preferinta = null;
+    deLaZero();
     let pierdut = true;
     const asc = {};
     const r = {
@@ -1312,10 +1923,7 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     const transcodateCatPierdut = jurnal.filter((e) => e.transcodata).length;
     pierdut = false;
     for (const f of [...(asc.webglcontextrestored ?? [])]) f();
-    d.laCadru();
     await curge(() => g.gata, 200_000);
-    const t2 = urmareste(d.sat.treaptaDoua ?? Promise.resolve());
-    await curge(() => t2.gata, 200_000);
     const fmt = d.teren.obiect.material.map?.format;
     const petic = numeTextura.get(d.petic.obiect.material.map);
     proba(g.v === true && transcodateCatPierdut === 0 && fmt === THREE.RGBA_BPTC_Format && petic === 'harta_v5-orto_v1' && (asc.webglcontextrestored?.size ?? 0) === 0,
@@ -1324,14 +1932,13 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     await curge(() => false, 200);
   }
 
-  // (m) Renunțarea pe o rețea care oprește încet cererile: încercarea nouă o așteaptă pe cea
+  // (p) Renunțarea pe o rețea care oprește încet cererile: încercarea nouă o așteaptă pe cea
   //     oprită, deci încărcătoarele nu se suprapun — altfel three avertiza „Multiple active KTX2
   //     loaders” (văzut în pagină, cu .ktx2 întârziate). Un al patrulea clic, dat cât încercarea
   //     nouă încă așteaptă, o oprește și pe ea: nicio cerere a ei.
   for (const patruClicuri of [false, true]) {
-    jurnal = []; avert = []; preferinta = 'relief'; vii.clear(); maxVii = 0;
+    deLaZero('relief');
     const d = deschide({ M: S });
-    d.laCadru();
     await curge(() => false, 2000);
     const { b } = butonul(d);
     abortLent = true;
@@ -1355,12 +1962,130 @@ console.log('\nSatelit devreme: prima treaptă înaintea construcției, peticul 
     else proba(!d.sat.activ && preferinta === 'relief' && noi === 0 && maxVii === 1 && avert.length === 0,
       `al patrulea clic, cu încercarea nouă încă în așteptare: Satelit ${d.sat.activ ? 'APLICAT' : 'neaplicat'}, preferința ${preferinta}, ${noi} cereri .ktx2 ale ei, cel mult ${maxVii} încărcător viu`);
     d.sat.dispose();
-    preferinta = null;
     await curge(() => false, 200);
   }
 
+  // (q) Baza căzută oprește tot, pe loc (`opresteTot`): fără ea nu există Satelit, iar celelalte
+  //     cinci s-ar fi descărcat și transcodat degeaba, cu harta ținută pe mesajul de încărcare.
+  //     Fișierul bazei cu 404, sau sidecarul ei fără soarele zborului, cu celelalte texturi lente —
+  //     10 bucăți la 6 s, corpul închis la 66 s —: `gata` false la 0 s virtuale, celelalte cereri
+  //     .ktx2 oprite, nimic transcodat, un singur avertisment, al bazei. Control: `opresteTot` făcut
+  //     no-op — `gata` vine abia după celelalte texturi, la 66 s.
+  {
+    const BAZA = '/data/harta_v4-orto_v1.ktx2', SC_BAZA = '/data/harta_v4-orto_v1.json';
+    const lente = (u) => (u.endsWith('.ktx2') ? lent(u, 10, 6_000) : null);
+    const faraSoare = JSON.stringify({ ...SIDECAR('harta_v4-orto_v1'), soare_zbor: undefined });
+    const cazuri = [
+      ['fișierul bazei cu 404', (u) => u === BAZA, lente, /^textura Satelit harta_v4-orto_v1 lipsește \(HTTP 404\)$/],
+      ['sidecarul bazei fără soarele zborului', () => false, (u) => (u === SC_BAZA ? new Response(faraSoare, { status: 200 }) : lente(u)),
+        /^textura Satelit harta_v4-orto_v1: sidecarul n-are soarele zborului sau marea$/],
+    ];
+    const cade = async (M, lipseste, sp) => {
+      deLaZero();
+      lipsa = lipseste;
+      special = sp;
+      const d = deschide({ M });
+      const g = urmareste(d.sat.gata);
+      let la = null;
+      d.sat.gata.then(() => { la = ceas.acum; });
+      // Fără timp virtual: baza cade pe loc, iar celelalte n-au trimis încă nicio bucată.
+      await curge(() => g.gata, 20_000);
+      // Codul care nu oprește tot: până la închiderea corpurilor lente, apoi fără alt timp virtual —
+      // verificarea sha256 a celorlalte merge pe timp real, ca la (d).
+      if (!g.gata) {
+        await avanseaza(66_000);
+        await curge(() => g.gata, 200_000);
+      }
+      const ktx = jurnal.filter((e) => e.url?.endsWith('.ktx2') && !lipseste(e.url));
+      const rez = {
+        v: g.gata ? g.v : 'ÎN AȘTEPTARE', la, avert: [...avert], ktx: ktx.length, oprite: ktx.filter((e) => e.semnal?.aborted).length,
+        transcodate: jurnal.filter((e) => e.transcodata).length, anunt: butonul(d).anunt.textContent,
+      };
+      d.sat.dispose();
+      await elibereazaToate();
+      return rez;
+    };
+    const descrieCaderea = (x) => `gata ${x.v} la ${x.la === null ? '—' : `${x.la / 1000} s`} virtuale, ${x.oprite} din ${x.ktx} cereri .ktx2 ${x.ktx === T6.length ? '(toate, cu a bazei)' : '(celelalte)'} oprite, `
+      + `${x.transcodate} texturi transcodate, anunțul „${x.anunt}”, avertismente ${x.avert.length}${x.avert.length ? ` (${x.avert.map((a) => `„${a}”`).join('; ')})` : ''}`;
+    const faraOprire = await mutatie(['const opresteTot = () => { if (!semnal.aborted) garda.abandoneaza(); };', 'const opresteTot = () => {};']);
+    for (const [text, lipseste, sp, re] of cazuri) {
+      const x = await cade(S, lipseste, sp);
+      const celelalte = T6.length - (lipseste(BAZA) ? 1 : 0);
+      proba(x.v === false && x.la === 0 && x.ktx === celelalte && x.oprite === x.ktx && x.transcodate === 0 && x.anunt === ESEC && x.avert.length === 1 && re.test(x.avert[0]),
+        `${text}, celelalte texturi lente: ${descrieCaderea(x)}`);
+      if (faraOprire) {
+        const c = await cade(faraOprire, lipseste, sp);
+        proba(!(c.v === false && c.la === 0 && c.oprite === c.ktx && c.transcodate === 0), `control, ${text}, cu opresteTot no-op: ${descrieCaderea(c)} — pică`);
+      } else proba(false, `control, ${text}, cu opresteTot no-op: ${NEAPLICATA}`);
+    }
+  }
+
+  // (r) `reanunta()`, chemat de scena.js când harta apare (`arata`): un anunț scris cât panoul
+  //     era ascuns până la `data-scena` (main.css) n-a ajuns la cititorul de ecran. După eșecul
+  //     bazei pe calea automată golește anunțul și îl scrie din nou la 150 ms — o schimbare a unei
+  //     regiuni care se vede; fără anunț — pornirea reușită, ieșirea — nu scrie nimic, și nici după
+  //     dispose(). Control: reanunta fără golire, care scrie același text peste el: nicio schimbare.
+  {
+    /** Scrierile în `el.textContent` de acum încolo: clipa virtuală de la `t0`, textul, dacă l-au schimbat. */
+    const inregistreaza = (el, t0) => {
+      let t = el.textContent;
+      const scrieri = [];
+      Object.defineProperty(el, 'textContent', {
+        configurable: true,
+        get: () => t,
+        set: (v) => { const nou = String(v); scrieri.push({ la: ceas.acum - t0, text: nou, schimbare: nou !== t }); t = nou; },
+      });
+      return scrieri;
+    };
+    const descrieScrierile = (s) => (s.length ? s.map((x) => `„${x.text}” la +${x.la} ms${x.schimbare ? '' : ' (FĂRĂ SCHIMBARE)'}`).join(', ') : 'nicio scriere');
+    const reanunta = async (M, cum) => {
+      deLaZero();
+      if (cum === 'esec' || cum.startsWith('dispose')) lipsa = (u) => u === '/data/harta_v4-orto_v1.ktx2';
+      const iesire = cum === 'iesire' ? new AbortController() : null;
+      if (iesire) retinute = (u) => u.endsWith('.ktx2');
+      const d = deschide({ M, faraSatelit: iesire?.signal });
+      const g = urmareste(d.sat.gata);
+      if (iesire) { await curge(() => false, 2000); iesire.abort(); }
+      await curge(() => g.gata, 200_000);
+      const { anunt } = butonul(d);
+      const inainte = anunt.textContent, t0 = ceas.acum;
+      const scrieri = inregistreaza(anunt, t0);
+      if (cum === 'dispose') d.sat.dispose();
+      d.sat.reanunta();
+      const peLoc = anunt.textContent;
+      if (cum === 'dispose-intre') d.sat.dispose();
+      await avanseaza(149);
+      const la149 = anunt.textContent;
+      await avanseaza(1001);
+      const rez = { v: g.gata ? g.v : 'ÎN AȘTEPTARE', inainte, peLoc, la149, final: anunt.textContent, scrieri };
+      if (!cum.startsWith('dispose')) d.sat.dispose();
+      retinute = () => false;
+      raspundeRetinutelor();
+      await elibereazaToate();
+      return rez;
+    };
+    const bunEsec = (x) => x.v === false && x.inainte === ESEC && x.peLoc === '' && x.la149 === '' && x.final === ESEC && x.scrieri.length === 2
+      && x.scrieri[0].text === '' && x.scrieri[0].la === 0 && x.scrieri[1].text === ESEC && x.scrieri[1].la === 150 && x.scrieri.every((s) => s.schimbare);
+    const e = await reanunta(S, 'esec');
+    proba(bunEsec(e), `după eșecul bazei (gata ${e.v}, anunțul „${e.inainte}”), reanunta: ${descrieScrierile(e.scrieri)}; la +149 ms „${e.la149}”, la capăt „${e.final}”`);
+    for (const [cum, text] of [['reusit', 'după o pornire reușită'], ['iesire', 'după ieșire (faraSatelit)'], ['dispose', 'după dispose()']]) {
+      const x = await reanunta(S, cum);
+      proba(x.scrieri.length === 0 && x.inainte === x.final, `${text} (gata ${x.v}, anunțul „${x.inainte}”), reanunta: ${descrieScrierile(x.scrieri)}`);
+    }
+    const di = await reanunta(S, 'dispose-intre');
+    proba(di.scrieri.filter((s) => s.la > 0).length === 0 && di.final === '', `reanunta, apoi dispose() înainte de 150 ms: ${descrieScrierile(di.scrieri)}; după dispose ${di.scrieri.some((s) => s.la > 0) ? 'SCRIE' : 'nimic'}`);
+    const faraGolire = await mutatie(["      anunt.textContent = '';\n      setTimeout(() => { if (viu && !anunt.textContent) anunt.textContent = t; }, 150);",
+      '      setTimeout(() => { if (viu) anunt.textContent = t; }, 150);']);
+    if (faraGolire) {
+      const c = await reanunta(faraGolire, 'esec');
+      proba(!bunEsec(c), `control, reanunta fără golire (același text scris peste el): ${descrieScrierile(c.scrieri)}, ${c.scrieri.filter((s) => s.schimbare).length} schimbări — pică`);
+    } else proba(false, `control, reanunta fără golire: ${NEAPLICATA}`);
+  }
+
   globalThis.fetch = F0;
-  P.init = init0; P.parse = parse0; P.dispose = dispose0;
+  globalThis.setTimeout = ST;
+  globalThis.clearTimeout = CT;
+  P.init = init0; P.parse = parse0; P.dispose = dispose0; P.detectSupport = detect0;
   if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
   delete globalThis.localStorage;
 }
@@ -1401,36 +2126,285 @@ console.log('\nEliberarea încărcătorului KTX2 cu transcodorul în drum');
   proba(c.facute === 1 && c.ramase === 1, `control, dispose() singur: ${c.facute} URL făcut, ${c.ramase} nerevocat — pică`);
 }
 
+// ------------------------------------------------------------ mesajul de încărcare (main.js)
+
+// main.js, cu `porneste` înlocuit și un DOM falsificat după index.html: faza fotografiei schimbă
+// textul și arată butonul; procentul se scrie numai în ea, iar o fracție venită înainte se ține
+// minte; clicul oprește așteptarea (`faraSatelit`) și dezactivează butonul; când harta apare,
+// un focus rămas în mesaj trece pe butonul Satelit, iar apoi — o singură dată, după `data-scena`
+// și după mutarea focusului — `scena.arata()` cere anunțurile scrise cât panourile erau ascunse.
+// Controale: main.js de la REPER_VECHI, care nu știe de mesaj, și trei mutații ale celui de azi —
+// fără `abort()`, procentul scris și înaintea fazei, fără apelul lui `arata`.
+console.log('\nMesajul de încărcare (main.js): faza, procentul, ieșirea, focusul, anunțurile');
+{
+  const SRC = textSursa('src/main.js');
+  const IMPORT = "import { porneste } from './scene/scena.js';";
+  let nr = 0;
+  const ruleaza = async (src) => {
+    if (!src.includes(IMPORT)) return null;
+    // Un DOM falsificat: numai ce citește main.js, după marcajul din index.html.
+    const D0 = globalThis.document;
+    const doc = { activeElement: null };
+    const el = (tag, o = {}) => ({
+      tag, hidden: false, disabled: false, copii: [], asc: {}, dataset: {}, ...o,
+      get textContent() { return this.copii.map((c) => (typeof c === 'string' ? c : c.textContent)).join(''); },
+      set textContent(t) { this.copii = t ? [String(t)] : []; },
+      addEventListener(t, f) { (this.asc[t] ??= []).push(f); },
+      removeEventListener() {},
+      replaceChildren(...c) { this.copii = c; },
+      append(...c) { this.copii.push(...c); },
+      remove() {},
+      focus() { doc.activeElement = this; },
+      blur() { doc.activeElement = doc.body; },
+      contains(x) { return x === this || this.copii.some((c) => typeof c === 'object' && c.contains?.(x)); },
+      querySelector(s) { return this.sel?.[s] ?? null; },
+    });
+    const procent = el('span');
+    const mesaj = el('p', { copii: ['Se încarcă harta 3D…', procent], sel: { span: procent } });
+    const buton = el('button', { hidden: true });
+    const incarcare = el('div', { copii: [mesaj, buton], sel: { '[role="status"]': mesaj, button: buton } });
+    const satelit = el('button');
+    const corp = el('body');
+    Object.assign(doc, {
+      body: corp, activeElement: corp,
+      createElement: (t) => el(t),
+      getElementById: (id) => (id === 'incarcare' ? incarcare : null),
+      querySelector: (s) => ({ '#scena': el('canvas'), '#continut': el('main'), '#surse': null,
+        '#straturi:not([hidden]) button:not([hidden])': satelit, '#incarcare': incarcare })[s] ?? null,
+    });
+    globalThis.document = doc;
+    // `porneste` falsificat: ține minte opțiunile și se rezolvă când i se spune.
+    const prins = {};
+    globalThis.__pornesteProba = (canvas, o) => new Promise((res) => { prins.o = o; prins.rezolva = res; });
+    const text = src.replace(IMPORT, 'const porneste = (...a) => globalThis.__pornesteProba(...a);')
+      .replace(/from '\.\/content\/([^']+)'/g, (_, f) => `from '${new URL(`../src/content/${f}`, import.meta.url).href}'`);
+    const f = join(tmpdir(), `cabo-main-${process.pid}-${nr++}.mjs`);
+    writeFileSync(f, text);
+    const info0 = console.info;
+    console.info = () => {};
+    try {
+      const modul = import(pathToFileURL(f).href);
+      for (let k = 0; k < 200 && !prins.o; k++) await new Promise((r) => setImmediate(r));
+      const o = prins.o ?? {};
+      const r = { functie: typeof o.laIncarcare === 'function', semnal: o.faraSatelit instanceof AbortSignal && !o.faraSatelit.aborted, arata: [] };
+      const focusul = () => (doc.activeElement === satelit ? 'butonul Satelit' : doc.activeElement === buton ? 'butonul mesajului' : doc.activeElement?.tag ?? 'nimic');
+      r.inainte = { text: mesaj.textContent, buton: !buton.hidden };
+      o.laIncarcare?.({ fractie: 0.17 });
+      r.fractieInainte = { text: mesaj.textContent, procent: procent.textContent };
+      o.laIncarcare?.({ faza: 'fotografie' });
+      r.faza = { text: mesaj.textContent, procent: procent.textContent, buton: !buton.hidden, procentInMesaj: mesaj.copii.includes(procent) };
+      const pasi = [];
+      for (const x of [0.42, 0.99, 1]) { o.laIncarcare?.({ fractie: x }); pasi.push(procent.textContent); }
+      r.pasi = pasi;
+      buton.focus();
+      for (const g of buton.asc.click ?? []) g();
+      r.clic = { oprit: o.faraSatelit?.aborted === true, dezactivat: buton.disabled };
+      // Scena falsă ține minte fiecare `arata()`: starea paginii în clipa apelului.
+      prins.rezolva?.({
+        nrTriunghiuri: 0, petic: null, teren: {}, sanctuar: null, surse: [], memorie: () => '',
+        arata: () => { r.arata.push({ scena: corp.dataset.scena, focus: focusul() }); },
+      });
+      await modul;
+      r.dupa = { scena: corp.dataset.scena, focus: focusul() };
+      return r;
+    } finally {
+      console.info = info0;
+      rmSync(f, { force: true });
+      delete globalThis.__pornesteProba;
+      delete globalThis.__scena;
+      if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
+    }
+  };
+  const FAZA = 'Se încarcă fotografia aeriană…';
+  const bun = (r) => r && r.functie && r.semnal && r.inainte.text === 'Se încarcă harta 3D…' && !r.inainte.buton
+    && r.fractieInainte.procent === '' && r.faza.text === `${FAZA}17%` && r.faza.buton && r.faza.procentInMesaj
+    && r.pasi.join(' ') === '42% 99% 100%' && r.clic.oprit && r.clic.dezactivat && r.dupa.scena === 'activa' && r.dupa.focus === 'butonul Satelit'
+    && r.arata.length === 1 && r.arata[0].scena === 'activa' && r.arata[0].focus === 'butonul Satelit';
+  const descrieArata = (r) => (r.arata.length ? `${r.arata.length} × scena.arata(), cu data-scena „${r.arata[0].scena}” și focusul pe ${r.arata[0].focus}` : 'scena.arata() NECHEMAT');
+  const r = await ruleaza(SRC);
+  proba(bun(r), r ? `main.js: laIncarcare ${r.functie ? 'dat' : 'LIPSĂ'}, faraSatelit ${r.semnal ? 'dat, neoprit' : 'LIPSĂ'}; la început „${r.inainte.text}”, butonul ${r.inainte.buton ? 'VIZIBIL' : 'ascuns'}; o fracție înaintea fazei: procent „${r.fractieInainte.procent}”; faza: „${r.faza.text}”, butonul ${r.faza.buton ? 'vizibil' : 'ASCUNS'}; pașii ${r.pasi.join(', ')}; clicul: așteptarea ${r.clic.oprit ? 'oprită' : 'NEOPRITĂ'}, butonul ${r.clic.dezactivat ? 'dezactivat' : 'ACTIV'}; harta: data-scena „${r.dupa.scena}”, focusul pe ${r.dupa.focus}; ${descrieArata(r)}` : 'main.js: importul lui porneste negăsit');
+  const vechi = textVechi('src/main.js');
+  const rv = vechi === null ? null : await ruleaza(vechi);
+  proba(rv !== null && !bun(rv), `control, main.js de la ${REPER_VECHI}: ${rv === null ? 'NECITIT' : `laIncarcare ${rv.functie ? 'dat' : 'lipsă'}, faraSatelit ${rv.semnal ? 'dat' : 'lipsă'}, mesajul „${rv.faza.text}”, ${descrieArata(rv)}`} — pică`);
+  /** Un control pe o mutație a lui main.js de azi: trebuie să se aplice și să strice ce se probează. */
+  const control = async (text, perechi, ce) => {
+    const s = muta(SRC, ...perechi);
+    const x = s === null ? null : await ruleaza(s);
+    proba(x !== null && !bun(x), `control, ${text}: ${s === null ? NEAPLICATA : x === null ? 'importul lui porneste negăsit' : ce(x)} — pică`);
+  };
+  await control('fără `abort()` la clic', [['    iesire.abort();\n', '']], (x) => `așteptarea ${x.clic.oprit ? 'oprită' : 'neoprită'}`);
+  await control('procentul scris și înaintea fazei', [['if (procent && fotografie && cat !== null)', 'if (procent && cat !== null)']],
+    (x) => `„${x.fractieInainte.text}” cu „${x.fractieInainte.procent}”`);
+  await control('fără apelul lui `scena.arata`', [['    scena.arata?.();\n', '']], descrieArata);
+}
+
 // ------------------------------------------------------------ compilarea înaintea primului cadru
 
 // three compilează programele la prima randare și așteaptă acolo, sincron, legarea fiecăruia:
 // la prima vizită primul cadru ținea firul ~0,37 s, din care ~0,30 s numai legarea. scena.js
 // le compilează întâi cu `compileAsync`, după ce toate plasele sunt în scenă și înaintea
-// buclei, fără altă așteptare între ele. Timpii cer WebGL: în pagină (CLAUDE.md). Aici se
-// păzește ordinea, pe sursă. Controale: scena.js de la 30a22c9, fără compilare, și sursa de
+// buclei. Între ele stă numai așteptarea fotografiei (`asteaptaSatelitul`; vezi „Satelit la
+// pornire”, (k)), nicio altă așteptare. Timpii cer WebGL: în pagină (CLAUDE.md). Aici se
+// păzește ordinea, pe sursă. Controale: scena.js de la REPER_VECHI, fără compilare, și sursa de
 // azi cu compilarea mutată după `setAnimationLoop`.
 console.log('\nCompilarea înaintea primului cadru (scena.js)');
 {
-  const { execFileSync } = await import('node:child_process');
   const COMPILA = 'try { await renderer.compileAsync(scena, camera); } catch', BUCLA = 'renderer.setAnimationLoop(() =>';
   const ordine = (src) => {
     const c = src.indexOf(COMPILA), b = src.indexOf(BUCLA), add = src.lastIndexOf('scena.add(');
-    const intre = c >= 0 && b > c ? src.slice(c + COMPILA.length, b).match(/\bawait\b/g)?.length ?? 0 : null;
-    return { ok: c > 0 && add < c && b > c && intre === 0, c, b, add, intre };
+    const bucata = c >= 0 && b > c ? src.slice(c + COMPILA.length, b) : null;
+    const sat = bucata?.match(/\bawait asteaptaSatelitul\(/g)?.length ?? 0;
+    const intre = bucata === null ? null : (bucata.match(/\bawait\b/g)?.length ?? 0) - sat;
+    return { ok: c > 0 && add < c && b > c && intre === 0 && sat <= 1, c, b, add, intre, sat };
   };
-  const azi = readFileSync('src/scene/scena.js', 'utf8');
+  const azi = textSursa('src/scene/scena.js');
   const o = ordine(azi);
-  proba(o.ok, `compileAsync (${o.c}) după ultimul scena.add (${o.add}) și înaintea buclei (${o.b}), cu ${o.intre} alte așteptări între ele`);
-  let vechi = null;
-  try { vechi = execFileSync('git', ['show', '30a22c9:src/scene/scena.js'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { /* fără git */ }
-  proba(vechi !== null && !ordine(vechi).ok, `control, scena.js de la 30a22c9: ${vechi === null ? 'NECITIT' : `compileAsync la ${ordine(vechi).c}`} — pică`);
+  proba(o.ok, `compileAsync (${o.c}) după ultimul scena.add (${o.add}) și înaintea buclei (${o.b}), cu ${o.intre} alte așteptări între ele în afara celei a fotografiei (${o.sat})`);
+  const vechi = textVechi('src/scene/scena.js');
+  proba(vechi !== null && !ordine(vechi).ok, `control, scena.js de la ${REPER_VECHI}: ${vechi === null ? 'NECITIT' : `compileAsync la ${ordine(vechi).c}`} — pică`);
+  // Rândul compilării, scos și pus imediat după rândul buclei.
   const randul = (s, i) => [s.lastIndexOf('\n', i) + 1, s.indexOf('\n', i) + 1];
-  const [a0, a1] = randul(azi, azi.indexOf(COMPILA));
-  const fara = azi.slice(0, a0) + azi.slice(a1);
-  const dupaBucla = randul(fara, fara.indexOf(BUCLA))[1];
-  const mutat = fara.slice(0, dupaBucla) + azi.slice(a0, a1) + fara.slice(dupaBucla);
-  const m = ordine(mutat);
-  proba(mutat !== azi && !m.ok, `control, compilarea mutată după bucla (${m.c} față de ${m.b}) — pică`);
+  let mutat = null;
+  if (azi.includes(COMPILA) && azi.includes(BUCLA)) {
+    const [a0, a1] = randul(azi, azi.indexOf(COMPILA));
+    const fara = azi.slice(0, a0) + azi.slice(a1);
+    const dupaBucla = randul(fara, fara.indexOf(BUCLA))[1];
+    mutat = fara.slice(0, dupaBucla) + azi.slice(a0, a1) + fara.slice(dupaBucla);
+  }
+  const m = mutat === null ? null : ordine(mutat);
+  proba(m !== null && !m.ok, `control, compilarea mutată după bucla: ${m === null ? NEAPLICATA : `${m.c} față de ${m.b}`} — pică`);
+}
+
+// ------------------------------------------------------------ anunțurile după apariția hărții
+
+// Până la `data-scena`, panourile stau ascunse (main.css), deci în afara arborelui de
+// accesibilitate: anunțurile scrise între timp în regiunile lor live — busola, eșecul fotografiei
+// — nu le-a auzit nimeni, iar textul deja prezent al unei regiuni care apare nu se anunță. main.js
+// cheamă atunci `scena.arata()` (proba de mai sus), iar ea, după două cadre ale paginii — în
+// aceeași actualizare cu dezvăluirea tot nu s-ar anunța —, `reanunta()` pe busolă și pe Satelit
+// (al lui Satelit: „Satelit la pornire”, (r)). `arata` trăiește în obiectul întors de
+// construieste(), care cere WebGL: corpul ei se scoate din sursa lui scena.js și rulează cu o
+// busolă, un Satelit și cadre ale paginii false. Busola se construiește întreagă, cu un DOM fals
+// și pe ceasul virtual. Controale: `arata` care cheamă pe loc, `arata` fără Satelit, busola care
+// scrie același text peste el.
+console.log('\nAnunțurile după apariția hărții (scena.js, busola.js)');
+{
+  // `arata()` din scena.js, cu `busola` și `satelit` date și cu `viu` stins de `stinge()`.
+  const SCENA = textSursa('src/scene/scena.js');
+  const CAP = '    arata() {';
+  const metoda = (src) => {
+    const i = src.indexOf(CAP);
+    if (i < 0) return null;
+    let j = i + CAP.length - 1, ad = 0;
+    for (; j < src.length; j++) {
+      if (src[j] === '{') ad++;
+      else if (src[j] === '}' && --ad === 0) break;
+    }
+    return src.slice(i + CAP.length - 1, j + 1);
+  };
+  const RAF = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame');
+  let cadre = [];
+  globalThis.requestAnimationFrame = (f) => { cadre.push(f); return cadre.length; };
+  const cadru = () => { const c = cadre; cadre = []; for (const f of c) f(); };
+  /** Cheamă `arata()` și numără `reanunta()` pe busolă și pe Satelit, cadru cu cadru; `stingeLa` = cadrul la care scena se eliberează. */
+  const ruleazaArata = (src, { cuBusola = true, cuSatelit = true, stingeLa = null } = {}) => {
+    const corp = metoda(src);
+    if (corp === null) return null;
+    const chemari = [];
+    let k = 0;
+    const busola = cuBusola ? { reanunta: () => chemari.push(`busola@${k}`) } : null;
+    const satelit = cuSatelit ? { reanunta: () => chemari.push(`satelit@${k}`) } : null;
+    cadre = [];
+    const s = new Function('busola', 'satelit', `let viu = true;\nreturn { arata() ${corp}, stinge() { viu = false; } };`)(busola, satelit);
+    s.arata();
+    for (; k < 3; ) {
+      k++;
+      if (stingeLa === k) s.stinge();
+      cadru();
+    }
+    return chemari.join(', ') || 'nicio chemare';
+  };
+  const bunArata = (x) => x === 'busola@2, satelit@2';
+  const a = ruleazaArata(SCENA);
+  proba(bunArata(a), `scena.js, arata(): reanunta pe busolă și pe Satelit, la cadrul paginii: ${a ?? 'arata() NEGĂSITĂ'} (cerut amândouă la al doilea)`);
+  const fara = [ruleazaArata(SCENA, { cuBusola: false }), ruleazaArata(SCENA, { cuSatelit: false }), ruleazaArata(SCENA, { stingeLa: 2 })];
+  proba(fara[0] === 'satelit@2' && fara[1] === 'busola@2' && fara[2] === 'nicio chemare',
+    `fără busolă: ${fara[0]}; fără Satelit: ${fara[1]}; scena eliberată înaintea celui de-al doilea cadru: ${fara[2]}`);
+  const controlArata = (text, perechi) => {
+    const s = muta(SCENA, ...perechi);
+    const x = s === null ? null : ruleazaArata(s);
+    proba(x !== null && !bunArata(x), `control, ${text}: ${s === null ? NEAPLICATA : x} — pică`);
+  };
+  controlArata('arata() care cheamă pe loc, în aceeași actualizare cu dezvăluirea',
+    [['const cadruPagina = globalThis.requestAnimationFrame ?? ((f) => setTimeout(f, 16));', 'const cadruPagina = (f) => f();']]);
+  controlArata('arata() fără Satelit', [['        satelit?.reanunta?.();\n', '']]);
+  if (RAF) Object.defineProperty(globalThis, 'requestAnimationFrame', RAF); else delete globalThis.requestAnimationFrame;
+
+  // Busola întreagă, cu un DOM fals și pe ceasul virtual: primul anunț la 600 ms; `reanunta()`
+  // îl golește și îl scrie din nou după aceeași pauză — o schimbare a regiunii —; după dispose(),
+  // nimic.
+  globalThis.setTimeout = (f, ms = 0, ...x) => { const id = ceas.urm++; ceas.t.set(id, { la: ceas.acum + ms, f: () => f(...x) }); return id; };
+  globalThis.clearTimeout = (id) => { ceas.t.delete(id); };
+  const D0 = globalThis.document;
+  const COLTURI = JSON.parse(readFileSync('public/data/harta_v4-dem.json', 'utf8')).colturi_geo;
+  /** Busola din `M`, cu scrierile anunțului ei: clipa virtuală, textul, dacă l-au schimbat. */
+  const busolaFalsa = (M) => {
+    ceas.acum = 0; ceas.t.clear();
+    const scrieri = [];
+    const el = () => ({
+      atribute: {}, asc: {}, textContent: '',
+      setAttribute(n, v) { this.atribute[n] = String(v); }, getAttribute(n) { return this.atribute[n] ?? null; },
+      addEventListener(t, f) { (this.asc[t] ??= []).push(f); }, removeEventListener(t, f) { this.asc[t] = (this.asc[t] ?? []).filter((g) => g !== f); },
+      remove() { this.scos = true; },
+    });
+    let text = '';
+    const anunt = el();
+    Object.defineProperty(anunt, 'textContent', {
+      get: () => text,
+      set: (v) => { const nou = String(v); scrieri.push({ la: ceas.acum, text: nou, schimbare: nou !== text }); text = nou; },
+    });
+    const parti = { '.roza': el(), '.cadran': el(), '.citire': el(), '.anunt': anunt };
+    const etichete = [['0', '-38'], ['38', '0'], ['0', '38'], ['-38', '0']].map(([x, y]) => { const e = el(); e.atribute.x = x; e.atribute.y = y; return e; });
+    globalThis.document = {
+      createElement: () => Object.assign(el(), { innerHTML: '', querySelector: (s) => parti[s] ?? null, querySelectorAll: (s) => (s === '.eticheta' ? etichete : []) }),
+    };
+    const controale = { getAzimuthalAngle: () => 0.6, addEventListener() {}, removeEventListener() {} };
+    const b = M.creeazaBusola({ gazda: { appendChild() {} }, controale, colturi: COLTURI, laClic: () => {} });
+    return { b, scrieri, anunt: () => text };
+  };
+  const descrie = (s) => (s.length ? s.map((x) => `„${x.text}” la ${x.la} ms${x.schimbare ? '' : ' (FĂRĂ SCHIMBARE)'}`).join(', ') : 'nicio scriere');
+  const reanuntaBusola = async (M) => {
+    const z = busolaFalsa(M);
+    if (!z.b) return null;
+    await avanseaza(600);
+    const primul = z.anunt();
+    const dinainte = z.scrieri.length;
+    z.b.reanunta();
+    const peLoc = z.anunt();
+    await avanseaza(599);
+    const la599 = z.anunt();
+    await avanseaza(1);
+    const dupa = z.scrieri.slice(dinainte);
+    // După dispose(), reanunta nu mai scrie nimic.
+    await avanseaza(1000);
+    z.b.dispose();
+    const laDispose = z.scrieri.length;
+    z.b.reanunta();
+    await avanseaza(2000);
+    return { primul, peLoc, la599, dupa, dupaDispose: z.scrieri.slice(laDispose) };
+  };
+  const bunBusola = (x) => /^Privești dinspre /.test(x.primul) && x.peLoc === '' && x.la599 === '' && x.dupa.length === 2
+    && x.dupa[0].text === '' && x.dupa[0].la === 600 && x.dupa[1].text === x.primul && x.dupa[1].la === 1200 && x.dupa.every((s) => s.schimbare);
+  const B = await import('../src/scene/busola.js');
+  const zb = await reanuntaBusola(B);
+  proba(zb !== null && bunBusola(zb) && zb.dupaDispose.length === 0,
+    zb === null ? 'busola nu s-a creat cu colțurile lui harta_v4' : `busola: primul anunț „${zb.primul}”; reanunta la 600 ms: ${descrie(zb.dupa)}; după dispose(): ${descrie(zb.dupaDispose)}`);
+  const faraGolire = muta(textSursa('src/scene/busola.js'), ["      if (!viu) return;\n      anunt.textContent = '';\n      programeazaAnunt();", '      if (!viu) return;\n      programeazaAnunt();']);
+  const cb = faraGolire === null ? null : await reanuntaBusola(await modulDin(faraGolire));
+  proba(cb !== null && !bunBusola(cb), `control, busola cu reanunta fără golire (același text scris peste el): ${faraGolire === null ? NEAPLICATA : cb === null ? 'busola nu s-a creat' : `${descrie(cb.dupa)}, ${cb.dupa.filter((s) => s.schimbare).length} schimbări`} — pică`);
+  globalThis.setTimeout = ST;
+  globalThis.clearTimeout = CT;
+  if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
 }
 
 console.warn = warn;

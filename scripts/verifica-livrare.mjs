@@ -69,7 +69,9 @@ const revalidat = (cc) => /\bno-cache\b/.test(cc) || /(^|[\s,])max-age=0\b/.test
 /** Ce politică cere fiecare fel de fișier din /data. Un fel nou trebuie trecut aici. */
 function clasaData(nume) {
   if (/^harta_v\d+-dem\.(bin|json)$/.test(nume)) return 'imutabil';
-  if (/^harta_v\d+-orto_v\d+(-mic)?\.(ktx2|json)$/.test(nume)) return 'imutabil';
+  // Regula din vercel.json mai prinde și `-mic`, varianta mică a lui harta_v9, scoasă din
+  // depozit: un fișier care ar reveni cu numele ăsta e un fel nou și pică până i se hotărăște.
+  if (/^harta_v\d+-orto_v\d+\.(ktx2|json)$/.test(nume)) return 'imutabil';
   if (/^(sanctuar|cladiri)_v\d+\.json$/.test(nume)) return 'imutabil';
   // NDVI-ul ia numele hărții, deci un strat refăcut n-ar avea unde primi alt nume;
   // paleta se reface sub același nume (`npm run paleta`) și are deja patru versiuni.
@@ -299,9 +301,24 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
   const tag = /<script\b[^>]*\bsrc="\/plasa\.js"[^>]*>/.exec(html)?.[0] ?? '';
   const intrare = /\/assets\/index-[\w-]+\.js/.exec(html)?.[0];
   const semnal = intrare && readFileSync(`dist${intrare}`, 'utf8').includes('__modulPornit') && plasa.includes('window.__modulPornit');
-  const mesaj = /<p id="incarcare" role="status">[^<]+<\/p>/.test(html);
-  proba(tag && /\bdefer\b/.test(tag) && !/type=/.test(tag) && semnal && mesaj,
-    `index.html: plasa clasică, cu defer (${tag || 'LIPSĂ'}); semnul __modulPornit în ${intrare ?? 'intrare LIPSĂ'} și în plasă: ${semnal ? 'da' : 'NU'}; mesajul de încărcare cu role="status": ${mesaj ? 'da' : 'NU'}`);
+  // Mesajul de încărcare (vezi „Pornirea”): un <div id="incarcare"> cu paragraful anunțat
+  // (`role="status"`), în care procentul stă într-un <span aria-hidden="true"> gol — cititorul de
+  // ecran aude numai faza —, și butonul „Arată relieful acum”, ascuns până la faza fotografiei.
+  // Fără atribute de stil sau handlere: le prinde și proba de mai sus, pe tot documentul.
+  const mesajNou = (h) => {
+    const div = /<div id="incarcare">([\s\S]*?)<\/div>/.exec(h)?.[1] ?? null;
+    const p = div && /^\s*<p role="status">([^<]+)<span aria-hidden="true"><\/span><\/p>/.exec(div);
+    const buton = div && /<button type="button" hidden>([^<]+)<\/button>\s*$/.exec(div);
+    return { ok: Boolean(p && buton && !/\s(style|on[a-z]+)\s*=/.test(div)), text: p?.[1] ?? null, buton: buton?.[1] ?? null };
+  };
+  const mesaj = mesajNou(html);
+  proba(tag && /\bdefer\b/.test(tag) && !/type=/.test(tag) && semnal && mesaj.ok && mesaj.text === 'Se încarcă harta 3D…' && mesaj.buton === 'Arată relieful acum',
+    `index.html: plasa clasică, cu defer (${tag || 'LIPSĂ'}); semnul __modulPornit în ${intrare ?? 'intrare LIPSĂ'} și în plasă: ${semnal ? 'da' : 'NU'}; mesajul de încărcare: ${mesaj.ok ? `„${mesaj.text}” cu role="status" pe paragraf, procentul aria-hidden, butonul „${mesaj.buton}” ascuns` : 'NU în forma cerută'}`);
+  // Controale: marcajul de dinainte (un singur <p>, fără buton) și un buton fără `hidden`, care s-ar
+  // vedea de la început.
+  const mesajVechi = mesajNou('<p id="incarcare" role="status">Se încarcă harta 3D…</p>');
+  const vizibil = mesajNou(html.replace('<button type="button" hidden>', '<button type="button">'));
+  proba(!mesajVechi.ok && !vizibil.ok, `control, marcajul de dinainte și butonul fără \`hidden\`: ${mesajVechi.ok ? 'TRECE' : 'pică'} / ${vizibil.ok ? 'TRECE' : 'pică'}`);
 }
 
 // Simularea regulilor refuză ce nu înțelege, în loc să potrivească greșit.

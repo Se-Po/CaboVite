@@ -33,11 +33,17 @@ import { instantaneuMemorie } from './dispose.js';
 
 /**
  * @param {HTMLCanvasElement} canvas
- * @param {{continut?: object, laSurse?: (surse: object[]) => void, laEsec?: (e: Error) => void}} [o]
+ * @param {{continut?: object, laSurse?: (surse: object[]) => void, laEsec?: (e: Error) => void,
+ *   laIncarcare?: (o: {faza?: 'fotografie', fractie?: number}) => void, faraSatelit?: AbortSignal|null}} [o]
  *   `laEsec`: bucla s-a oprit după cadre eșuate la rând (vezi bucla); cine a pornit
  *   scena o eliberează și trece pagina pe calea fără scenă.
+ *   `laIncarcare`: ce așteaptă pornirea, pentru mesajul de încărcare: `{ faza: 'fotografie' }`
+ *   când harta e gata și mai lipsește numai fotografia aeriană, apoi `{ fractie }`, cât din
+ *   octeții ei a sosit (pe procente întregi, 1 la capăt). Poate veni o fracție înaintea fazei.
+ *   `faraSatelit`: omul nu mai așteaptă fotografia — harta se arată pe loc, pe Relief, iar
+ *   Satelit rămâne de cerut din butonul lui.
  */
-export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
+export async function porneste(canvas, { continut, laSurse, laEsec, laIncarcare, faraSatelit } = {}) {
   const renderer = creeazaRenderer(canvas);
   if (!renderer) return null;
 
@@ -60,16 +66,18 @@ export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
   };
 
   // Garda pornirii (loaders.js): un ceas de inactivitate și un semnal de abandon pentru
-  // toate cererile de mai jos. După 20 s fără niciun octet pe nicio cerere, pornirea se
-  // abandonează și aruncă `garda.motiv` (TimeoutError), iar main.js trece pe calea fără
+  // toate cererile datelor de mai jos. După 20 s fără niciun octet pe nicio cerere, pornirea
+  // se abandonează și aruncă `garda.motiv` (TimeoutError), iar main.js trece pe calea fără
   // scenă. Pe orice eșec, `curata()` oprește și cererile încă în zbor. Ceasul se oprește
-  // în `finally`: după pornire nu mai are ce păzi. Texturile Satelit nu sunt ale lui: pleacă
-  // după toate datele pornirii, cu abandonul și limita lor de transcodare.
+  // imediat după ultimele date (în `construieste`): de acolo încolo nu mai are ce păzi, iar
+  // armat cât se așteaptă fotografia ar fi expirat fals, cu o excepție de mai târziu ieșită
+  // drept „datele n-au mai sosit”. Încă o dată în `finally`, idempotent, pe căile de eșec de
+  // dinaintea lui. Texturile Satelit au garda lor (satelit.js), cu limita lor de transcodare.
   const garda = creeazaGardaPornirii();
   deEliberat.push(() => garda.abandoneaza());
 
   try {
-    return await construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec);
+    return await construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec, laIncarcare, faraSatelit);
   } catch (e) {
     // Garda expirată e cauza, oricare ar fi excepția cu care a ieșit construcția.
     if (garda.expirat) e = garda.motiv;
@@ -87,7 +95,7 @@ export async function porneste(canvas, { continut, laSurse, laEsec } = {}) {
   }
 }
 
-async function construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec) {
+async function construieste(canvas, renderer, deEliberat, curata, garda, continut, laSurse, laEsec, laIncarcare, faraSatelit) {
   // Relieful pleacă ACUM, înaintea așteptării de mai jos.
   //
   // Paleta măsurată e un JSON de 6,5 KB; relieful, cu straturile NDVI, e 5,29 MB
@@ -218,17 +226,19 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     deEliberat.push(() => legenda.dispose());
   }
 
-  // Vederea Satelit își cere prima treaptă ACUM, înaintea construcției, nu după ea
+  // Vederea Satelit își cere texturile ACUM, toate și întregi, înaintea construcției, nu după ea
   // (satelit.js, `descarcaSatelit`): construcția ține firul principal ~0,3–0,5 s pe desktop,
   // iar rețeaua stătea în timpul ei degeaba. Abia după TOATE datele pornirii — de obicei
   // relieful sosește ultimul —, ca texturile să nu le ia banda. Nimic cu `?previzualizare`
   // sau cu preferința Relief. `curata()` oprește cererile pe orice eșec de mai jos; după
   // `creeazaSatelit` sunt ale lui. Separabil: dacă nu se poate, Satelit le cere mai târziu.
   const [, , niveluriImprejurimi] = await asteapta(Promise.all([sanctuarGata, cladiriGata, imprejurimiGata]));
+  // Toate datele pornirii au sosit: garda n-are ce mai păzi (vezi `porneste`).
+  garda.opreste();
   const descarcareSatelit = (() => {
     try {
       return relief.meta?.bbox_tm06 ? descarcaSatelit({
-        renderer, numeBaza: relief.meta.nume, fortatRelief: Boolean(culoare),
+        renderer, numeBaza: relief.meta.nume, numePetic: reliefPetic?.meta.nume ?? null, fortatRelief: Boolean(culoare),
         imprejurimi: (niveluriImprejurimi ?? []).map((L) => L.meta.nume),
       }) : null;
     } catch (e) {
@@ -393,15 +403,10 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   canvas.addEventListener('webglcontextrestored', laRestaurare);
   deEliberat.push(() => canvas.removeEventListener('webglcontextrestored', laRestaurare));
 
-  // Vederea Satelit: ortofotoul pe relief, comutabil cu vederea de mai sus. Pornește
-  // pe Relief și trece singur pe Satelit când texturile sunt gata — dacă omul nu
-  // și-a ales altfel data trecută. Separabil: fără textură, sau dacă nu se poate
-  // crea deloc, rămâne Relief — ca la cer și la umbre.
-  //
-  // Texturile ei urcă pe placă abia după primul cadru (`primulCadru`, rezolvat în buclă):
-  // pornite înaintea construcției, pot sosi înaintea lui.
-  let laPrimulCadru = null;
-  const primulCadru = new Promise((r) => { laPrimulCadru = r; });
+  // Vederea Satelit: ortofotoul pe relief, comutabil cu vederea de mai sus. Harta se arată
+  // direct pe ea, abia cu toate texturile pe placă (mai jos, înaintea buclei) — dacă omul nu
+  // și-a ales Relief data trecută. Separabil: fără textură, sau dacă nu se poate crea deloc,
+  // harta se arată pe Relief — ca la cer și la umbre.
   let satelit = null;
   try {
     if (!b) throw new Error('harta n-are bbox_tm06');
@@ -422,7 +427,9 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
       },
       laSursa: (s) => { surse = unesteSurse(surse, [s]); laSurse?.(surse); },
       fortatRelief: Boolean(culoare),
-      descarcare: descarcareSatelit, primulCadru,
+      descarcare: descarcareSatelit,
+      laProgres: laIncarcare ? (fractie) => laIncarcare({ fractie }) : undefined,
+      faraSatelit,
     });
     const sat = satelit;
     deEliberat.push(() => sat.dispose());
@@ -615,25 +622,34 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     return true;
   };
 
-  // Panourile hărții — busola, Satelit, „Coordonate” — sunt pe ecran de aici, înaintea primului
-  // cadru. Pe un ecran îngust sau scund, ori pe o pagină mărită, mesajul de încărcare din mijloc
-  // ar sta peste ele cât ține compilarea; main.css îl ascunde acolo după atributul ăsta, iar
-  // butonul Satelit ocupat rămâne semnul încărcării.
-  const radacinaDoc = canvas.ownerDocument.documentElement;
-  radacinaDoc.dataset.panouri = '';
-  deEliberat.push(() => { delete radacinaDoc.dataset.panouri; });
-
   // Programele se leagă ÎNAINTEA primului cadru, nu în el. three le compilează la prima
   // randare și așteaptă acolo, sincron, legarea fiecăruia, unul după altul. `compileAsync`
   // le pornește pe toate și, cu KHR_parallel_shader_compile, așteaptă fără să blocheze; fără
   // extensie programele trec drept gata (WebGLProgram.js:995), iar promisiunea se rezolvă
   // după un temporizator de ~10 ms (WebGLRenderer.js:1567), cu legarea tot pe primul cadru,
   // ca înainte — citit în cod, NEVERIFICAT într-un browser fără extensie. Programul umbrei
-  // rămâne pe primul cadru: `compile()` nu face trecerea de umbre. Satelit nu e atins: își compilează materialele
-  // abia după primul cadru (`primulCadru`). Toate datele pornirii au sosit deja, deci garda
-  // n-are ce păzi aici. Măsurat pe build, la prima vizită: primul cadru 370–383 → 99–109 ms,
-  // iar imaginea gata cu ~0,2 s mai devreme; la reveniri, cam la fel (CLAUDE.md).
+  // rămâne pe primul cadru: `compile()` nu face trecerea de umbre. `compile()` ia materialele
+  // din scenă pe loc, sincron, deci acestea sunt cele Relief: Satelit nu se poate aplica
+  // înainte, i-ar trebui o așteptare. Așa nici prima comutare pe Relief nu sacadează;
+  // materialele Satelit și le compilează Satelit, pe plase-proxy (satelit.js). Măsurat pe
+  // build, la prima vizită: primul cadru 370–383 → 99–109 ms, iar imaginea gata cu ~0,2 s
+  // mai devreme; la reveniri, cam la fel (CLAUDE.md).
   try { await renderer.compileAsync(scena, camera); } catch { /* se compilează la prima randare */ }
+
+  // Harta se arată o singură dată, direct pe Satelit, cu toate texturile la detaliul întreg pe
+  // placă: autorul a văzut pornirea în trei secvențe — Relief, apoi Satelit, apoi peticul și
+  // harta_v9 ascuțite — și a cerut una singură (2026-10-08). Deci bucla, care desenează primul
+  // cadru, pornește abia după `satelit.gata`. Cât se așteaptă, mesajul de încărcare spune ce
+  // lipsește, cu procentul, și oferă ieșirea (`faraSatelit`): harta se arată atunci pe loc, pe
+  // Relief. `gata` nu atârnă: Satelit are garda lui, iar transcodarea limita ei (satelit.js);
+  // eșuat, harta se arată pe Relief, cu anunțul eșecului. Fără așteptare cu `?previzualizare`,
+  // cu preferința Relief sau fără Satelit: harta e gata. Măsurat pe build (4173 și 4174, cu CSP
+  // impus), de cinci ori fiecare: când main.js pune `data-scena`, 0 cadre desenate, Satelit
+  // aplicat, peticul pe 2176 de texeli, harta_v9 pe 2432; primul cadru e Satelit.
+  if (satelit?.automat) {
+    try { laIncarcare?.({ faza: 'fotografie' }); } catch (e) { console.warn('mesajul de încărcare nu s-a putut schimba:', e?.message ?? e); }
+    await asteaptaSatelitul(satelit.gata, faraSatelit);
+  }
 
   // Cadrele eșuate de la ultima randare reușită. three cere cadrul următor ÎNAINTEA
   // buclei (WebGLAnimation.js:10), deci o excepție nu oprește bucla, ci se repetă:
@@ -651,10 +667,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   let esecuri = 0;
   renderer.setAnimationLoop(() => {
     try {
-      if (cadru()) {
-        esecuri = 0;
-        if (laPrimulCadru) { laPrimulCadru(); laPrimulCadru = null; }
-      }
+      if (cadru()) esecuri = 0;
     } catch (e) {
       // Un singur mesaj, cu excepția întreagă: repetările n-ar spune nimic nou.
       if (!esecuri++) console.error('cadrul scenei a eșuat:', e);
@@ -687,8 +700,25 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
 
   return {
     renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo, alpha, acasa,
-    // Getter: vederea Satelit adaugă o sursă când îi sosește textura, după pornire.
+    // Getter: vederea Satelit își adaugă sursele când îi sosesc texturile — pe calea automată
+    // înaintea lui `data-scena`, deci în prima scriere a subsolului; cerută din buton, după.
     get surse() { return surse; },
+    /**
+     * Harta e pe ecran (main.js, după `data-scena`). Panourile au stat ascunse până acum
+     * (main.css), deci anunțurile scrise între timp în regiunile lor live — busola, eșecul
+     * fotografiei — n-au ajuns la cititorul de ecran: un nod cu `visibility: hidden` nu e în
+     * arborele de accesibilitate, iar textul deja prezent al unei regiuni care apare nu se
+     * anunță. Se scriu din nou după două cadre ale paginii: în aceeași actualizare cu
+     * dezvăluirea, tot nu s-ar anunța (recenzia, măsurat în Edge).
+     */
+    arata() {
+      const cadruPagina = globalThis.requestAnimationFrame ?? ((f) => setTimeout(f, 16));
+      cadruPagina(() => cadruPagina(() => {
+        if (!viu) return;
+        busola?.reanunta?.();
+        satelit?.reanunta?.();
+      }));
+    },
     zbor, eticheta, cadruFisa, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
@@ -738,6 +768,26 @@ function unesteSurse(a, b) {
 }
 
 /**
+ * Așteptarea fotografiei la pornire: `gata` al lui Satelit, sau ieșirea omului (`semnal`), care
+ * vine întâi. Nu respinge — o promisiune respinsă trece drept Satelit eșuat — și nu lasă
+ * ascultătorul pe semnal după ce s-a hotărât. `true` numai dacă Satelit e pe ecran.
+ * Exportată pentru verifica-pagina.
+ *
+ * @param {Promise<boolean>} gata
+ * @param {AbortSignal|null} [semnal]
+ */
+export function asteaptaSatelitul(gata, semnal = null) {
+  const bun = Promise.resolve(gata).then((v) => v === true, () => false);
+  if (!semnal) return bun;
+  if (semnal.aborted) return Promise.resolve(false);
+  return new Promise((res) => {
+    const laIesire = () => res(false);
+    semnal.addEventListener('abort', laIesire, { once: true });
+    bun.then((v) => { semnal.removeEventListener('abort', laIesire); res(v); });
+  });
+}
+
+/**
  * Pe ce cutie se strânge harta de umbre, la fiecare cadru desenat.
  *
  * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
@@ -746,15 +796,19 @@ function unesteSurse(a, b) {
  * (`canvas.height`), nu CSS și nu neapărat de dispozitiv: raportul e plafonat la 2.
  * De aproape, grupul cel mai apropiat de țintă.
  *
- * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Primul cadru
- * are soarele Relief — Satelit își pune soarele abia când i-a sosit textura —,
- * deci cutia unită rămâne numai pe un canvas înalt de cel mult ~922 px de
- * canvas; sub Satelit histerezisul păstrează apoi alegerea (întoarcerea la
- * cutia unită cere ≤ ~917 px). Pe telefoanele în portret și pe ecranele dense harta
- * pornește strânsă pe sanctuar (~430 m de țintă; farul e la ~800 m), cu 0,21–0,22 m
- * pe texel — farul își primește umbra când te apropii de el. Un telefon în peisaj
- * rămâne pe cutia unită: cu raportul de pixeli plafonat la 2 (renderer.js), canvasul
- * de 844 × 390 la 3× are 780 px înălțime, nu 1170.
+ * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Alegerea se face
+ * abia la primul cadru: la creare canvasul n-are încă mărimea lui — o capătă în buclă —,
+ * deci aici iese mereu cutia unită. Primul cadru are soarele zborului — harta apare direct
+ * pe Satelit —, cu 0,497 m pe texel, deci cutia unită rămâne pe un canvas înalt de cel
+ * mult ~1 120 px de canvas (măsurat în pagină: 1120 → cutia unită, 1122 → sanctuarul).
+ * Cu preferința Relief primul cadru are soarele Relief, 0,604 m, iar pragul e ~922 px.
+ * Pe telefoanele în portret și pe ecranele dense harta pornește strânsă pe sanctuar
+ * (~430 m de țintă; farul e la ~800 m), cu 0,216 m pe texel — farul își primește umbra
+ * când te apropii de el. Un telefon în peisaj rămâne pe cutia unită: cu raportul de
+ * pixeli plafonat la 2 (renderer.js), canvasul de 844 × 390 la 3× are 780 px înălțime,
+ * nu 1170. Măsurat în pagină, la primul cadru: 1440 × 900 la DPR 1 → cutia unită, la
+ * DPR 2 (2428 × 1517) → sanctuarul; 390 × 844 la 3× (780 × 1688) → sanctuarul;
+ * 844 × 390 la 3× (1688 × 780) → cutia unită.
  *
  * Două praguri cu histerezis — ±10% pe pixel,
  * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu

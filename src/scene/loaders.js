@@ -28,8 +28,11 @@ export const INACTIVITATE_PORNIRE_MS = 20_000;
  *
  * `opreste()` oprește numai ceasul: pornirea s-a terminat. `abandoneaza()` oprește și
  * cererile; e idempotent. `acum` se schimbă numai în probe.
+ *
+ * Vederea Satelit își face una a ei, pentru texturi (satelit.js, `cereTexturile`), cu
+ * `eticheta` „a fotografiei aeriene” în mesaj.
  */
-export function creeazaGardaPornirii({ inactivitateMs = INACTIVITATE_PORNIRE_MS, acum = () => performance.now() } = {}) {
+export function creeazaGardaPornirii({ inactivitateMs = INACTIVITATE_PORNIRE_MS, acum = () => performance.now(), eticheta = 'a pornirii' } = {}) {
   const oprire = new AbortController();
   const doc = globalThis.document;
   let ceas = null, ascuns = false, oprit = false, expirat = false, motiv = null;
@@ -52,7 +55,7 @@ export function creeazaGardaPornirii({ inactivitateMs = INACTIVITATE_PORNIRE_MS,
     const termen = acum() + inactivitateMs;
     ceas = setTimeout(() => {
       if (ascuns || acum() - termen > 1000) return arma();
-      const e = new Error(`nicio cerere a pornirii n-a primit vreun octet în ${inactivitateMs / 1000} s`);
+      const e = new Error(`nicio cerere ${eticheta} n-a primit vreun octet în ${inactivitateMs / 1000} s`);
       e.name = 'TimeoutError';
       expirat = true;
       abandoneaza(e);
@@ -89,36 +92,43 @@ export async function cere(url, garda = null, semnal = garda?.semnal) {
 
 /**
  * Corpul unui răspuns, ca ArrayBuffer. Cu o gardă, citit pe bucăți: fiecare bucată sosită
- * rearmează ceasul, iar abandonul oprește citirea și aruncă `garda.motiv`. Fără gardă,
- * `arrayBuffer()` ca înainte.
+ * rearmează ceasul, iar abandonul oprește citirea și aruncă `garda.motiv`. `laOcteti(n)`, dacă
+ * există, se cheamă pe fiecare bucată, cu mărimea ei — progresul texturilor Satelit. Fără gardă
+ * și fără `laOcteti`, `arrayBuffer()` ca înainte.
  */
-export async function citesteOcteti(r, garda = null) {
-  const cititor = garda ? r.body?.getReader?.() : null;
-  if (!cititor) return r.arrayBuffer();
-  if (garda.semnal.aborted) {
+export async function citesteOcteti(r, garda = null, laOcteti = null) {
+  const cititor = garda || laOcteti ? r.body?.getReader?.() : null;
+  if (!cititor) {
+    const buf = await r.arrayBuffer();
+    laOcteti?.(buf.byteLength);
+    return buf;
+  }
+  const semnal = garda?.semnal ?? null;
+  if (semnal?.aborted) {
     cititor.cancel().catch(() => {});
     throw garda.motiv;
   }
   // Un corp care nu ascultă de semnal — în probe — se oprește de aici. `cancel()` termină
   // citirea în curs cu `done`, deci abandonul se judecă după buclă.
   const laAbandon = () => { cititor.cancel().catch(() => {}); };
-  garda.semnal.addEventListener('abort', laAbandon, { once: true });
+  semnal?.addEventListener('abort', laAbandon, { once: true });
   const bucati = [];
   let n = 0;
   try {
     for (;;) {
       const { done, value } = await cititor.read();
-      if (done || garda.semnal.aborted) break;
+      if (done || semnal?.aborted) break;
       bucati.push(value);
       n += value.byteLength;
-      garda.progres();
+      garda?.progres();
+      laOcteti?.(value.byteLength);
     }
   } catch (e) {
-    throw garda.semnal.aborted ? garda.motiv : e;
+    throw semnal?.aborted ? garda.motiv : e;
   } finally {
-    garda.semnal.removeEventListener('abort', laAbandon);
+    semnal?.removeEventListener('abort', laAbandon);
   }
-  if (garda.semnal.aborted) throw garda.motiv;
+  if (semnal?.aborted) throw garda.motiv;
   const tot = new Uint8Array(n);
   let o = 0;
   for (const b of bucati) { tot.set(b, o); o += b.byteLength; }
@@ -408,9 +418,11 @@ export function elibereazaKtx2(k) {
 }
 
 /**
- * Iese o textură Satelit comprimată pe placa asta? Se știe din `workerConfig`, imediat după
- * `detectSupport`, înaintea oricărei cereri. Fără niciun format, transcodorul dă RGBA
- * necomprimat, de patru ori mai mare: atunci peticul nici nu se mai cere (satelit.js).
+ * Iese o textură Satelit comprimată pe placa asta? Se știe din `workerConfig`, după
+ * `detectSupport`, înaintea primei transcodări; cererile texturilor pleacă deja înaintea lui.
+ * Fără niciun format, transcodorul dă RGBA necomprimat, de patru ori mai mare: atunci cererea
+ * peticului, pornită devreme odată cu celelalte, se oprește (satelit.js, `pregateste`), iar
+ * plasa lui rămâne pe textura bazei.
  *
  * PVRTC nu se numără: cere laturi putere a lui 2 (`needsPowerOfTwo`), iar nicio textură
  * Satelit nu le are, deci acolo tot RGBA iese. ETC1 se numără: texturile n-au alfa.
@@ -555,10 +567,24 @@ export function cereOrto(nume, semnal = null, { sidecar = true } = {}) {
  *
  * `cereri`: cererile pornite dinainte cu `cereOrto`; fără ele, le pornește aici, tot deodată.
  *
+ * `garda`: garda fotografiei (satelit.js): sidecarul, antetul și fiecare bucată a fișierului o
+ * rearmează, iar abandonul ei oprește citirea. `laOcteti(n)`: chemat pe fiecare bucată citită —
+ * progresul. `laDescarcat()`: chemat o singură dată, când textura nu mai așteaptă nimic de la
+ * rețea — fișierul citit și transcodorul sosit, sau încercarea încheiată —, ca garda să nu
+ * păzească și transcodarea, care are limita ei.
+ *
  * @returns {Promise<{meta: object, textura: THREE.CompressedTexture}|null>}
  */
-export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { limitaMs = LIMITA_TRANSCODARE_MS, cereri = null } = {}) {
+export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, {
+  limitaMs = LIMITA_TRANSCODARE_MS, cereri = null, garda = null, laOcteti = null, laDescarcat = null,
+} = {}) {
   const c = cereri ?? cereOrto(nume, semnal, { sidecar: !metaGata });
+  let descarcat = false;
+  const gataReteaua = () => {
+    if (descarcat) return;
+    descarcat = true;
+    laDescarcat?.();
+  };
   const lipsa = (motiv) => {
     c.opreste();
     if (semnal?.aborted) return null;
@@ -567,9 +593,11 @@ export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { 
   };
   try {
     const meta = metaGata ?? await c.meta;
+    garda?.progres();
     const r = await c.raspuns;
+    garda?.progres();
     if (!r.ok) return lipsa(`HTTP ${r.status}`);
-    const buf = await r.arrayBuffer();
+    const buf = await citesteOcteti(r, garda, laOcteti);
     if (buf.byteLength !== meta.octeti) return lipsa(`${buf.byteLength} octeți, aștept ${meta.octeti}`);
     const dv = new DataView(buf);
     const magic = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb];
@@ -594,6 +622,7 @@ export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { 
     // public în r186, dar marcat „TODO: Make this method private”: verifica-pagina pică
     // dacă dispare sau dacă `parse()` nu mai trece prin el.
     if (await inCursa(ktx2.init(), semnal, 0) === ABANDON) return null;
+    gataReteaua();
     // parse() nu întoarce o promisiune; o eroare de transcodare vine pe onError. Un
     // worker care n-a pornit nu cheamă nimic: de aceea limita.
     const textura = await inCursa(new Promise((res, rej) => ktx2.parse(buf, res, rej)), semnal, limitaMs);
@@ -602,5 +631,7 @@ export async function incarcaOrto(nume, ktx2, metaGata = null, semnal = null, { 
     return { meta, textura };
   } catch (e) {
     return lipsa(e?.message ?? String(e));
+  } finally {
+    gataReteaua();
   }
 }

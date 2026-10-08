@@ -16,6 +16,55 @@ const continut = document.querySelector('#continut');
 const subsol = document.querySelector('#surse');
 
 /**
+ * Mesajul de încărcare (index.html), până la `data-scena` pe <body>: „Se încarcă harta 3D…”,
+ * apoi, cât mai lipsește numai fotografia aeriană, „Se încarcă fotografia aeriană…” cu
+ * procentul și butonul „Arată relieful acum”. Clicul nu mai așteaptă fotografia (`faraSatelit`):
+ * harta se arată pe loc, pe Relief, iar Satelit rămâne de cerut din butonul lui. Preferința
+ * salvată nu se schimbă — omul n-a ales Relief, a ales să nu mai aștepte.
+ *
+ * Cititorul de ecran aude numai schimbarea fazei: `role="status"` stă pe paragraf, iar
+ * procentul, într-un `<span aria-hidden="true">`, nu se anunță la fiecare pas. O fracție venită
+ * înaintea fazei — octeții curg și cât se compilează programele — se ține minte și se scrie
+ * odată cu ea.
+ */
+const asteptare = (() => {
+  const radacina = document.getElementById('incarcare');
+  const mesaj = radacina?.querySelector('[role="status"]');
+  const procent = mesaj?.querySelector('span');
+  const buton = radacina?.querySelector('button');
+  const iesire = new AbortController();
+  let fotografie = false, cat = null;
+  const scrie = () => { if (procent && fotografie && cat !== null) procent.textContent = `${cat}%`; };
+  buton?.addEventListener('click', () => {
+    buton.disabled = true;
+    iesire.abort();
+  });
+  return {
+    faraSatelit: iesire.signal,
+    laIncarcare({ faza, fractie } = {}) {
+      if (faza === 'fotografie' && !fotografie) {
+        fotografie = true;
+        mesaj?.replaceChildren('Se încarcă fotografia aeriană…', ...(procent ? [procent] : []));
+        if (buton) buton.hidden = false;
+      }
+      if (Number.isFinite(fractie)) cat = Math.round(100 * Math.min(1, Math.max(0, fractie)));
+      scrie();
+    },
+    /**
+     * Harta e pe ecran: mesajul pleacă (main.css, după `data-scena`). Un focus rămas în el —
+     * pe butonul apăsat, sau numai ajuns acolo cu Tab — ar cădea pe <body>; trece pe butonul
+     * Satelit, de unde fotografia se poate cere sau lăsa.
+     */
+    laHarta() {
+      if (!radacina?.contains(document.activeElement)) return;
+      const satelit = document.querySelector('#straturi:not([hidden]) button:not([hidden])');
+      if (satelit) satelit.focus();
+      else document.activeElement.blur?.();
+    },
+  };
+})();
+
+/**
  * Atribuirea datelor. Relieful LiDAR și ortofotoul DGT sunt sub CC BY 4.0, care
  * cere numele autorului, licența și mențiunea că datele au fost schimbate —
  * oriunde se afișează. Subsolul apare numai când scena chiar le afișează: fără
@@ -61,8 +110,8 @@ const numeScurt = (p, surse = []) => surse.find((s) => s.producator === p && s.s
   ?? p.match(/\(([^)]+)\)\s*$/)?.[1] ?? (/OpenStreetMap/.test(p) ? 'OpenStreetMap' : p);
 
 /**
- * Rândul și modala se fac o singură dată. Scrierile de după — sursa Satelit
- * sosește după pornire — schimbă numai textele: o modală deschisă rămâne
+ * Rândul și modala se fac o singură dată. Scrierile de după — sursa Satelit cerută din
+ * buton, după pornire — schimbă numai textele: o modală deschisă rămâne
  * deschisă, iar butonul nu-și pierde focusul.
  */
 let dom = null;
@@ -217,13 +266,16 @@ function faraScena(motiv, { reincearca = false } = {}) {
 // `let`, în afara lui `try`: `laEsec` o eliberează după ce a pornit.
 let scena = null;
 try {
-  // `laSurse`: vederea Satelit își adaugă sursa când îi sosește textura, după ce
-  // subsolul a fost deja scris; atunci se scrie din nou.
+  // `laSurse`: vederea Satelit își adaugă sursele când îi sosesc texturile. Pe calea automată
+  // ele vin înaintea lui `data-scena` și intră în prima scriere a subsolului (`scena.surse`);
+  // cerută din buton, după pornire, Satelit le adaugă când subsolul e deja scris: atunci se
+  // scrie din nou.
   // `laEsec`: bucla s-a oprit după cadre eșuate la rând. Întâi `dispose()`, prin aceeași
   // listă ca la pornire, apoi calea fără scenă: `faraScena()` singur scoate numai
   // canvasul, iar bucla, plasa și ascultătorii ar rămâne vii. Canvasul e abandonat, deci
   // contextul se pierde și el, ca pe calea de eroare de la pornire: altfel ar rămâne viu,
   // cu bufferul de desen, cât trăiește pagina (canvasul e ținut de `canvas` și `__scena`).
+  // `laIncarcare` și `faraSatelit`: mesajul de încărcare și ieșirea lui (`asteptare`, mai sus).
   scena = await porneste(canvas, {
     continut: { sanctuar: SANCTUAR, cladiri: CLADIRI },
     laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); },
@@ -233,11 +285,16 @@ try {
       r?.forceContextLoss();
       faraScena(`cadre eșuate la rând: ${e?.message ?? e}`);
     },
+    laIncarcare: asteptare.laIncarcare,
+    faraSatelit: asteptare.faraSatelit,
   });
   if (!scena) {
     faraScena('WebGL indisponibil');
   } else {
     document.body.dataset.scena = 'activa';
+    asteptare.laHarta();
+    // Anunțurile scrise cât panourile erau ascunse — busola, eșecul fotografiei — se scriu din nou.
+    scena.arata?.();
     arataSurse(scena.surse);
     // Linia de bază pentru verificările de memorie de mai târziu.
     console.info('scenă pornită —', scena.nrTriunghiuri, 'triunghiuri',
