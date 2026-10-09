@@ -1,10 +1,12 @@
 // Punctul de intrare. Leagă scena de conținut — și atât.
 //
 // Textul e conținutul, scena îl servește. Dacă WebGL nu pornește, canvasul
-// dispare și pagina rămâne o pagină, nu un ecran de eroare.
+// dispare și pagina rămâne o pagină, nu un ecran de eroare: cu textul sanctuarului,
+// din capitolul lui (src/chapters/sanctuar.js, numai DOM).
 import { porneste } from './scene/scena.js';
 import { SANCTUAR } from './content/sanctuar.js';
 import { CLADIRI } from './content/cladiri.js';
+import * as capitolSanctuar from './chapters/sanctuar.js';
 
 // Semnul pentru plasa de siguranță (public/plasa.js): modulul a pornit. Prima instrucțiune —
 // ajunge aici numai dacă tot graful lui s-a parsat și s-a evaluat —, înaintea oricărei
@@ -237,13 +239,21 @@ function scrieSurse(surse) {
   subsol.hidden = false;
 }
 
-// Fără scenă, pagina n-ar avea nimic de arătat până vin capitolele. Un anunț
-// neutru: calea asta o iau WebGL-ul lipsă, o eroare la încărcare și bucla oprită
-// după cadre eșuate la rând.
+// Fără scenă, pagina arată textul pe care altfel îl deschide eticheta sanctuarului: un anunț
+// neutru, apoi capitolul sanctuarului, cu sursele lui. Calea asta o iau WebGL2-ul lipsă, o
+// eroare la încărcare și bucla oprită după cadre eșuate la rând. Numai într-un `#continut`
+// gol: titlul paginii (`h1`) stă de aceea în afara lui, în `<header>` (index.html), la fel
+// `<noscript>` — cu JavaScript pornit, conținutul lui e text, deci `#continut` n-ar mai fi gol.
 //
 // `reincearca`: datele n-au mai sosit (garda pornirii, loaders.js). Atunci anunțul spune
 // asta, iar butonul reîncarcă pagina — o rețea care a tăcut poate merge la a doua încercare.
-function faraScena(motiv, { reincearca = false } = {}) {
+//
+// Anunțul e o regiune `alert`: singura regiune live de până atunci, mesajul de încărcare,
+// pleacă odată cu `data-scena`, iar harta poate cădea și sub un cititor care o folosea
+// (WCAG 4.1.3). `muta`: după o așteptare sau după ce harta a fost pe ecran, focusul rămas pe
+// <body> sau pe canvasul scos trece pe „Reîncearcă”, altfel pe anunț (WCAG 2.4.3). La
+// încărcare, fără WebGL2, focusul nu se mută.
+function faraScena(motiv, { reincearca = false, muta = false } = {}) {
   canvas?.remove();
   document.body.dataset.scena = 'indisponibila';
   // Pe ultima cale subsolul fusese scris, dar fără scenă n-are ce atribui. Modala se
@@ -251,39 +261,55 @@ function faraScena(motiv, { reincearca = false } = {}) {
   if (dom?.dialog.open) dom.dialog.close();
   if (subsol) subsol.hidden = true;
   if (continut && !continut.textContent.trim()) {
-    continut.append(el('p', reincearca ? 'Harta 3D nu a putut porni: datele hărții n-au mai sosit.' : 'Harta 3D nu a putut porni.'));
+    const anunt = el('p', reincearca ? 'Harta 3D nu a putut porni: datele hărții n-au mai sosit.' : 'Harta 3D nu a putut porni.');
+    anunt.setAttribute('role', 'alert');
+    anunt.tabIndex = -1;
+    continut.append(anunt);
+    let b = null;
     if (reincearca) {
-      const b = el('button', 'Reîncearcă');
+      b = el('button', 'Reîncearcă');
       b.type = 'button';
       b.className = 'reincearca';
       b.addEventListener('click', () => location.reload());
       continut.append(b);
     }
+    capitolSanctuar.init({ gazda: continut, continut: SANCTUAR });
+    const a = document.activeElement;
+    if (muta && (!a || a === document.body || !document.documentElement.contains(a))) (b ?? anunt).focus();
   }
   console.info('Pagina rulează fără scenă 3D:', motiv);
 }
 
-// `let`, în afara lui `try`: `laEsec` o eliberează după ce a pornit.
+// `let`, în afara lui `try`: `laEsec` și `catch` o eliberează după ce a pornit.
 let scena = null;
+
+// Scena pornită pleacă prin aceeași listă ca la pornire (`dispose()`), apoi contextul se
+// pierde: canvasul e abandonat, iar altfel ar rămâne viu, cu bufferul de desen, cât trăiește
+// pagina (canvasul e ținut de `canvas` și `__scena`). O excepție de după `porneste()` o lăsa
+// vie: busola, Satelit, „Coordonate” și eticheta stăteau peste capitol, iar tastatura hărții
+// îi oprea defilarea (recenzia).
+function elibereazaScena() {
+  if (!scena) return;
+  const r = scena.renderer;
+  try { scena.dispose(); } catch (x) { console.warn('eliberarea scenei a eșuat:', x?.message ?? x); }
+  r?.forceContextLoss?.();
+  scena = null;
+}
 try {
   // `laSurse`: vederea Satelit își adaugă sursele când îi sosesc texturile. Pe calea automată
   // ele vin înaintea lui `data-scena` și intră în prima scriere a subsolului (`scena.surse`);
   // cerută din buton, după pornire, Satelit le adaugă când subsolul e deja scris: atunci se
   // scrie din nou.
-  // `laEsec`: bucla s-a oprit după cadre eșuate la rând. Întâi `dispose()`, prin aceeași
-  // listă ca la pornire, apoi calea fără scenă: `faraScena()` singur scoate numai
-  // canvasul, iar bucla, plasa și ascultătorii ar rămâne vii. Canvasul e abandonat, deci
-  // contextul se pierde și el, ca pe calea de eroare de la pornire: altfel ar rămâne viu,
-  // cu bufferul de desen, cât trăiește pagina (canvasul e ținut de `canvas` și `__scena`).
+  // `laEsec`: bucla s-a oprit după cadre eșuate la rând. Întâi scena pleacă
+  // (`elibereazaScena`), apoi calea fără scenă: `faraScena()` singur scoate numai
+  // canvasul, iar bucla, plasa și ascultătorii ar rămâne vii.
   // `laIncarcare` și `faraSatelit`: mesajul de încărcare și ieșirea lui (`asteptare`, mai sus).
   scena = await porneste(canvas, {
     continut: { sanctuar: SANCTUAR, cladiri: CLADIRI },
     laSurse: (s) => { if (document.body.dataset.scena === 'activa') arataSurse(s); },
     laEsec: (e) => {
-      const r = scena?.renderer;
-      scena?.dispose();
-      r?.forceContextLoss();
-      faraScena(`cadre eșuate la rând: ${e?.message ?? e}`);
+      elibereazaScena();
+      faraScena(`cadre eșuate la rând: ${e?.message ?? e}`, { muta: true });
     },
     laIncarcare: asteptare.laIncarcare,
     faraSatelit: asteptare.faraSatelit,
@@ -304,5 +330,7 @@ try {
     globalThis.__scena = scena; // cârlig pentru verificare din consolă
   }
 } catch (e) {
-  faraScena(e.message, { reincearca: e?.name === 'TimeoutError' });
+  const pornita = scena !== null, timp = e?.name === 'TimeoutError';
+  elibereazaScena();
+  faraScena(e.message, { reincearca: timp, muta: pornita || timp });
 }

@@ -211,12 +211,17 @@ export function creeazaBusola({ gazda, controale, colturi, laClic }) {
 
   function programeazaAnunt() {
     // Cititoarele de ecran n-au de ce să turuie la fiecare cadru de amortizare.
-    // Un singur anunț, după ce camera s-a liniștit.
+    // Un singur anunț, după ce camera s-a liniștit — și numai dacă direcția s-a schimbat:
+    // o mutare sau un zoom fără rotire scriau aceeași propoziție din nou, 10 din 10 (recenzia),
+    // iar cu săgețile ar fi repetat-o după fiecare apăsare. Comparația stă aici, nu în
+    // `laSchimbare`: o rotire întoarsă la același grad în timpul gestului tot programează
+    // cronometrul. `reanunta()` golește întâi regiunea, deci acolo textul se scrie din nou.
     clearTimeout(cronometru);
     cronometru = setTimeout(() => {
       const a = azimutCamerei();
-      anunt.textContent = `Privești dinspre ${NUME_PUNCTE[Math.round(a / 45) % 8]}, `
+      const text = `Privești dinspre ${NUME_PUNCTE[Math.round(a / 45) % 8]}, `
         + `${grade(Math.round(a) % 360)}.`;
+      if (anunt.textContent !== text) anunt.textContent = text;
     }, 600);
   }
 

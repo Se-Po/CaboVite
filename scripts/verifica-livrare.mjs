@@ -13,7 +13,8 @@
 //   - CSP-ul față de ce face pagina: transcodorul KTX2 (worker din blob:, new Function,
 //     WebAssembly), cursoarele (data:), fetch-urile pe aceeași origine; și că nici
 //     marcajul, nici codul nu pun stiluri sau scripturi inline;
-//   - garda numelor publicate (scripts/comun/publicat.mjs).
+//   - garda numelor publicate (scripts/comun/publicat.mjs);
+//   - titlul paginii (`h1`) și `<noscript>`, în sursă și în dist/, în afara lui `#continut`.
 // Fiecare probă de fond are un control negativ: aceeași probă pe o greșeală cunoscută
 // trebuie să pice.
 
@@ -319,6 +320,37 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
   const mesajVechi = mesajNou('<p id="incarcare" role="status">Se încarcă harta 3D…</p>');
   const vizibil = mesajNou(html.replace('<button type="button" hidden>', '<button type="button">'));
   proba(!mesajVechi.ok && !vizibil.ok, `control, marcajul de dinainte și butonul fără \`hidden\`: ${mesajVechi.ok ? 'TRECE' : 'pică'} / ${vizibil.ok ? 'TRECE' : 'pică'}`);
+}
+
+// ------------------------------------------------------------ titlul și <noscript>
+
+// Pagina are un titlu (`<h1>`, ascuns vizual) și, fără JavaScript, o propoziție (`<noscript>`), amândouă în
+// afara lui `<main id="continut">`, care rămâne gol: main.js scrie calea fără scenă numai într-un
+// `#continut` gol, iar cu JavaScript pornit conținutul lui <noscript> e text (CLAUDE.md, „Pornirea”). În
+// sursă și în ce publică build-ul. Controale: index.html de la 6ad3a47, fără ele, și titlul pus în
+// `#continut`.
+{
+  const titlu = (h) => {
+    const main = /<main id="continut">([\s\S]*?)<\/main>/.exec(h);
+    const h1 = [...h.matchAll(/<h1\b[^>]*>([^<]*)<\/h1>/g)];
+    const ns = [...h.matchAll(/<noscript>([\s\S]*?)<\/noscript>/g)];
+    return { main: Boolean(main), gol: main?.[1] === '', h1: h1.length, text: h1[0]?.[1] ?? null, ascuns: /<h1 class="ascuns">/.test(h),
+      noscript: ns.length, propozitie: ns[0]?.[1].replace(/<[^>]+>/g, '').trim() ?? '' };
+  };
+  const bun = (x) => x.main && x.gol && x.h1 === 1 && x.text === 'Cabo Espichel' && x.ascuns && x.noscript === 1 && x.propozitie.length > 0;
+  const descrie = (x) => `h1 ${x.h1}${x.text ? ` „${x.text}”${x.ascuns ? ', ascuns vizual' : ''}` : ''}, <noscript> ${x.noscript}${x.propozitie ? ` („${x.propozitie}”)` : ''}, <main id="continut"> ${x.main ? (x.gol ? 'gol' : 'CU CONȚINUT') : 'LIPSĂ'}`;
+  for (const [nume, h] of [['index.html', readFileSync('index.html', 'utf8')], ['dist/index.html', html]]) {
+    const x = titlu(h);
+    proba(bun(x), `${nume}: ${descrie(x)}`);
+  }
+  const vechi = git(['show', '6ad3a47:index.html']);
+  const v = titlu(vechi ?? '');
+  proba(Boolean(vechi) && !bun(v), `control, index.html de la 6ad3a47: ${vechi ? descrie(v) : 'NECITIT'} — pică`);
+  // Mutația se aplică întreagă sau deloc: altfel ar pica din alt motiv (două titluri).
+  const HEADER = '<header><h1 class="ascuns">Cabo Espichel</h1></header>', MAIN = '<main id="continut"></main>';
+  const inMain = html.includes(HEADER) && html.includes(MAIN)
+    ? titlu(html.replace(HEADER, '').replace(MAIN, '<main id="continut"><h1 class="ascuns">Cabo Espichel</h1></main>')) : null;
+  proba(inMain !== null && !bun(inMain), `control, titlul pus în #continut: ${inMain === null ? 'MUTAȚIA NU S-A APLICAT' : descrie(inMain)} — pică`);
 }
 
 // Simularea regulilor refuză ce nu înțelege, în loc să potrivească greșit.

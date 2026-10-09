@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { creeazaRotita } from './rotita.js';
 import { punctVazut } from './raza.js';
+import { COTA_MARE } from './mare.js';
 
 // Camera și controalele.
 //
@@ -59,12 +60,34 @@ export const STARE = Object.freeze({
   DEGET_ROTIRE: 3, DEGET_MUTARE: 4, DEGETE_ZOOM_MUTARE: 5, DEGETE_ZOOM_ROTIRE: 6,
 });
 
+// Pașii de la tastatură (`ControaleHarta.comanda`): mutarea cu 5% din înălțimea vederii,
+// la distanța țintei; rotirea cu 15°, oricât de înalt e ecranul; zoomul, o treaptă de rotiță.
+export const PAS_MUTARE = 0.05;
+export const UNGHI_PAS = (15 * Math.PI) / 180;
+export const COMENZI = Object.freeze(['sus', 'jos', 'stanga', 'dreapta',
+  'roteste-stanga', 'roteste-dreapta', 'urca', 'coboara', 'apropie', 'departeaza']);
+
+// Drona: Shift urcă, Ctrl coboară, cu privirea neschimbată (tastatura.js), la cererea
+// autorului (2026-10-09). Un pas e PAS_VERTICAL din înălțimea camerei peste ce e sub ea:
+// sus urcă repede, aproape de sol coboară încet. Niciun pas de la tastatură — mutarea,
+// rotirea, zoomul, coborârea — nu duce camera la mai puțin de LIBER_SOL peste relief, mare
+// sau un acoperiș, pe tot discul planului apropiat (`_solSub`): de două ori planul apropiat.
+// Pasul alunecă TAU_VERTICAL, cât amortizarea mutării (0,08 pe cadru, la 60 de cadre pe
+// secundă). Toate trei sunt alegeri, nu măsurători.
+export const PAS_VERTICAL = 0.1;
+export const LIBER_SOL = 2 * NEAR;
+const TAU_VERTICAL = 200; // ms
+const COADA_VERTICAL = 4; // pași
+
 const _raycaster = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 const _plan = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _raza = new THREE.Ray();
+const _jos = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
 const _q = new THREE.Vector3();
 const _u = new THREE.Vector3();
+const _v = new THREE.Vector3();
+const _w = new THREE.Vector3();
 const rectDin = (el) => el?.getBoundingClientRect?.() ?? null;
 
 /**
@@ -85,7 +108,11 @@ const rectDin = (el) => el?.getBoundingClientRect?.() ?? null;
  *   al unui punct care plutește la 60 m deasupra mării;
  * - **ciupirea** apropie spre punctul dintre degete, ca rotița spre cursor;
  * - **gestul se încheie și fără `pointerup`** (`incheieGestul`): la un zbor pornit cu
- *   harta ținută, la pierderea capturii pointerului și la pierderea focusului ferestrei.
+ *   harta ținută, la pierderea capturii pointerului și la pierderea focusului ferestrei;
+ * - **pașii de la tastatură** (`comanda`, chemată de tastatura.js): mutare, rotire,
+ *   urcare și coborâre ca o dronă, zoom, cu limitele obișnuite. `listenToKeyEvents` al lui
+ *   OrbitControls nu se folosește: rotea cu 0,4° pe apăsare, n-avea zoom și nici pivotul
+ *   pe teren.
  *
  * `connect()` și `update()` rulează din constructorul lui OrbitControls, înaintea
  * câmpurilor de mai jos: nimic de aici nu se sprijină pe ele.
@@ -107,9 +134,21 @@ export class ControaleHarta extends MapControls {
     this.rotita = creeazaRotita({ camera, controale: this });
     this._teren = null;
     this._apucat = null;
-    // O tragere sau o rotire iau camera: treptele rămase nu mai alunecă peste ea.
-    // Rotița emite și ea `start`, dar cu starea NIMIC.
-    this.addEventListener('start', () => { if (this.state !== STARE.NIMIC) this.rotita.opreste(); });
+    this._vertical = 0;      // metrii de urcare (negativ: coborâre) care mai au de alunecat
+    this._tVertical = null;
+    this._pazaSol = false;   // un pas de la tastatură încă alunecă: camera rămâne peste sol
+    this._panAmanat = new THREE.Vector3();   // partea din mutare care așteaptă urcarea
+    // Pentru treptele de la tastatură (rotita.js, `pasZoom`): cât stă un punct peste ce e sub
+    // el, și cât trebuie să stea.
+    this.liberLa = (p) => p.y - this._solSub(p.x, p.y, p.z);
+    this.liberMin = LIBER_SOL;
+    // O tragere sau o rotire iau camera: treptele rotiței și urcarea rămase nu mai alunecă
+    // peste ea. Rotița și tastele emit și ele `start`, dar cu starea NIMIC.
+    this.addEventListener('start', () => {
+      if (this.state === STARE.NIMIC) return;
+      this.rotita.opreste();
+      this.opresteVertical();
+    });
     // OrbitControls încheie gestul numai la `pointerup` sau `pointercancel`, iar
     // `pointermove` îl ascultă pe document, fără să citească `buttons`
     // (OrbitControls.js:1592). Fără `pointerup` — Alt+Tab în mijlocul unei trageri —
@@ -274,6 +313,318 @@ export class ControaleHarta extends MapControls {
   }
 
   /**
+   * Unde cade ținta pe ecran, în coordonatele ferestrei: centrul vederii. Fără decalaj de
+   * obiectiv e centrul canvasului; cu fișa deschisă, centrul părții libere. Spre el apropie
+   * „+” și de acolo culege „Măsoară centrul” (punct.js). Null fără canvas cu mărime.
+   */
+  centruVederii() {
+    const r = rectDin(this.domElement);
+    if (!r?.width || !r?.height) return null;
+    this.object.updateMatrixWorld();
+    _q.copy(this.target).project(this.object);
+    if (!Number.isFinite(_q.x) || !Number.isFinite(_q.y)) return null;
+    return { x: r.left + ((_q.x + 1) / 2) * r.width, y: r.top + ((1 - _q.y) / 2) * r.height };
+  }
+
+  /**
+   * Cota a ce e sub (x, z), văzut de la înălțimea y: relieful randat, suprafața mării sau
+   * acoperișul unei clădiri — cel mai sus —, pe tot discul pe care îl ocupă planul apropiat
+   * cu camera în (x, z). Raza e a colțurilor planului apropiat, NEAR·√(1 + tg²(fov/2)·(1 +
+   * aspect²)), cu 10% marjă pentru eșantionare: 14,4 m la 16:9, 12,1 m în portret. Centrul,
+   * 16 puncte pe cerc și 16 la jumătatea razei. Numai pe verticala punctului, drona ținută la
+   * 20 m peste plajă ajungea cu planul apropiat în peretele falezei, iar stânca din centrul
+   * ecranului la 1,31 m (recenzia); cu un disc de NEAR, pe margini tot rămâneau tăieturi.
+   */
+  _solSub(x, y, z) {
+    const t = this._teren;
+    let sol = COTA_MARE;
+    if (!t) return sol;
+    const l = t.lim, cam = this.object, tv = Math.tan((cam.fov * Math.PI) / 360);
+    const raza = 1.1 * cam.near * Math.sqrt(1 + tv * tv * (1 + cam.aspect * cam.aspect));
+    for (let k = -1; k < 32; k++) {
+      const a = (k * Math.PI) / 8, q = k < 0 ? 0 : k < 16 ? raza : raza / 2;
+      const px = x + q * Math.cos(a), pz = z + q * Math.sin(a);
+      if (!l || (px >= l.xMin && px <= l.xMax && pz >= l.zMin && pz <= l.zMax)) {
+        const h = t.inaltimeLa(px, pz);
+        if (Number.isFinite(h)) sol = Math.max(sol, h);
+      }
+      if (t.loveste) {
+        _jos.origin.set(px, y, pz);
+        const c = t.loveste(_jos);
+        if (c && c.t > 0) sol = Math.max(sol, y - c.t);
+      }
+    }
+    return sol;
+  }
+
+  /**
+   * Drona: camera urcă (dy > 0) sau coboară pe verticală, cu privirea neschimbată, iar
+   * ținta trece pe raza privirii, pe ce se vede — ca la `pivotPeTeren`, între 80 m și 8 km
+   * și în alpha. Pe verticală nu se poate muta ținta împreună cu camera: limita alpha o
+   * ține între cota mării și cea mai înaltă cotă a hărții, deci urcarea s-ar fi oprit după
+   * ~100 m, iar coborârea pe plajă după câțiva metri.
+   *
+   * Coborârea se oprește la LIBER_SOL peste ce e sub cameră și cât ce se vede în față e
+   * la mai puțin de 80 m (DIST_MIN, garda zoomului); urcarea, unde privirea nu mai găsește
+   * nimic în alpha la cel mult 8 km — privind spre orizont, mai jos decât privind în jos.
+   * Coborârea numai apropie ce se vede, deci nu se refuză când acum nu se vede nimic în 8 km
+   * (după „−” sau rotița înapoi): ținta trece atunci la capătul ei în alpha. Altfel Ctrl nu
+   * cobora deloc după opt trepte înapoi (recenzia). Un pas care nu încape se scurtează, prin
+   * înjumătățire, până încape.
+   *
+   * @returns {number} cât a urcat camera (negativ: a coborât), în metri
+   */
+  _mutaVertical(dy) {
+    const C = this.object.position;
+    _u.copy(this.target).sub(C);
+    const r = _u.length();
+    if (!dy || !Number.isFinite(dy) || !(r > 0)) return 0;
+    _u.divideScalar(r);
+    const t = this._teren;
+    if (!t) {
+      C.y += dy;
+      this.target.y += dy;
+      return dy;
+    }
+    const sol = dy < 0 ? this._solSub(C.x, C.y, C.z) + LIBER_SOL : -Infinity;
+    // Unde ar sta ținta cu camera la cota y, sau null dacă acolo nu se poate.
+    const tintaLa = (y) => {
+      if (y < sol) return null;
+      _q.set(C.x, y, C.z);
+      _raza.set(_q, _u);
+      const d = punctVazut(_raza, t, this.maxDistance);
+      if (d === null ? dy > 0 : dy < 0 && d < this.minDistance) return null;
+      let lo = this.minDistance, hi = this.maxDistance;
+      if (t.alpha) {
+        const iv = t.alpha.intervalRaza(_q, _u);
+        if (!iv) return null;
+        lo = Math.max(lo, iv[0]); hi = Math.min(hi, iv[1]);
+      }
+      return lo > hi ? null : Math.min(hi, Math.max(lo, d ?? Infinity));
+    };
+    let f = 1, d = tintaLa(C.y + dy);
+    if (d === null) {
+      let a = 0, b = 1;
+      for (let i = 0; i < 12; i++) {
+        const m = (a + b) / 2, dm = tintaLa(C.y + dy * m);
+        if (dm === null) b = m; else { a = m; d = dm; }
+      }
+      if (d === null) return 0;
+      f = a;
+    }
+    C.y += dy * f;
+    this.target.copy(C).addScaledVector(_u, d);
+    return dy * f;
+  }
+
+  /**
+   * Un cadru al dronei, din buclă, înaintea lui `update()`: urcarea sau coborârea care încă
+   * alunecă și, cât alunecă un pas de la tastatură, paza solului. `update()` adaugă țintei, și
+   * camerei cu ea, `_panOffset` ori fracțiunea lui de amortizare și rotește camera în jurul
+   * țintei cu `_sphericalDelta.theta` ori fracțiunea lui, deci locul în care ajunge camera se
+   * știe dinainte:
+   * - **mutarea**: urcarea care îi lipsește până la capătul ei intră în urcarea care alunecă,
+   *   cu aceeași lege, deci pe o pantă obișnuită camera urcă odată cu mutarea. Partea din
+   *   mutare care n-ar încăpea la cota de acum așteaptă cadrul următor (`_panAmanat`), nu se
+   *   pierde. Dacă nu mai poate urca — tavanul din `_mutaVertical` —, drona stă în fața
+   *   peretelui. Ridicată dintr-odată, cum era întâi, camera sărea până la 41 m într-un cadru
+   *   (recenzia); scurtată fără amânare, mutarea se târa pe orice pantă;
+   * - **rotirea** (Q, E): pe cercul ei în jurul țintei camera își păstrează cota, iar pe cerc
+   *   relieful poate urca — recenzia o dusese la 61,7 m sub sol. Camera urcă pe loc la
+   *   LIBER_SOL peste locul în care o duce cadrul; ridicarea mută ținta pe raza privirii,
+   *   deci prezicerea se reface, de cel mult 12 ori. Dacă nu poate urca, rotirea se oprește.
+   * @returns {boolean} true dacă a mișcat camera
+   */
+  pasVertical() {
+    let mutat = false;
+    const po = this._panOffset, am = this._panAmanat;
+    const f = this.enableDamping ? this.dampingFactor : 1, C = this.object.position;
+    const lipsa = (x, z) => this._solSub(x, C.y, z) + LIBER_SOL - C.y;
+    if (this._pazaSol) {
+      po.add(am);
+      am.set(0, 0, 0);
+      const nevoie = Math.max(lipsa(C.x + po.x, C.z + po.z), lipsa(C.x + po.x * f, C.z + po.z * f));
+      if (nevoie > this._vertical) {
+        if (!this._vertical) this._tVertical = null;
+        this._vertical = nevoie;
+      }
+    }
+    if (this._vertical) {
+      const acum = performance.now();
+      const dt = this._tVertical === null ? 1000 / 60 : Math.min(100, acum - this._tVertical);
+      this._tVertical = acum;
+      const rest = this._vertical;
+      const dy = Math.abs(rest) < 1e-3 ? rest : rest * (1 - Math.exp(-dt / TAU_VERTICAL));
+      const facut = this._mutaVertical(dy);
+      // La o limită pasul a ieșit mai scurt: restul nu mai are unde merge.
+      this._vertical = Math.abs(facut - dy) > 1e-9 || dy === rest ? 0 : rest - dy;
+      if (!this._vertical) this._tVertical = null;
+      mutat = facut !== 0;
+    }
+    if (this._pazaSol) {
+      if (lipsa(C.x + po.x * f, C.z + po.z * f) > 1e-9) {
+        if (!(this._vertical > 0)) {
+          po.set(0, 0, 0);
+          am.set(0, 0, 0);
+        } else {
+          // Cea mai lungă parte a mutării de pe cadrul acesta care încape la cota de acum. O
+          // cameră deja prea jos se poate depărta: nu se cere mai mult decât are.
+          const aici = Math.max(0, lipsa(C.x, C.z));
+          let a = 0, b = 1;
+          for (let i = 0; i < 14; i++) {
+            const m = (a + b) / 2;
+            if (lipsa(C.x + po.x * f * m, C.z + po.z * f * m) <= aici + 1e-6) a = m; else b = m;
+          }
+          am.copy(po).multiplyScalar(1 - a);
+          po.multiplyScalar(a);
+        }
+      }
+      if (this._sphericalDelta.theta && this._pazesteRotirea(f)) mutat = true;
+      if (po.lengthSq() < 1e-8 && am.lengthSq() < 1e-8 && !this._vertical && Math.abs(this._sphericalDelta.theta) < 1e-6) {
+        this._pazaSol = false;
+      }
+    }
+    return mutat;
+  }
+
+  /** Rotirea de pe cadrul acesta (fracțiunea `f`), cu camera la LIBER_SOL peste locul în care ajunge. */
+  _pazesteRotirea(f) {
+    let mutat = false;
+    const C = this.object.position, T = this.target, po = this._panOffset;
+    for (let i = 0; i < 12; i++) {
+      const th = this._sphericalDelta.theta * f, c = Math.cos(th), s = Math.sin(th);
+      const ox = C.x - T.x, oz = C.z - T.z;
+      const lipsa = this._solSub(T.x + po.x * f + ox * c + oz * s, C.y, T.z + po.z * f + oz * c - ox * s) + LIBER_SOL - C.y;
+      if (!(lipsa > 1e-9)) break;
+      const facut = this._mutaVertical(lipsa);
+      if (facut) mutat = true;
+      if (this._vertical > 0) this._vertical = Math.max(0, this._vertical - facut);
+      if (facut < lipsa - 1e-6) {
+        this._sphericalDelta.set(0, 0, 0);
+        po.set(0, 0, 0);
+        this._panAmanat.set(0, 0, 0);
+        break;
+      }
+    }
+    return mutat;
+  }
+
+  /** Golește urcarea rămasă, mutarea amânată și paza solului: un zbor, o tragere sau o rotire iau camera. */
+  opresteVertical() {
+    this._vertical = 0;
+    this._tVertical = null;
+    this._pazaSol = false;
+    this._panAmanat.set(0, 0, 0);
+  }
+
+  /**
+   * Oprește urcarea sau coborârea care încă alunecă, fără paza solului: Shift sau Ctrl s-au
+   * dovedit taste de modificare (tastatura.js). Ce i-ar trebui mutării, paza pune la loc.
+   */
+  opresteUrcarea() {
+    this._vertical = 0;
+    this._tVertical = null;
+  }
+
+  /** Urcarea de `dy` metri: alunecă, sau pe loc fără amortizare (reduced-motion). */
+  _adaugaVertical(dy, limita) {
+    if (!this.enableDamping) {
+      this.opresteUrcarea();
+      this._mutaVertical(dy);
+      return;
+    }
+    this._vertical = Math.max(-limita, Math.min(limita, this._vertical + dy));
+    this._tVertical = null;
+  }
+
+  /**
+   * Mutarea pe orizontală de la tastatură, ca `_pan`. Jos, drona urcă peste ce are în cale,
+   * prin paza solului din `pasVertical`. Fără amortizare mutarea se face pe loc, la `update()`
+   * din `comanda()`, deci și urcarea: o mutare spre un loc în care nu poate urca nu se face.
+   * Nu coboară după relief: își păstrează înălțimea, ca o dronă.
+   */
+  _mutaOrizontal(dx, dy) {
+    this._pazaSol = true;
+    if (this.enableDamping) {
+      this._pan(dx, dy);
+      return;
+    }
+    _v.copy(this._panOffset);
+    this._pan(dx, dy);
+    _w.subVectors(this._panOffset, _v);
+    const C = this.object.position;
+    const lipsa = this._solSub(C.x + _w.x, C.y, C.z + _w.z) + LIBER_SOL - C.y;
+    if (lipsa > 0 && this._mutaVertical(lipsa) < lipsa - 1e-6) this._panOffset.copy(_v);
+  }
+
+  /**
+   * Un pas al hărții, de la tastatură (tastatura.js):
+   * - `sus`, `jos`, `stanga`, `dreapta` mută harta pe orizontală cu PAS_MUTARE din
+   *   înălțimea vederii la distanța țintei; `sus` duce înainte, pe direcția privirii;
+   * - `roteste-dreapta` întoarce privirea spre dreapta cu 15° — citirea busolei crește cu
+   *   15 —, ca o tragere spre dreapta cu butonul drept; `roteste-stanga`, invers;
+   * - `urca` și `coboara`: drona, cu PAS_VERTICAL din înălțimea camerei peste ce e sub ea
+   *   (`_mutaVertical`);
+   * - `apropie` și `departeaza`: o treaptă de rotiță (×1,4), spre centrul vederii.
+   *
+   * Unghiul se dă direct: `keyRotateSpeed` al lui OrbitControls se împarte la înălțimea
+   * canvasului. Înaintea rotirii ținta coboară pe ce se vede, ca la butonul drept
+   * (`pivotPeTeren`): fără el, după șase clicuri de rotiță spre platou, șase rotiri
+   * mutau punctul din centrul ecranului cu 534 px (verifica-controale). Limitele sunt cele
+   * obișnuite: alpha (scena.js, la `change`), 80 m – 8 km, unghiurile polare. Emite
+   * `start` și `end` cu starea NIMIC, ca rotița: un zbor în curs se oprește, iar fișa
+   * știe că harta a fost atinsă. Cu amortizare pasul alunecă; sub reduced-motion, pe loc.
+   *
+   * @param {string} nume — una dintre COMENZI
+   * @returns {boolean} false dacă n-a făcut nimic: comandă necunoscută, controale oprite
+   *   (pagina mărită) sau canvas fără mărime
+   */
+  comanda(nume) {
+    if (!this.enabled) return false;
+    const h = this.domElement?.clientHeight;
+    if (!(h > 0)) return false;
+    this.object.updateMatrixWorld();
+    const p = PAS_MUTARE * h;
+    let pas;
+    switch (nume) {
+      case 'sus': pas = () => this._mutaOrizontal(0, p); break;
+      case 'jos': pas = () => this._mutaOrizontal(0, -p); break;
+      case 'stanga': pas = () => this._mutaOrizontal(p, 0); break;
+      case 'dreapta': pas = () => this._mutaOrizontal(-p, 0); break;
+      case 'roteste-dreapta': pas = () => { this.pivotPeTeren(); this._rotateLeft(UNGHI_PAS); this._pazaSol = true; }; break;
+      case 'roteste-stanga': pas = () => { this.pivotPeTeren(); this._rotateLeft(-UNGHI_PAS); this._pazaSol = true; }; break;
+      case 'urca':
+      case 'coboara': {
+        const C = this.object.position;
+        const s = PAS_VERTICAL * Math.max(LIBER_SOL, C.y - this._solSub(C.x, C.y, C.z));
+        pas = () => this._adaugaVertical(nume === 'urca' ? s : -s, COADA_VERTICAL * s);
+        break;
+      }
+      case 'apropie':
+      case 'departeaza': {
+        const c = this.centruVederii();
+        if (!c) return false;
+        pas = () => this.rotita.treaptaTasta(nume === 'apropie' ? -1 : 1, c.x, c.y, rectDin(this.domElement));
+        break;
+      }
+      default: return false;
+    }
+    // `start` și `end` numai fără un gest deschis: cu harta ținută de mouse sau de un deget,
+    // `end`-ul tastei ar fi stins cursorul gestului și sfera pivotului (gest.js) în mijlocul
+    // tragerii (recenzia). Zborul îl oprise deja `start`-ul gestului.
+    const liber = this.state === STARE.NIMIC;
+    if (liber) this.dispatchEvent({ type: 'start' });
+    pas();
+    // `update()`, chiar acum, aplică din mutare și din rotire cât aplică bucla pe un cadru —
+    // fără amortizare, tot —, deci paza solului trece întâi, ca în buclă. Fără ea, fiecare pas
+    // al unei taste ținute muta camera nepăzită cu 1–2 m: măsurat, 7,1 m peste sol.
+    if (this._pazaSol) this.pasVertical();
+    this.update();
+    if (liber) this.dispatchEvent({ type: 'end' });
+    return true;
+  }
+
+  /**
    * Ciupirea: zoom spre punctul dintre degete, cu raportul distanței dintre ele.
    * OrbitControls apropie spre țintă (`_updateZoomParameters` nu face nimic fără
    * `zoomToCursor`), deci locul dintre degete fugea.
@@ -310,6 +661,7 @@ export class ControaleHarta extends MapControls {
     globalThis.removeEventListener?.('blur', this._laBlur);
     this._apucat = null;
     this.rotita.opreste();
+    this.opresteVertical();
     // `disconnect()` scrie pe canvas `style.cursor = 'auto'` (OrbitControls.js:536):
     // la o repornire pe același canvas, cursorul inline ar bate cursoarele din CSS.
     this.domElement?.style?.removeProperty('cursor');
@@ -383,11 +735,12 @@ export function urmaresteMarireaPaginii(controale, vv = globalThis.visualViewpor
  * pe aici ar ateriza alături de țintă cu cât mai rămăsese de aplicat — pe calea
  * `prefers-reduced-motion`, măsurat, 0,8° din 10°. Vezi zbor.js.
  *
- * Treptele rotiței care încă alunecă se golesc și ele: altfel ar împinge camera
- * peste zbor, de la primul cadru.
+ * Treptele rotiței și urcarea dronei care încă alunecă se golesc și ele: altfel ar
+ * împinge camera peste zbor, de la primul cadru.
  */
 export function descarcaInertia(controale) {
   controale.rotita?.opreste();
+  controale.opresteVertical?.();
   const amortiza = controale.enableDamping;
   controale.enableDamping = false;
   controale.update();

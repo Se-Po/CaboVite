@@ -16,6 +16,9 @@
 //     KTX2Loader pe care se sprijină;
 //   - foaia de stil (main.css): fără `:has()`, `dvh` numai cu rezervă, iar selecția
 //     oprită numai pe hartă și pe butoanele ei;
+//   - accesibilitatea foii: haloul `--bg` al focusului pe butoanele de peste hartă, cât
+//     inelul generic plus 2 px, cu umbra lor păstrată; bifa lui Satelit în afara numelui, cu
+//     rezervă; busola în contrast forțat, pe cascadă; panoul „Coordonate” fără text sub 14 px;
 //   - ordinea de desenare (cer.js, mare.js): cerul ultimul, marea după teren, cu
 //     `Less` strict pe mare, prin sortarea lui three însuși;
 //   - mărimea canvasului (renderer.js): raportul de pixeli cel mult 2, plafonul de pixeli;
@@ -46,7 +49,11 @@
 //     și înaintea buclei, pe sursă; timpii, în pagină (CLAUDE.md);
 //   - anunțurile după apariția hărții (scena.js, busola.js): `arata()` cheamă `reanunta()` pe
 //     busolă și pe Satelit după două cadre ale paginii; busola, construită cu un DOM fals,
-//     golește anunțul și îl scrie din nou.
+//     golește anunțul și îl scrie din nou;
+//   - pagina fără scenă (main.js, src/chapters/sanctuar.js, index.html): textul fișei
+//     sanctuarului, cu sursele, în `#continut`, după anunț; un singur `h1`, în afara lui, și niciun
+//     id dublu, și după o excepție cu eticheta încă în pagină; fișa etichetei, la fel ca înainte
+//     de extragerea capitolului, la outerHTML.
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -75,6 +82,8 @@ const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text
 // trepte. Fără el — fără git, sau fără commitul acesta —, fiecare control pe el pică cu mesajul
 // lui, iar probele pe codul de azi rulează mai departe.
 const REPER_VECHI = '30a22c9';
+// Reperul accesibilității (lotul E): 0.1.5.04, dinaintea reparațiilor din foaie și din index.html.
+const REPER_ACCES = '6ad3a47';
 
 // Capetele de rând. În index toate fișierele sunt LF, dar cu core.autocrlf copia de lucru poate
 // avea, fișier cu fișier, CRLF sau LF. Textul paginii — src/ și index.html, de pe disc sau din
@@ -83,10 +92,10 @@ const REPER_VECHI = '30a22c9';
 const LF = (t) => t.replace(/\r\n/g, '\n');
 /** Un fișier al paginii, de pe disc, ca text cu LF. */
 const textSursa = (cale) => LF(readFileSync(cale, 'utf8'));
-/** Același fișier la REPER_VECHI, ca text cu LF; `null` fără git sau fără reper. */
-const textVechi = (cale) => {
+/** Același fișier la REPER_VECHI — sau la alt reper —, ca text cu LF; `null` fără git sau fără reper. */
+const textVechi = (cale, reper = REPER_VECHI) => {
   try {
-    return LF(execFileSync('git', ['show', `${REPER_VECHI}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
+    return LF(execFileSync('git', ['show', `${reper}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
   } catch { return null; }
 };
 
@@ -105,6 +114,53 @@ const muta = (text, ...perechi) => {
   return s;
 };
 const NEAPLICATA = 'MUTAȚIA NU S-A APLICAT';
+
+/**
+ * Specificitatea unui selector, [id, clasă, tip], pe subsetul din foaie: `:where()` 0,
+ * `:not()`/`:is()`/`:has()` cât argumentul lor cel mai specific, un pseudo-element ca un tip.
+ */
+const specificitate = (sel) => {
+  const v = [0, 0, 0];
+  const maiMare = (x, y) => (x[0] - y[0] || x[1] - y[1] || x[2] - y[2]) > 0;
+  // Argumentele unei liste, despărțite numai de virgulele din afara parantezelor.
+  const desparte = (t) => {
+    const p = [];
+    let ad = 0, de = 0;
+    for (let k = 0; k < t.length; k++) {
+      if (t[k] === '(') ad++;
+      else if (t[k] === ')') ad--;
+      else if (t[k] === ',' && ad === 0) { p.push(t.slice(de, k)); de = k + 1; }
+    }
+    return [...p, t.slice(de)];
+  };
+  let i = 0;
+  const nume = () => { const n = /^[\w-]*/.exec(sel.slice(i))[0]; i += n.length; return n; };
+  const argument = () => {
+    const de = i;
+    for (let ad = 0; i < sel.length; i++) {
+      if (sel[i] === '(') ad++;
+      else if (sel[i] === ')' && --ad === 0) { i++; break; }
+    }
+    return sel.slice(de + 1, i - 1);
+  };
+  while (i < sel.length) {
+    const ch = sel[i];
+    if (ch === '#') { i++; nume(); v[0]++; } else if (ch === '.') { i++; nume(); v[1]++; } else if (ch === '[') { i = sel.indexOf(']', i) + 1; v[1]++; } else if (sel.startsWith('::', i)) {
+      i += 2; nume();
+      if (sel[i] === '(') argument();
+      v[2]++;
+    } else if (ch === ':') {
+      i++;
+      const n = nume().toLowerCase(), arg = sel[i] === '(' ? argument() : null;
+      if (n === 'where') continue;
+      if (arg !== null && ['not', 'is', 'has'].includes(n)) {
+        const m = desparte(arg).map((s) => specificitate(s.trim())).reduce((a, x) => (maiMare(x, a) ? x : a), [0, 0, 0]);
+        v[0] += m[0]; v[1] += m[1]; v[2] += m[2];
+      } else v[1]++;
+    } else if (/[\w-]/.test(ch)) { nume(); v[2]++; } else i++;
+  }
+  return v;
+};
 
 /** Un modul din text, cu importurile relative și `three` duse la fișierele de azi din src/scene. */
 let nrModul = 0;
@@ -410,69 +466,27 @@ console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecți
     `control, fără oprirea roții mesajului și cu o animație pe \`left\`: ${ca === null ? NEAPLICATA : `${ca.straine.join(', ')} / ${ca.neoprite.join(', ')}`} — pică`);
 
   // Harta o singură dată: până la `data-scena`, panourile — tot ce stă direct în <body>, în afară
-  // de mesaj, de capitole și de canvas — sunt ascunse, iar canvasul nu primește pointerul; numai
+  // de mesaj, de capitole, de canvas, de titlul paginii (`<header>`, cu `h1` ascuns vizual) și de
+  // `<noscript>` — sunt ascunse, iar canvasul nu primește pointerul; numai
   // butonul mesajului primește clicuri; fără JavaScript versiunea se arată. Regula de dinainte,
   // care ascundea mesajul pe ecranele mici odată cu panourile (`[data-panouri]`), a plecat: acum
   // panourile vin abia cu harta. Pe selectori, nu pe text: ce ar ascunde o regulă se judecă pe
-  // copiii lui <body>, cu selectorul ei. Controale: main.css de la REPER_VECHI, o regulă prea largă
-  // și `[data-panouri]` pus la loc.
+  // copiii lui <body>, cu selectorul ei. Controale: main.css de la REPER_VECHI, o regulă prea largă,
+  // `[data-panouri]` pus la loc și regula de la REPER_ACCES, care ascundea și titlul, și
+  // `<noscript>`: fără JavaScript, `data-scena` nu vine niciodată.
   //
   // Versiunea fără JavaScript se judecă pe cascadă, nu pe textul regulii: regula din @media
   // (scripting: none) trebuie să bată, cu specificitatea și apoi cu ordinea, fiecare regulă care o
   // ascunde până la `data-scena`. Fără `:where(…)`, regula panourilor are (3,1,1) și bate (1,1,1)
   // a versiunii, deci versiunea rămânea ascunsă fără JavaScript, cu regula ei în foaie.
-  /**
-   * Specificitatea unui selector, [id, clasă, tip], pe subsetul din foaie: `:where()` 0,
-   * `:not()`/`:is()`/`:has()` cât argumentul lor cel mai specific, un pseudo-element ca un tip.
-   */
-  const specificitate = (sel) => {
-    const v = [0, 0, 0];
-    const maiMare = (x, y) => (x[0] - y[0] || x[1] - y[1] || x[2] - y[2]) > 0;
-    // Argumentele unei liste, despărțite numai de virgulele din afara parantezelor.
-    const desparte = (t) => {
-      const p = [];
-      let ad = 0, de = 0;
-      for (let k = 0; k < t.length; k++) {
-        if (t[k] === '(') ad++;
-        else if (t[k] === ')') ad--;
-        else if (t[k] === ',' && ad === 0) { p.push(t.slice(de, k)); de = k + 1; }
-      }
-      return [...p, t.slice(de)];
-    };
-    let i = 0;
-    const nume = () => { const n = /^[\w-]*/.exec(sel.slice(i))[0]; i += n.length; return n; };
-    const argument = () => {
-      const de = i;
-      for (let ad = 0; i < sel.length; i++) {
-        if (sel[i] === '(') ad++;
-        else if (sel[i] === ')' && --ad === 0) { i++; break; }
-      }
-      return sel.slice(de + 1, i - 1);
-    };
-    while (i < sel.length) {
-      const ch = sel[i];
-      if (ch === '#') { i++; nume(); v[0]++; } else if (ch === '.') { i++; nume(); v[1]++; } else if (ch === '[') { i = sel.indexOf(']', i) + 1; v[1]++; } else if (sel.startsWith('::', i)) {
-        i += 2; nume();
-        if (sel[i] === '(') argument();
-        v[2]++;
-      } else if (ch === ':') {
-        i++;
-        const n = nume().toLowerCase(), arg = sel[i] === '(' ? argument() : null;
-        if (n === 'where') continue;
-        if (arg !== null && ['not', 'is', 'has'].includes(n)) {
-          const m = desparte(arg).map((s) => specificitate(s.trim())).reduce((a, x) => (maiMare(x, a) ? x : a), [0, 0, 0]);
-          v[0] += m[0]; v[1] += m[1]; v[2] += m[2];
-        } else v[1]++;
-      } else if (/[\w-]/.test(ch)) { nume(); v[2]++; } else i++;
-    }
-    return v;
-  };
+  // Ce rămâne vizibil până la data-scena: canvasul, capitolele, mesajul, titlul și <noscript>.
+  const VIZIBILE = ['#scena', '#continut', '#incarcare', 'header', 'noscript'];
   const pornirea = (css) => {
     const fara = css.replace(/\/\*[\s\S]*?\*\//g, '');
     const reguli = [...fara.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim().split(/\s*,\s*/), bloc: m[2], poz: m.index }));
     const cu = (re) => reguli.filter((r) => re.test(r.bloc)).flatMap((r) => r.sel);
     // Copiii lui <body>: cei din index.html și cei puși de scenă (gazda lor e <body>).
-    const COPII = ['#scena', '#continut', '#incarcare', '#surse', '#versiune', '#busola', '#straturi', '#punct', '#sanctuar-eticheta', '#sanctuar-fisa', '.pivot-rotire'];
+    const COPII = ['#scena', '#continut', '#incarcare', 'header', 'noscript', '#surse', '#versiune', '#busola', '#straturi', '#punct', '#sanctuar-eticheta', '#sanctuar-fisa', '.pivot-rotire'];
     // Un selector de forma `body:not([data-scena]) > X` ascunde copilul `c` dacă `c` se potrivește cu X:
     // un `:not(#id)` exclude acel id, un `:where(…)` se desface.
     const ascunde = (sel, c) => {
@@ -496,8 +510,9 @@ console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecți
     const sp = (x) => specificitate(x.sel), text = (v) => `(${v.join(',')})`;
     const bate = (a, h) => { const x = sp(a), y = sp(h), d = x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; return d > 0 || (d === 0 && a.poz > h.poz); };
     return {
-      panouri: COPII.filter((c) => !['#scena', '#continut', '#incarcare'].includes(c) && ascunsLa(c)),
-      straine: ['#scena', '#continut', '#incarcare'].filter(ascunsLa),
+      total: COPII.length - VIZIBILE.length,
+      panouri: COPII.filter((c) => !VIZIBILE.includes(c) && ascunsLa(c)),
+      straine: VIZIBILE.filter(ascunsLa),
       canvas: faraPointer.includes('body:not([data-scena]) #scena'),
       mesaj: faraPointer.includes('#incarcare') && cuPointer.includes('#incarcare button'),
       panouriVechi: /\[data-panouri\]/.test(fara),
@@ -509,25 +524,277 @@ console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecți
     };
   };
   const p = pornirea(CSS);
-  proba(p.panouri.length === 8 && p.straine.length === 0 && p.canvas && p.mesaj && !p.panouriVechi,
-    `până la data-scena: ascunse ${p.panouri.length} din 8 panouri (${p.panouri.join(', ')}), mesajul, capitolele și canvasul ${p.straine.length ? `ASCUNSE: ${p.straine.join(', ')}` : 'nu'}; canvasul fără pointer: ${p.canvas ? 'da' : 'NU'}; numai butonul mesajului cu clicuri: ${p.mesaj ? 'da' : 'NU'}; regula [data-panouri]: ${p.panouriVechi ? 'ÎNCĂ ACOLO' : 'scoasă'}`);
+  proba(p.panouri.length === p.total && p.straine.length === 0 && p.canvas && p.mesaj && !p.panouriVechi,
+    `până la data-scena: ascunse ${p.panouri.length} din ${p.total} panouri (${p.panouri.join(', ')}), mesajul, capitolele, canvasul, titlul și <noscript> ${p.straine.length ? `ASCUNSE: ${p.straine.join(', ')}` : 'nu'}; canvasul fără pointer: ${p.canvas ? 'da' : 'NU'}; numai butonul mesajului cu clicuri: ${p.mesaj ? 'da' : 'NU'}; regula [data-panouri]: ${p.panouriVechi ? 'ÎNCĂ ACOLO' : 'scoasă'}`);
   const descrieVersiunea = (x) => `regula din @media (scripting: none) ${x.versiune.aratata}, regulile care o ascund până la data-scena ${x.versiune.ascunsa}`;
   proba(p.versiune.ok, `fără JavaScript, versiunea se arată — câștigă cascada: ${descrieVersiunea(p)}`);
   // Control: regula panourilor fără `:where(…)`.
-  const faraWhereCss = muta(CSS, ['> :where(:not(#incarcare):not(#continut):not(#scena))', '> :not(#incarcare):not(#continut):not(#scena)']);
+  const faraWhereCss = muta(CSS, ['> :where(:not(#incarcare):not(#continut):not(#scena):not(header):not(noscript))', '> :not(#incarcare):not(#continut):not(#scena):not(header):not(noscript)']);
   const faraWhere = faraWhereCss === null ? null : pornirea(faraWhereCss);
-  proba(faraWhere !== null && !faraWhere.versiune.ok && faraWhere.panouri.length === 8,
+  proba(faraWhere !== null && !faraWhere.versiune.ok && faraWhere.panouri.length === faraWhere.total,
     `control, regula panourilor fără \`:where(…)\`: ${faraWhere === null ? NEAPLICATA : `${descrieVersiunea(faraWhere)}; versiunea ${faraWhere.versiune.ok ? 'se arată' : 'RĂMÂNE ASCUNSĂ'}`} — pică`);
-  const bun = (x) => x.panouri.length === 8 && x.straine.length === 0 && x.canvas && x.mesaj && !x.panouriVechi;
+  const bun = (x) => x.panouri.length === x.total && x.straine.length === 0 && x.canvas && x.mesaj && !x.panouriVechi;
   const css0 = textVechi('src/styles/main.css');
   const v = css0 === null ? null : pornirea(css0);
-  proba(v !== null && !bun(v), `control, main.css de la ${REPER_VECHI}: ${v === null ? 'NECITIT' : `ascunse ${v.panouri.length} din 8 panouri, canvasul fără pointer: ${v.canvas ? 'da' : 'nu'}`} — pică`);
+  proba(v !== null && !bun(v), `control, main.css de la ${REPER_VECHI}: ${v === null ? 'NECITIT' : `ascunse ${v.panouri.length} din ${v.total} panouri, canvasul fără pointer: ${v.canvas ? 'da' : 'nu'}`} — pică`);
   // O regulă prea largă — tot <body> — ar ascunde și mesajul, capitolele și canvasul.
-  const largCss = muta(CSS, [':where(:not(#incarcare):not(#continut):not(#scena))', '*']);
+  const largCss = muta(CSS, [':where(:not(#incarcare):not(#continut):not(#scena):not(header):not(noscript))', '*']);
   const larg = largCss === null ? null : pornirea(largCss);
-  proba(larg !== null && !bun(larg) && larg.straine.length === 3, `control, \`body:not([data-scena]) > *\`: ${larg === null ? NEAPLICATA : `ascunde și ${larg.straine.join(', ')}`} — pică`);
+  proba(larg !== null && !bun(larg) && larg.straine.length === VIZIBILE.length, `control, \`body:not([data-scena]) > *\`: ${larg === null ? NEAPLICATA : `ascunde și ${larg.straine.join(', ')}`} — pică`);
   const cuVechi = pornirea(`${CSS}\n@media (max-width: 22.5rem) {\n  [data-panouri] #incarcare { display: none; }\n}\n`);
   proba(!bun(cuVechi), `control, regula \`[data-panouri] #incarcare\` pusă la loc: ${cuVechi.panouriVechi ? 'găsită' : 'NEGĂSITĂ'} — pică`);
+  const cssAcces = textVechi('src/styles/main.css', REPER_ACCES);
+  const va = cssAcces === null ? null : pornirea(cssAcces);
+  proba(va !== null && !bun(va) && va.straine.includes('header') && va.straine.includes('noscript'),
+    `control, main.css de la ${REPER_ACCES}: ${va === null ? 'NECITIT' : `ascunde până la data-scena ${va.straine.join(', ') || 'nimic din ce rămâne vizibil'}`} — pică`);
+}
+
+// ------------------------------------------------------------ accesibilitatea foii
+
+// Ce se vede și ce se citește, în foaie: haloul focusului pe butoanele de peste hartă, bifa lui
+// Satelit în afara numelui, busola în contrast forțat și textul panoului „Coordonate”. Controale:
+// main.css de la REPER_ACCES, dinaintea reparațiilor, și mutații ale celui de azi.
+/**
+ * Regulile foii, în ordine: selectorii, declarațiile — toate, și cele repetate, ca o rezervă —
+ * și preludiile @media/@supports/@keyframes care le cuprind, din afară înăuntru.
+ */
+const reguliCss = (css) => {
+  const fara = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const reguli = [], stiva = [];
+  let de = 0;
+  for (let i = 0; i < fara.length; i++) {
+    if (fara[i] === '}') { stiva.pop(); de = i + 1; continue; }
+    if (fara[i] !== '{') continue;
+    const prelud = fara.slice(de, i).split(';').pop().trim();
+    const urm = fara.indexOf('{', i + 1), inchis = fara.indexOf('}', i + 1);
+    if (urm !== -1 && urm < inchis) { stiva.push(prelud); de = i + 1; continue; }
+    const bloc = fara.slice(i + 1, inchis);
+    const decl = [...bloc.matchAll(/([\w-]+)\s*:\s*((?:"[^"]*"|[^;"])+)/g)].map((m) => [m[1], m[2].trim()]);
+    reguli.push({ sel: prelud.split(/\s*,\s*/), decl, medii: [...stiva] });
+    i = inchis;
+    de = i + 1;
+  }
+  return reguli;
+};
+/** Valoarea unei proprietăți într-o regulă: ultima declarație. */
+const ultima = (r, p) => r.decl.filter(([k]) => k === p).at(-1)?.[1];
+/** Straturile unei liste (umbre), despărțite de virgulele din afara parantezelor. */
+const straturi = (v) => {
+  const p = [];
+  let ad = 0, de = 0;
+  for (let k = 0; k < v.length; k++) {
+    if (v[k] === '(') ad++;
+    else if (v[k] === ')') ad--;
+    else if (v[k] === ',' && ad === 0) { p.push(v.slice(de, k).trim()); de = k + 1; }
+  }
+  return [...p, v.slice(de).trim()];
+};
+const px = (v) => { const m = /(-?[\d.]+)px/.exec(v ?? ''); return m ? +m[1] : NaN; };
+
+console.log('\nAccesibilitatea foii: haloul focusului, numele lui Satelit, busola în contrast forțat, textul panoului');
+{
+  const CSS = textSursa('src/styles/main.css');
+  const CSS0 = textVechi('src/styles/main.css', REPER_ACCES);
+
+  // Haloul. Inelul generic (`:focus-visible`) stă la `outline-offset` în afara butonului și are
+  // `outline-width`; haloul din `--bg`, primul strat al umbrei pe `:focus-visible`, trebuie să
+  // treacă de inel cu cel puțin 2 px: offset + grosime + 2, azi 7 px. Cu 5 px s-ar opri chiar la
+  // marginea inelului, care ar rămâne pe cer pe partea aceea. Umbra de dinainte a butonului
+  // trebuie să rămână printre straturi. Harta (`.inel-harta`): banda aurie între două benzi din
+  // `--bg`, de cel puțin 2 px fiecare.
+  const PESTE_HARTA = ['#busola .roza', '#straturi button', '#punct .activeaza', '#sanctuar-eticheta .poi'];
+  const halouri = (css) => {
+    const sus = reguliCss(css).filter((r) => r.medii.length === 0);
+    let W = NaN, O = NaN;
+    for (const r of sus.filter((x) => x.sel.includes(':focus-visible'))) {
+      if (ultima(r, 'outline')) W = px(ultima(r, 'outline'));
+      if (ultima(r, 'outline-offset')) O = px(ultima(r, 'outline-offset'));
+    }
+    const butoane = PESTE_HARTA.map((s) => {
+      let w = W, o = O, umbra = null;
+      for (const r of sus.filter((x) => x.sel.includes(`${s}:focus-visible`))) {
+        if (ultima(r, 'outline')) w = px(ultima(r, 'outline'));
+        if (ultima(r, 'outline-offset')) o = px(ultima(r, 'outline-offset'));
+        if (ultima(r, 'box-shadow')) umbra = ultima(r, 'box-shadow');
+      }
+      const st = umbra ? straturi(umbra) : [];
+      const m = /^0 0 0 ([\d.]+)px var\(--bg\)$/.exec(st[0] ?? '');
+      const baza = sus.filter((r) => r.sel.includes(s)).map((r) => ultima(r, 'box-shadow')).filter(Boolean).at(-1) ?? null;
+      return { s, halou: m ? +m[1] : 0, cerut: o + w + 2, pastrata: baza === null || st.slice(1).includes(baza), baza };
+    });
+    const inel = sus.find((r) => r.sel.includes('.inel-harta'));
+    const umbraInel = inel ? straturi(ultima(inel, 'box-shadow') ?? '') : [];
+    const aur = /^inset 0 0 0 ([\d.]+)px var\(--gold\)$/.exec(umbraInel[0] ?? ''), fond = /^inset 0 0 0 ([\d.]+)px var\(--bg\)$/.exec(umbraInel[1] ?? '');
+    const harta = {
+      afara: /var\(--bg\)/.test(ultima(inel ?? { decl: [] }, 'border') ?? '') ? px(ultima(inel, 'border')) : 0,
+      aur: aur ? +aur[1] : 0,
+      inauntru: aur && fond ? +fond[1] - +aur[1] : 0,
+      arata: sus.some((r) => r.sel.includes('#scena:focus-visible ~ .inel-harta') && ultima(r, 'display') === 'block'),
+    };
+    return { W, O, butoane, harta };
+  };
+  const bunHalou = (x) => x.butoane.every((b) => b.halou >= b.cerut && b.pastrata)
+    && x.harta.afara >= 2 && x.harta.aur >= x.W && x.harta.inauntru >= 2 && x.harta.arata;
+  const descrieHalou = (x) => `${x.butoane.map((b) => `${b.s} ${b.halou} px${b.pastrata ? '' : ' FĂRĂ UMBRA DE DINAINTE'}`).join(', ')} (cerut ${x.O} + ${x.W} + 2 = ${x.O + x.W + 2} px); `
+    + `harta: --bg ${x.harta.afara} px, aur ${x.harta.aur} px, --bg ${x.harta.inauntru} px${x.harta.arata ? '' : ', INELUL NU SE ARATĂ'}`;
+  const h = halouri(CSS);
+  proba(bunHalou(h), `haloul focusului peste hartă: ${descrieHalou(h)}`);
+  const hv = CSS0 === null ? null : halouri(CSS0);
+  proba(hv !== null && !bunHalou(hv), `control, main.css de la ${REPER_ACCES}: ${hv === null ? 'NECITIT' : descrieHalou(hv)} — pică`);
+  const mh = [
+    ['haloul busolei de 5 px', muta(CSS, ['#busola .roza:focus-visible { box-shadow: 0 0 0 7px var(--bg)', '#busola .roza:focus-visible { box-shadow: 0 0 0 5px var(--bg)'])],
+    ['Satelit fără umbra de dinainte', muta(CSS, ['#straturi button:focus-visible { box-shadow: 0 0 0 7px var(--bg), 0 4px 18px rgb(0 0 0 / 0.22); }', '#straturi button:focus-visible { box-shadow: 0 0 0 7px var(--bg); }'])],
+    ['inelul generic la 4 px de buton', muta(CSS, [':focus-visible {\n  outline: 3px solid var(--gold);\n  outline-offset: 2px;', ':focus-visible {\n  outline: 3px solid var(--gold);\n  outline-offset: 4px;'])],
+    ['harta cu banda dinăuntru de 1 px', muta(CSS, ['inset 0 0 0 5px var(--bg)', 'inset 0 0 0 4px var(--bg)'])],
+  ].map(([n, c]) => [n, c === null ? null : halouri(c)]);
+  proba(mh.every(([, x]) => x !== null && !bunHalou(x)), `control: ${mh.map(([n, x]) => `${n}: ${x === null ? NEAPLICATA
+    : `${x.butoane.filter((b) => b.halou < b.cerut || !b.pastrata).map((b) => `${b.s} ${b.halou}/${b.cerut} px${b.pastrata ? '' : ' fără umbră'}`).join(', ') || `harta ${x.harta.inauntru} px`}`}`).join('; ')} — pică`);
+
+  // Numele lui Satelit. Orice `content` cu text vizibil are text alternativ (`/ "…"`), iar
+  // înaintea lui declarația de rezervă cu același text, fără el: un browser care nu știe forma o
+  // aruncă pe a doua. Numele calculat, după AccName — textul alternativ al lui ::before, apoi
+  // eticheta —, iese „Satelit” în ambele stări.
+  const continut = (css) => reguliCss(css).flatMap((r) => {
+    const c = r.decl.filter(([k]) => k === 'content').map(([, v]) => v);
+    if (!c.length) return [];
+    const parti = (v) => { const m = /^"([^"]*)"(?:\s*\/\s*"([^"]*)")?$/.exec(v); return m ? { vizibil: m[1], alt: m[2] ?? null } : { vizibil: '', alt: null }; };
+    const u = parti(c.at(-1));
+    return [{ sel: r.sel.join(', '), vizibil: u.vizibil, alt: u.alt, rezerva: c.slice(0, -1).some((v) => { const p = parti(v); return p.alt === null && p.vizibil === u.vizibil; }) }];
+  });
+  const numele = (css) => {
+    const c = continut(css);
+    const cuText = c.filter((x) => x.vizibil.trim() !== '');
+    const fara = cuText.filter((x) => x.alt === null || !x.rezerva).map((x) => `${x.sel}${x.alt === null ? ' fără text alternativ' : ' fără rezervă'}`);
+    const stare = (sel) => { const x = c.find((y) => y.sel === sel); return `${x ? (x.alt ?? x.vizibil) : ''}Satelit`; };
+    return { cuText: cuText.length, fara, neapasat: stare('#straturi button::before'), apasat: stare('#straturi button[aria-pressed="true"]::before') };
+  };
+  const bunNume = (x) => x.fara.length === 0 && x.neapasat === 'Satelit' && x.apasat === 'Satelit';
+  const descrieNume = (x) => `numele „${x.neapasat}” / „${x.apasat}” (neapăsat / apăsat); ${x.cuText} reguli cu text vizibil, fără text alternativ sau fără rezervă: ${x.fara.join(', ') || 'niciuna'}`;
+  const n = numele(CSS);
+  proba(bunNume(n), `butonul Satelit: ${descrieNume(n)}`);
+  const nv = CSS0 === null ? null : numele(CSS0);
+  const fr = muta(CSS, ['content: "☐ "; content: "☐ " / "";', 'content: "☐ " / "";']);
+  const fa = muta(CSS, ['content: "☑ "; content: "☑ " / "";', 'content: "☑ ";']);
+  const mn = [[`main.css de la ${REPER_ACCES}`, nv], ['bifa fără rezervă', fr === null ? null : numele(fr)], ['bifa apăsată fără text alternativ', fa === null ? null : numele(fa)]];
+  proba(mn.every(([, x]) => x !== null && !bunNume(x)), `control: ${mn.map(([t, x]) => `${t}: ${x === null ? NEAPLICATA : descrieNume(x)}`).join('; ')} — pică`);
+
+  // Busola în contrast forțat. Chromium nu forțează `fill` și `stroke` pe SVG, deci decide
+  // cascada: specificitatea, apoi ordinea, cu regulile din @media (forced-colors: active) puse
+  // în joc. N trebuie să ia CanvasText, ca E; pivotul, Canvas cu conturul CanvasText.
+  const parte = (p) => ({ tag: /^[a-z][\w-]*/i.exec(p)?.[0] ?? null, id: /#([\w-]+)/.exec(p)?.[1] ?? null, clase: [...p.matchAll(/\.([\w-]+)/g)].map((m) => m[1]) });
+  const seAplica = (p, el) => (!p.tag || p.tag === el.tag) && (!p.id || p.id === el.id) && p.clase.every((c) => el.clase.includes(c));
+  // Selectorii compuși cu combinatorul descendent; o stare (`:hover`), un atribut sau alt
+  // combinator nu se potrivesc: elementele de aici n-au niciunul.
+  const potriveste = (sel, lant) => {
+    if (/[:[>+~*]/.test(sel)) return false;
+    const parti = sel.trim().split(/\s+/).map(parte);
+    if (!seAplica(parti.at(-1), lant[0])) return false;
+    let j = 1;
+    for (let k = parti.length - 2; k >= 0; k--) {
+      while (j < lant.length && !seAplica(parti[k], lant[j])) j++;
+      if (j++ >= lant.length) return false;
+    }
+    return true;
+  };
+  const valoarea = (R, lant, prop, medii) => {
+    let castig = null;
+    for (const r of R) {
+      if (!r.medii.every((m) => medii.includes(m))) continue;
+      const v = ultima(r, prop);
+      if (v === undefined) continue;
+      for (const s of r.sel) {
+        if (!potriveste(s, lant)) continue;
+        const sp = specificitate(s);
+        if (!castig || (sp[0] - castig.sp[0] || sp[1] - castig.sp[1] || sp[2] - castig.sp[2]) >= 0) castig = { sp, v };
+      }
+    }
+    return castig?.v ?? null;
+  };
+  const SUS = [{ tag: 'g', clase: ['cadran'] }, { tag: 'svg', clase: [] }, { tag: 'button', clase: ['roza'] }, { tag: 'div', id: 'busola', clase: [] }, { tag: 'body', clase: [] }, { tag: 'html', clase: [] }];
+  const N = [{ tag: 'text', clase: ['eticheta', 'nord'] }, ...SUS], E = [{ tag: 'text', clase: ['eticheta'] }, ...SUS], PIVOT = [{ tag: 'circle', clase: ['pivot'] }, ...SUS];
+  const FORTAT = ['@media (forced-colors: active)'];
+  const busola = (css) => {
+    const R = reguliCss(css);
+    return { N: valoarea(R, N, 'fill', FORTAT), E: valoarea(R, E, 'fill', FORTAT), pivot: valoarea(R, PIVOT, 'fill', FORTAT), contur: valoarea(R, PIVOT, 'stroke', FORTAT),
+      obisnuit: [valoarea(R, N, 'fill', []), valoarea(R, E, 'fill', [])] };
+  };
+  const bunBusola = (x) => x.N === 'CanvasText' && x.E === 'CanvasText' && x.pivot === 'Canvas' && x.contur === 'CanvasText';
+  const descrieBusola = (x) => `N ${x.N}, E ${x.E}, pivotul ${x.pivot} cu conturul ${x.contur}`;
+  const b = busola(CSS);
+  proba(bunBusola(b) && b.obisnuit[0] !== b.obisnuit[1], `busola în contrast forțat: ${descrieBusola(b)}; fără el, N ${b.obisnuit[0]} și E ${b.obisnuit[1]}, cum e voit`);
+  const bv = CSS0 === null ? null : busola(CSS0);
+  const bN = muta(CSS, ['#busola .ac-sud, #busola .eticheta, #busola .eticheta.nord { fill: CanvasText; }', '#busola .ac-sud, #busola .eticheta, .eticheta.nord { fill: CanvasText; }']);
+  const bP = muta(CSS, ['  #busola .pivot { fill: Canvas; stroke: CanvasText; }', '  .pivot { fill: Canvas; stroke: CanvasText; }']);
+  const mb = [[`main.css de la ${REPER_ACCES}`, bv], ['N scris `.eticheta.nord` (0,2,0)', bN === null ? null : busola(bN)], ['pivotul scris `.pivot`', bP === null ? null : busola(bP)]];
+  proba(mb.every(([, x]) => x !== null && !bunBusola(x)), `control: ${mb.map(([t, x]) => `${t}: ${x === null ? NEAPLICATA : descrieBusola(x)}`).join('; ')} — pică`);
+
+  // Panoul „Coordonate”: nicio mărime de text sub 0,875rem (14 px), pe nicio lățime, iar
+  // rândurile mici pe o coloană peste tot — pe două, la 14 px, rândul „scenă” n-ar încăpea.
+  const panoul = (css) => {
+    const R = reguliCss(css);
+    const mici = R.filter((r) => r.sel.some((s) => s.startsWith('#punct'))).flatMap((r) => {
+      const v = ultima(r, 'font-size') ?? ultima(r, 'font');
+      const m = /([\d.]+)rem/.exec(v ?? '');
+      return m && +m[1] < 0.875 ? [`${r.sel.join(', ')} ${m[1]}rem${r.medii.length ? ` (${r.medii.join(' ')})` : ''}`] : [];
+    });
+    const coloana = R.some((r) => r.medii.length === 0 && r.sel.includes('#punct .mici') && ultima(r, 'grid-template-columns') === '1fr');
+    return { mici, coloana };
+  };
+  const bunPanou = (x) => x.mici.length === 0 && x.coloana;
+  const descriePanou = (x) => `mărimi sub 0,875rem: ${x.mici.join('; ') || 'niciuna'}; rândurile mici pe o coloană pe orice lățime: ${x.coloana ? 'da' : 'NU'}`;
+  const p = panoul(CSS);
+  proba(bunPanou(p), `panoul „Coordonate”: ${descriePanou(p)}`);
+  const pv = CSS0 === null ? null : panoul(CSS0);
+  const p1 = muta(CSS, ['  word-spacing: 0.28em;\n  font-size: 0.875rem;', '  word-spacing: 0.28em;\n  font-size: 0.78rem;']);
+  const p2 = muta(CSS, ['#punct .mici {\n  grid-template-columns: 1fr;\n', '#punct .mici {\n']);
+  const mp = [[`main.css de la ${REPER_ACCES}`, pv], ['rândurile mici la 0,78rem', p1 === null ? null : panoul(p1)], ['pe două coloane', p2 === null ? null : panoul(p2)]];
+  proba(mp.every(([, x]) => x !== null && !bunPanou(x)), `control: ${mp.map(([t, x]) => `${t}: ${x === null ? NEAPLICATA : descriePanou(x)}`).join('; ')} — pică`);
+}
+
+// ------------------------------------------------------------ fișa și cutia „Coordonate”
+
+// Pe desktop fișa sanctuarului stă de la 10rem în jos, iar cutia „Coordonate” deschisă de la
+// 0,75rem + versiunea în sus; deschise amândouă, înălțimile lor maxime (main.css) trebuie să lase
+// între ele cel puțin 1rem, la orice înălțime a ferestrei, cu versiunea și fără. Pe ecranele
+// înalte cutia își păstra plafonul de jumătate, iar cu spațierea textului din WCAG 1.4.12 intra
+// sub fișă cu 60,8 px la 1280 × 1200 (recenzia). Se calculează pe sursă: valorile max-height se
+// evaluează pentru fiecare înălțime. Controale: regula de dinainte (jumătatea) și 27,25rem în
+// loc de 26,25rem.
+console.log('\nFișa și cutia „Coordonate”: cel puțin 1rem între ele, la orice înălțime');
+{
+  const CSS = textSursa('src/styles/main.css');
+  const valoare = (css, sel) => {
+    const i = css.indexOf(`${sel} {`);
+    if (i < 0) return null;
+    const j = css.indexOf('max-height:', i), k = css.indexOf(';', j);
+    return j < 0 || k < 0 ? null : css.slice(j + 'max-height:'.length, k).trim();
+  };
+  // Un evaluator mic pentru calc/min/max cu vh, rem și --versiune, în px (1rem = 16 px).
+  const px = (expr, H, v) => Function(`return ${expr
+    .replaceAll('var(--versiune, 0rem)', `${v}px`).replaceAll('100vh', `${H}px`)
+    .replace(/([\d.]+)rem/g, (_, x) => `${x * 16}px`).replace(/([\d.]+)px/g, '$1')
+    .replaceAll('calc(', '(').replace(/\bmax\(/g, 'Math.max(').replace(/\bmin\(/g, 'Math.min(')};`)();
+  const goluri = (css) => {
+    const fisa = valoare(css, 'html[data-punct-deschis] #sanctuar-fisa'), cutie = valoare(css, 'html[data-fisa-deschisa] #punct .cutie');
+    if (!fisa || !cutie) return null;
+    const gol = (H, v) => H - (0.75 * 16 + v) - px(cutie, H, v) - (10 * 16 + px(fisa, H, v));
+    let min = Infinity, unde = null;
+    for (const v of [0, 1.15 * 16]) for (let H = 545; H <= 2200; H += 1) {
+      const g = gol(H, v);
+      if (g < min) { min = g; unde = { H, v }; }
+    }
+    return { min, unde, la1200: gol(1200, 1.15 * 16) };
+  };
+  const text = (g) => (g === null ? NEAPLICATA : `golul cel mai mic ${g.min.toFixed(1)} px (la ${g.unde.H} px, versiunea ${g.unde.v ? 'da' : 'nu'}); la 1200 px cu versiunea, ${g.la1200.toFixed(1)} px`);
+  const g = goluri(CSS);
+  proba(g !== null && g.min >= 16 - 0.01, `fișa și cutia deschise, înălțimea ferestrei de la 545 la 2 200 px: ${text(g)} (cerut cel puțin 16)`);
+  for (const [ce, c] of [
+    ['jumătatea, ca înainte', muta(CSS, ['max-height: min(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), 26.25rem);', 'max-height: calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2);'])],
+    ['27,25rem', muta(CSS, ['var(--versiune, 0rem)) / 2), 26.25rem);', 'var(--versiune, 0rem)) / 2), 27.25rem);'])],
+  ]) {
+    const x = c === null ? null : goluri(c);
+    proba(x !== null && x.min < 16 - 0.01, `control, ${ce}: ${text(x)} — pică`);
+  }
 }
 
 // ------------------------------------------------------------ ordinea de desenare
@@ -2177,7 +2444,7 @@ console.log('\nMesajul de încărcare (main.js): faza, procentul, ieșirea, focu
     const prins = {};
     globalThis.__pornesteProba = (canvas, o) => new Promise((res) => { prins.o = o; prins.rezolva = res; });
     const text = src.replace(IMPORT, 'const porneste = (...a) => globalThis.__pornesteProba(...a);')
-      .replace(/from '\.\/content\/([^']+)'/g, (_, f) => `from '${new URL(`../src/content/${f}`, import.meta.url).href}'`);
+      .replace(/from '\.\/((?:content|chapters)\/[^']+)'/g, (_, f) => `from '${new URL(`../src/${f}`, import.meta.url).href}'`);
     const f = join(tmpdir(), `cabo-main-${process.pid}-${nr++}.mjs`);
     writeFileSync(f, text);
     const info0 = console.info;
@@ -2236,6 +2503,275 @@ console.log('\nMesajul de încărcare (main.js): faza, procentul, ieșirea, focu
   await control('procentul scris și înaintea fazei', [['if (procent && fotografie && cat !== null)', 'if (procent && cat !== null)']],
     (x) => `„${x.fractieInainte.text}” cu „${x.fractieInainte.procent}”`);
   await control('fără apelul lui `scena.arata`', [['    scena.arata?.();\n', '']], descrieArata);
+}
+
+// ------------------------------------------------------------ pagina fără scenă
+
+// Fără WebGL2, după o eroare la pornire sau cu bucla oprită, pagina arată textul fișei
+// sanctuarului, cu sursele, din capitolul lui (src/chapters/sanctuar.js, numai DOM); titlul
+// paginii (`h1`) stă ascuns vizual în `<header>`, în afara lui `#continut`, ca anunțul să se scrie
+// în continuare într-un `#continut` gol. Pe un DOM falsificat care își scrie elementele ca HTML,
+// iar documentul vine din index.html, citit ca browserul cu JavaScript pornit (`<noscript>` e
+// text). Două probe:
+//   - fișa etichetei e aceeași după extragere: eticheta.js de la REPER_ACCES și cea de azi, pe
+//     același text, dau același outerHTML. Controale: două mutații ale capitolului de azi —
+//     fără `rel` pe legături, fără `tabIndex` pe titlu —, ca proba să arate că DOM-ul fals
+//     chiar le scrie;
+//   - main.js pe calea fără scenă, cu `porneste` înlocuit: fără WebGL2, cu garda pornirii
+//     expirată și după o excepție de după pornire, cu fișa etichetei încă în pagină. Controale:
+//     main.js și index.html de la REPER_ACCES, `h1` pus în `#continut`, `<noscript>` pus acolo
+//     și capitolul cu id-urile fișei.
+console.log('\nPagina fără scenă: titlul, capitolul sanctuarului cu sursele, fișa neschimbată');
+{
+  const VOIDE = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+  // Conținutul acestora e text: cu JavaScript pornit, și al lui <noscript>.
+  const BRUTE = new Set(['script', 'style', 'noscript']);
+  const scapa = (s, atr) => s.replace(/&/g, '&amp;').replace(atr ? /"/g : /[<>]/g, (c) => ({ '"': '&quot;', '<': '&lt;', '>': '&gt;' })[c]);
+  const scoate = (n) => { if (n.parentNode) { n.parentNode.childNodes = n.parentNode.childNodes.filter((x) => x !== n); n.parentNode = null; } };
+  class Text {
+    constructor(t) { this.data = t; this.parentNode = null; }
+    get nodeType() { return 3; }
+    get textContent() { return this.data; }
+    get outerHTML() { return scapa(this.data, false); }
+    remove() { scoate(this); }
+  }
+  // Proprietățile pe care le scrie codul paginii și atributele în care se reflectă, ca în browser.
+  const REFLECTATE = { id: 'id', className: 'class', type: 'type', href: 'href', rel: 'rel', target: 'target', lang: 'lang', title: 'title' };
+  class Element {
+    constructor(doc, tag) {
+      Object.assign(this, { ownerDocument: doc, localName: tag.toLowerCase(), atribute: new Map(), childNodes: [], parentNode: null, asc: {}, dataset: {}, style: {} });
+      this.classList = { toggle() {}, contains: () => false, add() {}, remove() {} };
+    }
+    get nodeType() { return 1; }
+    get tagName() { return this.localName.toUpperCase(); }
+    get children() { return this.childNodes.filter((n) => n.nodeType === 1); }
+    setAttribute(k, v) { this.atribute.set(k.toLowerCase(), String(v)); }
+    getAttribute(k) { return this.atribute.get(k) ?? null; }
+    hasAttribute(k) { return this.atribute.has(k); }
+    removeAttribute(k) { this.atribute.delete(k); }
+    toggleAttribute(k, f) { const da = f ?? !this.hasAttribute(k); if (da) this.setAttribute(k, ''); else this.removeAttribute(k); return da; }
+    get hidden() { return this.hasAttribute('hidden'); }
+    set hidden(v) { if (v) this.setAttribute('hidden', ''); else this.removeAttribute('hidden'); }
+    get disabled() { return this.hasAttribute('disabled'); }
+    set disabled(v) { if (v) this.setAttribute('disabled', ''); else this.removeAttribute('disabled'); }
+    get tabIndex() { return Number(this.getAttribute('tabindex') ?? -1); }
+    set tabIndex(v) { this.setAttribute('tabindex', v); }
+    get textContent() { return this.childNodes.map((n) => n.textContent).join(''); }
+    set textContent(t) { this.replaceChildren(...(t === '' || t == null ? [] : [String(t)])); }
+    append(...n) {
+      for (let c of n) {
+        if (typeof c === 'string') c = new Text(c);
+        scoate(c);
+        c.parentNode = this;
+        this.childNodes.push(c);
+      }
+    }
+    appendChild(c) { this.append(c); return c; }
+    replaceChildren(...n) { for (const c of this.childNodes) c.parentNode = null; this.childNodes = []; this.append(...n); }
+    remove() { scoate(this); }
+    contains(x) { for (let n = x; n; n = n.parentNode) if (n === this) return true; return false; }
+    closest() { return null; }
+    focus() { this.ownerDocument.activeElement = this; }
+    blur() { this.ownerDocument.activeElement = this.ownerDocument.body; }
+    addEventListener(t, f) { (this.asc[t] ??= []).push(f); }
+    removeEventListener() {}
+    getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }; }
+    getClientRects() { return []; }
+    * descendenti() { for (const c of this.children) { yield c; yield* c.descendenti(); } }
+    // Numai selectori simpli: tag, #id, .clasă, [atribut] și [atribut="valoare"], legați. Restul
+    // — cu spațiu sau cu `:` — nu se potrivește cu nimic (#straturi, #busola: nu există aici).
+    querySelectorAll(s) {
+      const m = /^([a-z][\w-]*)?((?:#[\w-]+|\.[\w-]+|\[[\w-]+(?:="[^"]*")?\])*)$/i.exec(s);
+      if (!m) return [];
+      const conditii = [...m[2].matchAll(/#([\w-]+)|\.([\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g)];
+      return [...this.descendenti()].filter((e) => (!m[1] || e.localName === m[1].toLowerCase()) && conditii.every((c) => (
+        c[1] ? e.id === c[1] : c[2] ? e.className.split(/\s+/).includes(c[2]) : c[4] === undefined ? e.hasAttribute(c[3]) : e.getAttribute(c[3]) === c[4])));
+    }
+    querySelector(s) { return this.querySelectorAll(s)[0] ?? null; }
+    get outerHTML() {
+      const atr = [...this.atribute].map(([k, v]) => ` ${k}="${scapa(v, true)}"`).join('');
+      if (VOIDE.has(this.localName)) return `<${this.localName}${atr}>`;
+      return `<${this.localName}${atr}>${this.childNodes.map((n) => n.outerHTML).join('')}</${this.localName}>`;
+    }
+  }
+  for (const [p, a] of Object.entries(REFLECTATE)) {
+    Object.defineProperty(Element.prototype, p, { get() { return this.getAttribute(a) ?? ''; }, set(v) { this.setAttribute(a, v); } });
+  }
+  /** Un document gol, sau cu <body> din marcajul dat (index.html). */
+  const document_ = (html) => {
+    const doc = { asc: {} };
+    doc.createElement = (t) => new Element(doc, t);
+    doc.documentElement = new Element(doc, 'html');
+    doc.body = new Element(doc, 'body');
+    doc.documentElement.append(doc.body);
+    doc.activeElement = doc.body;
+    doc.getElementById = (id) => [...doc.documentElement.descendenti()].find((e) => e.id === id) ?? null;
+    doc.querySelector = (s) => doc.documentElement.querySelector(s);
+    doc.querySelectorAll = (s) => doc.documentElement.querySelectorAll(s);
+    doc.addEventListener = (t, f) => { (doc.asc[t] ??= []).push(f); };
+    doc.removeEventListener = () => {};
+    if (html === undefined) return doc;
+    const corp = /<body[^>]*>([\s\S]*?)<\/body>/.exec(html)?.[1];
+    if (corp === undefined) throw new Error('marcaj fără <body>');
+    const re = /<!--[\s\S]*?-->|<\/([a-z][\w-]*)\s*>|<([a-z][\w-]*)((?:\s+[^\s"'=<>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*\/?>|[^<]+/gi;
+    let cur = doc.body, m;
+    while ((m = re.exec(corp))) {
+      if (m[0].startsWith('<!--')) continue;
+      if (m[1]) {
+        if (cur.localName !== m[1].toLowerCase()) throw new Error(`marcaj: </${m[1]}> în <${cur.localName}>`);
+        cur = cur.parentNode;
+      } else if (m[2]) {
+        const e = doc.createElement(m[2]);
+        for (const a of m[3].matchAll(/([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)) e.setAttribute(a[1], a[2] ?? a[3] ?? a[4] ?? '');
+        cur.append(e);
+        if (BRUTE.has(e.localName)) {
+          const sf = corp.toLowerCase().indexOf(`</${e.localName}`, re.lastIndex);
+          if (sf < 0) throw new Error(`marcaj: <${e.localName}> neînchis`);
+          if (sf > re.lastIndex) e.append(corp.slice(re.lastIndex, sf));
+          re.lastIndex = corp.indexOf('>', sf) + 1;
+        } else if (!VOIDE.has(e.localName)) cur = e;
+      } else cur.append(m[0]);
+    }
+    if (cur !== doc.body) throw new Error(`marcaj: <${cur.localName}> neînchis`);
+    return doc;
+  };
+  const toate = (doc) => [...doc.documentElement.descendenti()];
+  const idDuble = (doc) => {
+    const n = new Map();
+    for (const e of toate(doc)) if (e.id) n.set(e.id, (n.get(e.id) ?? 0) + 1);
+    return [...n].filter(([, k]) => k > 1).map(([id, k]) => `${id} ×${k}`);
+  };
+  const { SANCTUAR } = await import('../src/content/sanctuar.js');
+  const NR_SURSE = [...SANCTUAR.fapte.map((f) => (f.surse ?? [f.sursa]).length), ...(SANCTUAR.conflicte ?? []).map((c) => c.surse.length)].reduce((a, b) => a + b, 0);
+  const CAPITOL_JS = textSursa('src/chapters/sanctuar.js');
+  const URL_CAPITOL = new URL('../src/chapters/sanctuar.js', import.meta.url).href;
+  const temporare = [];
+  /** Un modul din text, scris în directorul temporar; `capitol`: adresa capitolului de folosit. */
+  const modul = async (src, { capitol = URL_CAPITOL, pastreaza = false } = {}) => {
+    src = src.replace(/from '(three(?:\/[^']*)?)'/g, (_, s) => `from '${import.meta.resolve(s)}'`)
+      .replace(/from '(?:\.\.|\.)\/chapters\/sanctuar\.js'/g, () => `from '${capitol}'`)
+      .replace(/from '\.\/((?:content)\/[^']+)'/g, (_, f) => `from '${new URL(`../src/${f}`, import.meta.url).href}'`)
+      .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`);
+    const f = join(tmpdir(), `cabo-farascena-${process.pid}-${nrModul++}.mjs`);
+    writeFileSync(f, src);
+    if (pastreaza) { temporare.push(f); return pathToFileURL(f).href; }
+    try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
+  };
+  /** Capitolul mutat, ca modul păstrat până la sfârșitul secțiunii; `null` dacă mutația nu se aplică. */
+  const capitolMutat = async (...perechi) => { const s = muta(CAPITOL_JS, ...perechi); return s === null ? null : modul(s, { pastreaza: true }); };
+  const D0 = globalThis.document, A0 = globalThis.addEventListener, R0 = globalThis.removeEventListener;
+  globalThis.addEventListener = globalThis.removeEventListener = () => {};
+  try {
+    // 1. Fișa etichetei, cu același text, pe eticheta.js de la REPER_ACCES și pe cea de azi.
+    const fisaDin = async (srcEticheta, capitol) => {
+      if (srcEticheta === null) return null;
+      const E = await modul(srcEticheta, { capitol });
+      const doc = document_();
+      globalThis.document = doc;
+      const e = E.creeazaEticheta({ gazda: doc.body, canvas: doc.createElement('canvas'), camera: new THREE.PerspectiveCamera(), inaltimeLa: () => 0,
+        ancora: [0, 100, 0], continut: SANCTUAR, laDeschidere: () => {}, laInchidere: () => {}, cereRandare: () => {} });
+      const fisa = doc.getElementById('sanctuar-fisa');
+      return { fisa: fisa?.outerHTML ?? '', tot: doc.body.outerHTML, legaturi: fisa?.querySelectorAll('a').length ?? 0, e };
+    };
+    const ETICHETA_JS = textSursa('src/scene/eticheta.js');
+    const azi = await fisaDin(ETICHETA_JS);
+    const vechi = await fisaDin(textVechi('src/scene/eticheta.js', REPER_ACCES));
+    const la = (x) => (x === null ? 'NECITITĂ' : `${x.fisa.length} caractere, ${x.legaturi} legături`);
+    proba(vechi !== null && azi.fisa.length > 3000 && azi.legaturi === NR_SURSE && azi.fisa === vechi.fisa && azi.tot === vechi.tot,
+      `fișa etichetei, outerHTML: azi ${la(azi)}, la ${REPER_ACCES} ${la(vechi)} — ${vechi && azi.fisa === vechi.fisa ? 'identice' : 'DIFERITE'}; eticheta cu fișa, întregi: ${vechi && azi.tot === vechi.tot ? 'identice' : 'DIFERITE'}`);
+    for (const [ce, perechi] of [['fără `rel` pe legături', [["{ href: q.url, rel: 'noopener', target: '_blank' }", "{ href: q.url, target: '_blank' }"]]],
+      ['fără `tabIndex` pe titlu', [["{ id: 'sanctuar-fisa-titlu', tabIndex: -1 }", "{ id: 'sanctuar-fisa-titlu' }"]]]]) {
+      const url = await capitolMutat(...perechi);
+      const x = url === null ? null : await fisaDin(ETICHETA_JS, url);
+      proba(x !== null && vechi !== null && x.fisa !== vechi.fisa, `control, capitolul ${ce}: ${x === null ? NEAPLICATA : `fișa ${x.fisa === vechi?.fisa ? 'IDENTICĂ' : `diferă (${x.fisa.length} caractere)`}`} — pică`);
+    }
+
+    // 2. main.js pe calea fără scenă.
+    const MAIN_JS = textSursa('src/main.js'), INDEX = textSursa('index.html');
+    const IMPORT = "import { porneste } from './scene/scena.js';";
+    const CAZURI = {
+      'fără WebGL2': async () => null,
+      'garda pornirii': async () => { const e = new Error('datele n-au mai sosit'); e.name = 'TimeoutError'; throw e; },
+      // Scena a pornit, cu fișa etichetei (cu id-urile ei) în pagină, apoi o excepție în main.js.
+      'după pornire': async () => {
+        const { creeazaFisa } = await import(URL_CAPITOL);
+        globalThis.document.body.append(creeazaFisa(SANCTUAR).fisa);
+        return { nrTriunghiuri: 0, petic: null, teren: {}, sanctuar: null, surse: [], arata() {}, memorie() { throw new Error('excepție de probă'); },
+          dispose() { globalThis.__dispuse = (globalThis.__dispuse ?? 0) + 1; },
+          renderer: { forceContextLoss() { globalThis.__pierdut = (globalThis.__pierdut ?? 0) + 1; } } };
+      },
+    };
+    const faraScena = async (mainJs, index, caz, capitol = URL_CAPITOL) => {
+      if (mainJs === null || index === null || !mainJs.includes(IMPORT)) return null;
+      const doc = document_(index);
+      globalThis.document = doc;
+      globalThis.__pornesteProba = CAZURI[caz];
+      globalThis.__dispuse = 0; globalThis.__pierdut = 0;
+      const info0 = console.info;
+      console.info = () => {};
+      try {
+        await modul(mainJs.replace(IMPORT, 'const porneste = (...a) => globalThis.__pornesteProba(...a);'), { capitol });
+      } finally {
+        console.info = info0;
+        delete globalThis.__pornesteProba;
+        delete globalThis.__modulPornit;
+        delete globalThis.__scena;
+      }
+      const dispuse = globalThis.__dispuse, pierdut = globalThis.__pierdut;
+      delete globalThis.__dispuse; delete globalThis.__pierdut;
+      const continut = doc.getElementById('continut');
+      const a = doc.activeElement, buton = continut.querySelector('button');
+      const h1 = toate(doc).filter((e) => e.localName === 'h1');
+      const legaturi = continut.querySelectorAll('a').filter((a) => /^https:\/\//.test(a.href) && a.target === '_blank' && a.rel === 'noopener');
+      return {
+        text: continut.textContent.length, santuario: continut.textContent.includes('Santuário'),
+        anunt: continut.children[0]?.localName === 'p' && continut.children[0].textContent.startsWith('Harta 3D nu a putut porni'),
+        reincearca: continut.querySelector('button')?.textContent ?? null,
+        h1: h1.length, h1Afara: h1.length === 1 && !continut.contains(h1[0]) && h1[0].textContent === 'Cabo Espichel',
+        duble: idDuble(doc), idInCapitol: [...continut.descendenti()].filter((e) => e.id).length,
+        legaturi: legaturi.length, scena: doc.body.dataset.scena, canvas: doc.getElementById('scena') !== null,
+        rol: continut.children[0]?.getAttribute('role') ?? null,
+        focus: a && a === buton ? 'Reîncearcă' : a && a === continut.children[0] ? 'anunț' : a === doc.body ? '<body>' : 'altundeva',
+        dispuse, pierdut,
+      };
+    };
+    // Anunțul e `alert` peste tot. Focusul: pe „Reîncearcă” după garda pornirii, pe anunț după o
+    // excepție de după pornire — harta fusese pe ecran —, neatins la încărcare, fără WebGL2. Scena
+    // pornită se eliberează, o dată, cu contextul pierdut.
+    const FOCUS = { 'fără WebGL2': '<body>', 'garda pornirii': 'Reîncearcă', 'după pornire': 'anunț' };
+    const bun = (r, caz) => r !== null && r.text >= 2000 && r.santuario && r.anunt && r.h1 === 1 && r.h1Afara && r.duble.length === 0
+      && r.idInCapitol === 0 && r.legaturi === NR_SURSE && r.scena === 'indisponibila' && !r.canvas
+      && (caz === 'garda pornirii' ? r.reincearca === 'Reîncearcă' : r.reincearca === null)
+      && r.rol === 'alert' && r.focus === FOCUS[caz] && r.dispuse === (caz === 'după pornire' ? 1 : 0) && r.pierdut === r.dispuse;
+    const descrie = (r) => (r === null ? 'NECITIT' : `#continut ${r.text} caractere, „Santuário” ${r.santuario ? 'da' : 'NU'}, anunțul ${r.anunt ? 'primul' : 'LIPSĂ'}${r.reincearca ? `, „${r.reincearca}”` : ''}, ${r.legaturi} legături; h1 ${r.h1}${r.h1Afara ? ' (în afara lui #continut)' : ''}; id-uri duble ${r.duble.join(', ') || 'niciunul'}, id-uri în capitol ${r.idInCapitol}; data-scena „${r.scena}”, canvasul ${r.canvas ? 'RĂMAS' : 'scos'}; anunțul cu role „${r.rol}”, focusul pe ${r.focus}; scena eliberată de ${r.dispuse} ori, contextul pierdut de ${r.pierdut} ori`);
+    for (const caz of Object.keys(CAZURI)) {
+      const r = await faraScena(MAIN_JS, INDEX, caz);
+      proba(bun(r, caz), `${caz}: ${descrie(r)}`);
+    }
+    // Controale.
+    const control = async (ce, mainJs, index, caz, capitol) => {
+      const r = await faraScena(mainJs, index, caz, capitol);
+      proba(r !== null && !bun(r, caz), `control, ${ce} (${caz}): ${mainJs === null || index === null ? NEAPLICATA : descrie(r)} — pică`);
+    };
+    await control(`main.js de la ${REPER_ACCES}`, textVechi('src/main.js', REPER_ACCES), INDEX, 'fără WebGL2');
+    await control(`index.html de la ${REPER_ACCES}`, MAIN_JS, textVechi('index.html', REPER_ACCES), 'fără WebGL2');
+    await control('`h1` pus în #continut', MAIN_JS, muta(INDEX, ['    <header><h1 class="ascuns">Cabo Espichel</h1></header>\n', ''],
+      ['<main id="continut"></main>', '<main id="continut"><h1 class="ascuns">Cabo Espichel</h1></main>']), 'fără WebGL2');
+    const noscript = /^ {4}<noscript>.*<\/noscript>\n/m.exec(INDEX)?.[0] ?? null;
+    await control('`<noscript>` pus în #continut', MAIN_JS, noscript === null ? null : muta(INDEX, [noscript, ''],
+      ['<main id="continut"></main>', `<main id="continut">${noscript.trim()}</main>`]), 'fără WebGL2');
+    await control('scena pornită neeliberată', muta(MAIN_JS, ['  elibereazaScena();\n  faraScena(e.message', '  faraScena(e.message']), INDEX, 'după pornire');
+    await control('anunțul fără rol', muta(MAIN_JS, ["    anunt.setAttribute('role', 'alert');\n", '']), INDEX, 'fără WebGL2');
+    await control('focusul nemutat', muta(MAIN_JS, ['    if (muta && (', '    if (false && (']), INDEX, 'garda pornirii');
+    const cuId = await capitolMutat(["capitol = el('section', { className: 'capitol-sanctuar' });", "capitol = el('section', { className: 'capitol-sanctuar', id: 'sanctuar-fisa' });"],
+      ["el('h2', {}, continut.nume)", "el('h2', { id: 'sanctuar-fisa-titlu' }, continut.nume)"]);
+    if (cuId === null) proba(false, `control, capitolul cu id-urile fișei: ${NEAPLICATA} — pică`);
+    else await control('capitolul cu id-urile fișei', MAIN_JS, INDEX, 'după pornire', cuId);
+  } finally {
+    for (const f of temporare) rmSync(f, { force: true });
+    if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
+    if (A0 === undefined) { delete globalThis.addEventListener; delete globalThis.removeEventListener; } else { globalThis.addEventListener = A0; globalThis.removeEventListener = R0; }
+  }
 }
 
 // ------------------------------------------------------------ compilarea înaintea primului cadru

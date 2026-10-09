@@ -26,6 +26,8 @@
 // iar clicul pe scenă nu culege nimic — nicio rază, niciun rând scris. Activat,
 // face tot ce e descris aici; minimizat din nou, se suspendă, dar ține ultimul
 // punct. Mișcarea camerei nu depinde de el: e a controalelor în ambele stări.
+// Fără mouse, butonul „Măsoară centrul” culege, la fel, punctul din centrul vederii.
+// Escape îl minimizează, după fișa sanctuarului, dacă e deschisă.
 //
 // ────────────────────────────────────────────────── ce cifre au acoperire
 //
@@ -93,9 +95,11 @@ const brut = (v, zec) => v.toFixed(zec);
  * @param {(raza: THREE.Ray) => ({t: number, cheie: string, x: number, y: number, z: number}|null)} [o.loveste]
  *   — clădirile sanctuarului: prima lovită de rază, dacă e una
  * @param {(cheie: string) => string} [o.numeElement] — numele de afișat al unui element
+ * @param {() => ({x: number, y: number}|null)} [o.centru] — centrul vederii, în coordonatele
+ *   ferestrei, pentru „Măsoară centrul”; implicit, centrul canvasului
  * @returns {{dispose: () => void, culegeLa: Function, activeaza: Function, minimizeaza: Function, activ: boolean}|null}
  */
-export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, limiteMars, inAlpha, zMin, loveste, numeElement }) {
+export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, limiteMars, inAlpha, zMin, loveste, numeElement, centru }) {
   // Proba e un apel adevărat, nu o verificare de chei: `laGeo` întoarce null
   // dacă lipsesc `colturi_geo` sau `bbox_tm06`, iar un panou care arată
   // longitudinea „null" e mai rău decât unul care lipsește.
@@ -186,7 +190,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     + '<div class="antet"><h2 class="titlu">Coordonate</h2>'
     + '<button class="minimizeaza" type="button" aria-label="Minimizează coordonatele"'
     + ' title="Minimizează: clicul pe hartă nu mai măsoară"><span aria-hidden="true">–</span></button></div>'
-    + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul.</p>'
+    + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul, sau măsoară centrul hărții.</p>'
     + '<dl class="mari" hidden>'
     + '<dt class="cl" hidden>clădire</dt><dd class="cl" hidden></dd>'
     + '<dt>altitudine</dt><dd class="alt"></dd>'
@@ -202,7 +206,11 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     + '<dt>scenă (m)</dt><dd class="sc"><span class="axa"></span> <span class="axa"></span> <span class="axa"></span></dd>'
     + '<dt>TM06 (m)</dt><dd class="tm"><span class="axa"></span> <span class="axa"></span></dd>'
     + '</dl>'
+    // Fără mouse: punctul din centrul vederii, cu aceeași culegere ca un clic.
+    + '<div class="actiuni">'
+    + '<button class="centru" type="button" title="Măsoară punctul din centrul hărții">Măsoară centrul</button>'
     + '<button class="copiaza" type="button" hidden>Copiază</button>'
+    + '</div>'
     + '<span class="anunt" role="status" aria-live="polite"></span>'
     + '</div>';
 
@@ -213,6 +221,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const dlMari = radacina.querySelector('.mari');
   const dlMici = radacina.querySelector('.mici');
   const buton = radacina.querySelector('.copiaza');
+  const centruBtn = radacina.querySelector('.centru');
   const anunt = radacina.querySelector('.anunt');
   const camp = {
     alt: radacina.querySelector('.alt'),
@@ -348,11 +357,27 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     const dist = Math.hypot(ev.clientX - apasat.x, ev.clientY - apasat.y);
     apasat = null;
     if (dist > PRAG_CLIC) return;   // a fost o mutare a hărții, nu clic
-    const p = punctSubCursor(ev);
-    if (p) arata(p);
+    culege(ev.clientX, ev.clientY);
   };
 
   const laAnulare = () => { apasat = null; };
+
+  /** Culege punctul de sub (clientX, clientY) și îl arată. Minimizat, null. */
+  const culege = (clientX, clientY) => {
+    if (!activ) return null;
+    const p = punctSubCursor({ clientX, clientY });
+    if (p) arata(p);
+    return p;
+  };
+
+  // „Măsoară centrul”: panoul se folosește și fără mouse — de la tastatură, cu un cititor
+  // de ecran. Centrul e al vederii (`centru`, din controale): cu fișa deschisă, al părții
+  // libere; fără el, al canvasului.
+  const laCentru = () => {
+    const r = canvas.getBoundingClientRect();
+    const c = centru?.() ?? { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    if (activ && !culege(c.x, c.y)) anunt.textContent = 'În centrul hărții nu se vede niciun punct de măsurat.';
+  };
 
   /**
    * Activează sau minimizează. Focusul trece pe butonul care apare: cel apăsat
@@ -375,6 +400,19 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   const laActivare = () => seteaza(true, true);
   const laMinimizare = () => seteaza(false, true);
 
+  // Escape minimizează cutia deschisă. Îngustă și scundă (320 × 256, pagina mărită de patru
+  // ori), ea coboară peste Satelit și busolă, iar Tab ajunge totuși la ele: Escape le dezvăluie
+  // fără să mute focusul de pe ele. Numai focusul din cutie trece pe „Coordonate” — altfel ar
+  // cădea pe <body>, cu cutia. Cât fișa sanctuarului e deschisă, Escape-ul e al ei (eticheta.js):
+  // ascultătorul de aici e înscris înaintea ei, deci fără condiția asta o apăsare ar închide
+  // amândouă. La fel, al modalei surselor.
+  const laTasta = (e) => {
+    if (e.key !== 'Escape' || !activ || e.defaultPrevented || e.target?.closest?.('dialog[open]')) return;
+    if (document.documentElement.hasAttribute('data-fisa-deschisa')) return;
+    e.preventDefault();
+    seteaza(false, cutie.contains(e.target));
+  };
+
   canvas.addEventListener('pointerdown', laApasare);
   // Ridicarea se ascultă pe fereastră, nu pe canvas: controalele mută
   // `pointermove`/`pointerup` pe `ownerDocument` cât ține tragerea, iar o tragere
@@ -384,17 +422,14 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   globalThis.addEventListener('pointerup', laRidicare);
   globalThis.addEventListener('pointercancel', laAnulare);
   buton.addEventListener('click', laCopiere);
+  centruBtn.addEventListener('click', laCentru);
   activeazaBtn.addEventListener('click', laActivare);
   minimizeazaBtn.addEventListener('click', laMinimizare);
+  document.addEventListener('keydown', laTasta);
 
   return {
     /** Pentru verificare din consolă: culege fără eveniment de pointer. Minimizat, null. */
-    culegeLa: (clientX, clientY) => {
-      if (!activ) return null;
-      const p = punctSubCursor({ clientX, clientY });
-      if (p) arata(p);
-      return p;
-    },
+    culegeLa: culege,
     activeaza: () => seteaza(true, false),
     minimizeaza: () => seteaza(false, false),
     get activ() { return activ; },
@@ -405,8 +440,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       globalThis.removeEventListener('pointerup', laRidicare);
       globalThis.removeEventListener('pointercancel', laAnulare);
       buton.removeEventListener('click', laCopiere);
+      centruBtn.removeEventListener('click', laCentru);
       activeazaBtn.removeEventListener('click', laActivare);
       minimizeazaBtn.removeEventListener('click', laMinimizare);
+      document.removeEventListener('keydown', laTasta);
       clearTimeout(cronoCopiere);
       canvas.removeAttribute('data-culege');
       document.documentElement.removeAttribute('data-punct-deschis');

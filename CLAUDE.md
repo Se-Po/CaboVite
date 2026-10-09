@@ -47,9 +47,9 @@ se poartă în română.
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul și fișierele fiecărui nivel, culoarea peste cusături, netezirea, shaderul fără codul umbrelor |
-| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate”, harta cu pagina mărită |
-| `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate, blocurile `static {}` din `dist/assets` și plasa ES5; `-- --live` le compară cu sebastians.life |
-| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit la pornire (cele șase texturi întregi cerute înaintea construcției, procentul, garda fotografiei, ieșirea fără Satelit; peticul oprit fără compresie); harta o singură dată (pe sursă: compilarea, apoi așteptarea fotografiei, apoi bucla; panourile ascunse și canvasul fără pointer până la `data-scena`; mesajul cu procentul și butonul „Arată relieful acum”) |
+| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate” și „Măsoară centrul”, harta cu pagina mărită, tastatura și drona (urcarea, coborârea, paza solului pe tot trunchiul vederii, la mutare, rotire și zoom, Shift și Ctrl ca taste de modificare), anunțul busolei, Escape pe fișă și pe cutia „Coordonate” |
+| `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate, blocurile `static {}` din `dist/assets` și plasa ES5, titlul (`h1`) și `<noscript>` în afara lui `#continut`; `-- --live` le compară cu sebastians.life |
+| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion, haloul focusului peste hartă, golul dintre fișă și cutia „Coordonate” pe ecrane înalte, bifa lui Satelit în afara numelui, busola în contrast forțat, panoul „Coordonate” fără text sub 14 px; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit la pornire (cele șase texturi întregi cerute înaintea construcției, procentul, garda fotografiei, ieșirea fără Satelit; peticul oprit fără compresie); harta o singură dată (pe sursă: compilarea, apoi așteptarea fotografiei, apoi bucla; panourile ascunse și canvasul fără pointer până la `data-scena`; mesajul cu procentul și butonul „Arată relieful acum”); pagina fără scenă (textul fișei sanctuarului cu sursele, un `h1`, niciun id dublu; fișa etichetei neschimbată la outerHTML) |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
@@ -62,7 +62,8 @@ EXIF-ul — stă în `scripts/comun/`.
 
 - `src/main.js` — punctul de intrare; leagă scena de conținut, nimic altceva
 - `src/scene/` — tot codul three.js. Nimic din three.js nu trăiește în afara acestui director.
-- `src/chapters/` — câte un modul per capitol narativ, cu un `init()` și un `dispose()`
+- `src/chapters/` — câte un modul per capitol narativ, numai DOM, cu un `init()` și un `dispose()`.
+  Azi `sanctuar.js`: fișa etichetei (`creeazaFisa`, din eticheta.js) și textul ei pe calea fără scenă
 - `src/content/` — textele în română, ca date, separate de cod
 - `public/` — modele, texturi, fotografii, decodoare. Servite ca atare.
 
@@ -259,11 +260,40 @@ pleacă la `data-scena` pe `<body>` (`activa` sau `indisponibila`); fără JavaS
 
 **Panourile** — busola, Satelit, „Coordonate”, sursele, versiunea, eticheta și fișa, pivotul —
 au `visibility: hidden` până la `data-scena`: apar toate odată cu harta și nu iau focus până
-atunci. Canvasul n-are pointer până atunci: o tragere de 400 px în timpul încărcării muta camera
+atunci. Titlul (`<header>`) și `<noscript>` rămân: fără JavaScript `data-scena` nu vine. Canvasul n-are pointer până atunci: o tragere de 400 px în timpul încărcării muta camera
 cu 560 m înaintea primului cadru (control, în pagină). Măsurat pe build: `data-scena` se pune cu
 `frame` 0, cu Satelit deja aplicat, iar primul cadru e Satelit (5 din 5 încărcări). La
 1600 × 900, 390 × 844, 844 × 390, 320 × 568 și 195 × 422, cu „5%” și cu „100%”, pastila și
 butonul stau în ecran, fără defilare orizontală.
+
+**Titlul și pagina fără scenă.** `<header><h1 class="ascuns">Cabo Espichel</h1></header>`
+(ascuns vizual, ca `.ascuns` al versiunii) și `<noscript>`, cu o propoziție, stau înaintea lui
+`#continut`, nu în el: `faraScena()` scrie numai într-un `#continut` gol, iar cu JavaScript
+pornit conținutul lui `<noscript>` e text. Fără scenă, după anunț vine capitolul sanctuarului
+(`src/chapters/sanctuar.js`): textul fișei, cu sursele ca legături, fără nota despre model și
+fără id-uri — calea fără scenă poate veni și după o excepție cu eticheta încă vie.
+- `verifica-pagina`: fără WebGL2, cu garda expirată și după o excepție, `#continut` are 2 994 de
+  caractere, 20 de legături, un singur `h1`, în afara lui, și 0 id-uri duble. Controale: main.js
+  de la 6ad3a47, 26 de caractere; `h1` pus în `#continut`, 13; `<noscript>` acolo, 72; capitolul
+  cu id-urile fișei, `sanctuar-fisa` ×2. Fișa etichetei, eticheta.js de la 6ad3a47 față de azi:
+  outerHTML identic, 7 281 de caractere (controale: fără `rel`, fără `tabIndex`, diferă);
+- `verifica-livrare`: index.html și dist/ au un `h1` și un `<noscript>`, cu `#continut` gol;
+- în pagină (2026-10-09), build-ul fără WebGL pe serverul de probă, cu CSP impus: 3 006 caractere
+  vizibile; textul 17,76 px, `--ink` pe `--bg` 14,6:1; sursele 16 px, 7,1:1; legăturile 7,2:1,
+  subliniate, cu focus; la 390 px fără defilare orizontală; 0 încălcări CSP. Fără JavaScript
+  (iframe `sandbox` fără scripturi): propoziția se vede, mesajul de încărcare nu; control, regula
+  panourilor de la 6ad3a47 ascunde propoziția și titlul. Cu scena (4174 la 916 × 579, 4173 și la
+  390 × 844): `h1` 1 × 1 px, tăiat; scos `<header>`, 0 din 148 de cutii se mută (control, `h1`
+  fără `.ascuns`: 2). Cu un cititor de ecran adevărat nu s-a încercat
+  <!-- NEVERIFICAT: titlul și capitolul cu NVDA/VoiceOver -->.
+- Anunțul e `role="alert"`: mesajul de încărcare, singura regiune live de până atunci, pleacă
+  odată cu `data-scena`, iar harta poate cădea și sub un cititor care o folosea. După garda
+  pornirii focusul trece pe „Reîncearcă”, după o cădere de după pornire pe anunț, numai dacă era
+  pe <body> sau pe canvasul scos; la încărcare, fără WebGL2, nu se mută. O excepție de după
+  `porneste()` eliberează acum scena, ca `laEsec` (`elibereazaScena`): busola, Satelit și
+  eticheta rămâneau peste capitol, iar tastatura hărții îi oprea defilarea (recenzia).
+  `verifica-pagina`: rolul, focusul pe fiecare cale și scena eliberată o dată, cu contextul
+  pierdut; controale: scena neeliberată, anunțul fără rol, focusul nemutat.
 
 **Browserele vechi.** three r186 are șase blocuri `static {}`, pe care Safari/iOS le
 parsează abia de la 16.4. Un modul care nu se parsează oprește tot graful, deci nici
@@ -276,6 +306,8 @@ iOS 15.4–16.3 nu s-a încercat <!-- NEVERIFICAT: iPhone/iPad pe iOS 15.4–16.
 `'unsafe-inline'`), în ES5. main.js pune `__modulPornit` la prima instrucțiune; modulele rulează
 înaintea lui `load`, deci dacă la `load` semnul lipsește, plasa scoate canvasul, pune
 `data-scena="indisponibila"` și scrie „Harta 3D nu a putut porni.”. Fără niciun temporizator.
+Capitolul sanctuarului nu-l poate importa — e un modul, iar plasa rulează tocmai când modulele
+nu pornesc —, deci rămâne propoziția.
 Pe un server de probă local, cu build-ul de producție:
 - three.core cu o eroare de parsare la început: mesajul, fără canvas, fără mesajul de încărcare.
   Control, același modul fără plasă: „Se încarcă harta 3D…” pe vecie, `#continut` gol;
@@ -623,7 +655,14 @@ panou care defilează, în textul capitolelor sau într-o modală deschisă. Dec
 elementul cu focus, iar când acela e `<body>` — după un clic pe text care nu ia
 focus, un rând din fișă —, locul ultimei apăsări: altfel Home închidea fișa în loc
 s-o ducă sus. Ținută apăsată, contează numai prima apăsare; repetările ar fi pornit
-zborul de la capăt la fiecare 33 ms.
+zborul de la capăt la fiecare 33 ms. Home stă în `tastatura.js`, cu celelalte taste ale
+hărții (vezi „Mouse-ul, degetele și cursorul”).
+
+**Anunțul busolei** (regiunea live, 600 ms după ce camera s-a liniștit) se scrie numai
+când textul se schimbă: o mutare sau un zoom fără rotire îl rescriau identic, 10 din 10.
+`reanunta()` golește întâi regiunea, deci la apariția hărții se scrie tot. Proba, în
+`verifica-controale`: 10 mutări și zoomuri, 0 scrieri; o rotire de 15°, una; pe busola.js
+de la 6ad3a47, 10 scrieri identice.
 
 **Zborul pune poziția ABSOLUT**, nu cu `rotateLeft()`. Acela există și e public
 în r186, dar adaugă un *delta* într-un acumulator care se scurge exponențial;
@@ -709,7 +748,11 @@ panoul e text românesc și se citește, textul copiat pleacă în altă parte.
 clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeLa()`
 întoarce `null`; o apăsare începută înainte de minimizare nu mai culege nici ea.
 Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
-rămâne. Mișcarea camerei nu depinde de el. Unde stă:
+rămâne. Mișcarea camerei nu depinde de el. Fără mouse, butonul **„Măsoară centrul”**
+(următorul după „–” cu Tab) culege, cu aceeași culegere ca un clic, punctul din centrul
+vederii — ținta camerei pe ecran (`centruVederii` din camera.js), deci cu fișa deschisă
+centrul părții libere. Stă pe un rând cu „Copiază” pe desktop, pe telefon unul sub altul.
+Escape îl minimizează (vezi „Focusul, Escape și contrastul forțat”). Unde stă:
 - pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
 - pe telefon, pe rândul de jos, la stânga coloanei busolei și a lui Satelit;
@@ -721,8 +764,11 @@ Cutia deschisă primește clicurile: are înălțime maximă și defilează, cu 
 lipit sus, deci „–” se vede mereu. Prin ea nu se culege și nu se rotește camera;
 o cutie prin care treceau rotița și degetul nu defila deloc — măsurat la 195 px,
 rotița muta camera cu 66 m. Pe desktop fișa sanctuarului și panoul deschis stau în
-aceeași coloană: pe ecrane înalte fișa se oprește deasupra panoului (24rem rezervă;
-pe o clădire panoul ocupă de jos 21,64rem), iar sub ~56rem își împart înălțimea
+aceeași coloană: pe ecrane înalte fișa se oprește deasupra panoului (28rem rezervă, plus
+versiunea), iar cutia are cel mult restul, 26,25rem, și defilează: cu plafonul ei de jumătate,
+spațierea textului din WCAG 1.4.12 o ducea sub fișă, cu tot cu „–”, cu 60,8 px la 1280 × 1200
+(recenzia). `verifica-pagina` calculează golul pe sursă, de la 545 la 2 200 px: cel puțin 16 px
+(controale: jumătatea, −60,8 px la 1 200; 27,25rem, 0 px). Sub ~65rem își împart înălțimea
 dintre 10rem și marginea de jos și defilează fiecare. Pe telefon fișa e o foaie jos,
 peste busolă, Satelit și panou, ca înainte.
 
@@ -826,25 +872,30 @@ Control: compunerea veche, înghețată în probă, pune punctul de pe mare la m
 pixeli la peste 1 µm. În pagină, la 916 × 417, pe 625 de pixeli: 0 la peste 1 µm,
 „apă” pe 316 din 316.
 
-Rândurile mici, în pagină, cu valorile cele mai lungi (X −1163,00 · Y 168,28 ·
-Z −1492,00; TM06 X −95790,00 · Y −138900,00): golul dintre axe e de 2,0 spații
-(6,86 px pe desktop, 6,33 px pe telefon); textul cu două spații avea lățimea celui cu
-unul. Rândul scenei stă pe o linie pe desktop, la 360, 320 și 844 × 390; la 390 × 844,
-390 × 330 și 195 px, Z trece pe al doilea rând. Rândurile mici nu fac cutia să
-defileze pe orizontală la nicio lățime, nici cu o bară de defilare clasică de 15 px,
-simulată cu o margine de 16 px, și nicio axă nu se rupe. Singura depășire nu vine de
-la ele: la 195 px, cu bara simulată, cutia iese cu 6 px din cauza rândurilor mari
-(altitudine, longitudine, latitudine), la fel și înainte.
+**Textul de 14 px** (alegerea autorului, 2026-10-08): etichetele și rândurile mici au
+0,875rem pe orice lățime (erau 0,72–0,8rem), iar rândurile mici stau pe o coloană, eticheta
+deasupra cifrelor. Măsurat în pagină (build), cu punctul în colțul lui alpha (−1162,50;
+−1491,90), pe lanterna farului (`far.turn`, 168,28 m) și cu valorile cele mai lungi scrise
+de mână (X −1163,00 · Y 168,28 · Z −1492,00; TM06 X −95790,00 · Y −138900,00; clădirea
+„zidul cercado-ului, incinta Casei da Água”): la 1440 × 900, 700 × 800, 844 × 390,
+390 × 844, 361 × 800 și 320 × 568, `scrollWidth` = `clientWidth` și fiecare rând mic pe o
+linie; la 195 × 422 pe două, tot fără defilare orizontală; nicio axă ruptă. Control, la
+390 × 844 cu valorile cele mai lungi: pe două coloane rândul trece pe două linii, iar cu
+`white-space: nowrap` cutia defilează (255 față de 230 px). `verifica-pagina` cere 0 mărimi
+sub 0,875rem în `#punct` și o coloană; pe main.css de la 6ad3a47 găsește 0,8 / 0,78 /
+0,72rem. Golul dintre axe, cu bara de defilare clasică simulată la 195 px, nu s-a remăsurat
+la 14 px <!-- NEVERIFICAT: bara clasică, la 14 px -->.
 
 ## Mouse-ul, degetele și cursorul
 
 Harta se mânuiește ca o hartă, la cererea autorului (2026-10-07):
 
-| | desktop | telefon |
-|---|---|---|
-| mutare | butonul stâng | un deget |
-| unghiul (rotire și înclinare) | butonul drept; Shift, Ctrl sau Cmd + stâng | două degete trase împreună (punctul lor de mijloc, nu răsucire) |
-| zoom | rotița, spre cursor; butonul din mijloc tras | ciupire, spre punctul dintre degete |
+| | desktop | telefon | tastatură (2026-10-09) |
+|---|---|---|---|
+| mutare | butonul stâng | un deget | săgețile sau W A S D; ↑ și W înainte, pe direcția privirii |
+| unghiul (rotire și înclinare) | butonul drept; Shift, Ctrl sau Cmd + stâng | două degete trase împreună (punctul lor de mijloc, nu răsucire) | Q și E rotesc cu 15° pe apăsare, în jurul centrului; înclinarea, numai cu mouse-ul și degetele |
+| înălțimea | — | — | Shift urcă, Ctrl coboară, ca o dronă: privirea rămâne |
+| zoom | rotița, spre cursor; butonul din mijloc tras | ciupire, spre punctul dintre degete | + și − (= și _), spre centrul vederii |
 
 Așa fac ArcGIS SceneView, Mapbox/MapLibre și Potree EarthControls; model viewer-ele
 (Sketchfab, OrbitControls implicit) au stânga = rotire. Controalele sunt
@@ -978,6 +1029,141 @@ ca la Revit și Potree. Se proiectează pe cadrul care se desenează, după
 `camera.updateMatrixWorld()`, ca eticheta, și se stinge printr-o tranziție CSS de 250 ms,
 fără niciun cadru cerut. Clasa nu e `.pivot`: acela e cercul din mijlocul busolei, pe care
 l-ar fi făcut invizibil.
+
+**Tastatura** (`src/scene/tastatura.js`; pașii, în `comanda()` din camera.js), ca o dronă, la
+cererea autorului (2026-10-09): săgețile sau W A S D mută, Q și E rotesc, Shift urcă, Ctrl
+coboară, + și − (= și _) apropie și depărtează, Home duce acasă. Butoanele hărții de la lotul E
+(zece, pe ecran) au plecat odată cu cererea: harta rămâne pe tastatură, pe mouse și pe degete.
+Cu harta pornită, canvasul e focusabil — Tab ajunge întâi pe el —, cu `role="application"`,
+`aria-roledescription` „hartă”, numele hărții și descrierea tastelor (`#harta-taste`, ascunsă
+vizual); cum o citesc NVDA și VoiceOver nu s-a încercat <!-- NEVERIFICAT: cu un cititor de ecran -->.
+Inelul de focus e `.inel-harta`, o bandă aurie între două din culoarea fundalului, pe marginea
+ecranului: conturul obișnuit ar sta în afara canvasului.
+- **Pașii.** Mutarea, 5% din înălțimea vederii la distanța țintei; rotirea, 15° în jurul
+  centrului, nu prin `keyRotateSpeed`, care se împarte la înălțimea canvasului (0,4° pe apăsare
+  cu valoarea implicită), și după `pivotPeTeren`, ca butonul drept; zoomul, o treaptă de rotiță
+  spre centrul vederii (`treaptaTasta`, care nu atinge ritmul rotiței). Tastele se recunosc după
+  poziție (`code`): pe AZERTY, W A S D sunt Z Q S D, sub aceleași degete; plusul și minusul,
+  după semn. Înclinarea de la tastatură a plecat: Shift + săgețile mută acum, cu urcarea.
+- **Ținute.** O apăsare face un pas; ținută, tasta face câte unul la 150 ms, numărați de bucla
+  scenei, pe ceasul tastei, nu de repetarea sistemului — aceea vine abia după ~0,5 s, iar pe
+  macOS Shift și Ctrl nu se repetă deloc. Pașii alunecă, deci harta curge. Ridicarea, `blur`, o
+  filă ascunsă, focusul plecat de pe hartă și pagina mărită îi opresc.
+- **Drona** (`_mutaVertical`, camera.js): camera urcă sau coboară pe verticală, cu privirea
+  neschimbată, iar ținta trece pe ce se vede pe raza privirii, între 80 m și 8 km și în alpha.
+  Ținta nu urcă odată cu camera: limita alpha o ține sub cea mai înaltă cotă a hărții, deci
+  urcarea s-ar fi oprit după ~90 m. Un pas e 10% din înălțimea camerei peste ce e sub ea
+  (`PAS_VERTICAL`, o alegere). Coborârea se oprește la 20 m (`LIBER_SOL`, de două ori planul
+  apropiat, o alegere) peste ce e sub cameră și cât ce se vede în față e la mai puțin de 80 m,
+  garda zoomului; urcarea, unde privirea nu mai găsește nimic în alpha la cel mult 8 km — de la
+  vederea de pornire, la 961,5 m. Coborârea nu se refuză când acum nu se vede nimic în 8 km:
+  după „−” de opt ori, Ctrl nu cobora deloc (recenzia).
+- **Paza solului.** Niciun pas de la tastatură — mutarea, rotirea, zoomul, coborârea — nu duce
+  camera la mai puțin de 20 m peste ce e sub ea: relief, mare sau acoperiș, pe tot discul
+  planului apropiat (`_solSub`: raza colțurilor lui, cu 10% marjă, 14,4 m la 16:9; centrul și
+  32 de puncte). Numai pe verticala punctului, drona ținută jos ajungea cu planul apropiat în
+  peretele falezei, iar stânca din centrul ecranului la 1,3 m (recenzia). Cât alunecă un pas,
+  `pasVertical` (din buclă, și din `comanda()` înaintea lui `update()`) știe unde ajunge camera
+  la cadrul acesta: la mutare, urcarea care lipsește alunecă odată cu ea, iar partea din mutare
+  care n-ar încăpea la cota de acum așteaptă cadrul următor; la Q și E, camera urcă pe loc peste
+  locul în care o duce rotirea (recenzia o dusese la 61,7 m sub sol); la „+” și „−”, treapta nu
+  coboară camera sub prag (`pasZoom`, numai pentru tastatură; rotița și degetele rămân ca
+  înainte). Dacă nu mai poate urca, pasul se oprește: drona stă în fața peretelui. Un zbor
+  golește urcarea rămasă, ca treptele rotiței.
+- **Shift și Ctrl sunt și taste de modificare.** Urcarea și coborârea pornesc abia după 250 ms
+  ținute (`GRATIE`, o alegere); orice altă tastă apăsată între timp, în afară de mutare și
+  rotire, un clic sau rotița le anulează până la ridicare; venită după cele 250 ms, anularea
+  oprește și urcarea care încă alunecă (Shift ținut 300 ms, apoi Tab: 5,9 m, nu 26,8). Apăsate
+  scurt nu fac nimic: NVDA oprește vorbirea cu Ctrl. Shift + Tab, Shift + = („+”), Ctrl + F, Ctrl + plus și Shift cu
+  mouse-ul rămân ce erau; Shift și Ctrl ținute deodată nu fac nimic. Ctrl + W închide fila în
+  Chrome, Edge și Firefox, iar pagina nu-l poate opri: autorul a ales Ctrl fără protecție. Pe
+  macOS, Ctrl + săgeți mută desktopurile <!-- NEVERIFICAT: pe un Mac -->; acolo, cu W A S D.
+- **Unde.** Numai pe hartă — focusul pe canvas, sau pe `<body>` după o apăsare pe hartă ori
+  înaintea oricărei apăsări —, nu în `UNDE_NU`, nu pe butoane și nu cu Alt sau Cmd; cu Ctrl,
+  mutarea și rotirea merg, plusul nu (Ctrl + plus mărește pagina). Cu pagina mărită tastele
+  sunt ale paginii. Tastatura se creează abia cu harta gata de primul cadru: o tastă apăsată
+  cât se încarcă ar fi mutat camera nevăzut. Limitele sunt cele obișnuite, `start` și `end` vin
+  cu starea NIMIC (un zbor se oprește) — numai fără un gest deschis: cu harta ținută de mouse,
+  `end`-ul tastei stingea cursorul gestului și sfera pivotului —, iar sub reduced-motion pasul
+  e pe loc.
+
+Probele, în `verifica-controale`, fiecare cu controlul ei:
+- săgețile și W A S D: ținta se mută cu 25,32 m pe direcția cerută, camera cu ea, cu
+  amortizare și pe loc; „+” ×1,400000 pe distanța cameră–punctul din centru, care rămâne pe
+  pixel la 7,5·10⁻¹³ px, și cu decalajul fișei; „=”, „_”, plusul și minusul tastaturii
+  numerice, la fel; E −15,0000° și Q +15,0000° în theta, la înălțimea 900 și 700; Shift + →
+  nu rotește; după 6 clicuri spre platou, 6 × E țin punctul din centru la 4·10⁻¹² px (fără
+  pivot, 534,4 px); controale pe 6ad3a47: fără tastatură, 0 m și 0°;
+- W ținut o secundă: 7 pași, și cu repetările sistemului la 33 ms, 0 după ridicare (fără
+  ceasul buclei, 1); `blur`, fila ascunsă, focusul pe un buton, pagina mărită: 0 pași după
+  (fără oprire, 6; fără ascultătorul de `blur`, 6);
+- Shift ținut o secundă: 6 pași, +193,5 m, nimic în primele 200 ms, x și z la 6·10⁻¹² m,
+  privirea neschimbată, ținta pe ce se vede la 10⁻¹³ m (ținta urcată odată cu camera: +90 m);
+  ținut 20 s: tavanul la 961,5 m, fără mutare pe orizontală (fără intervalul lui alpha, 4,9 km);
+- Ctrl ținut 20 s: de la vederea de pornire, la 27,17 m, cât cota mării a cutiei lui alpha lasă
+  ținta la 80 m; pe platou, privind în jos la 45°, la 54,60 m peste el, cu ce se vede la 80 m
+  (fără garda celor 80 m, 31,24 m); pe o faleză de 146,7 m, privind spre larg, la 20,00 m peste
+  ea (fără garda solului, 10,45 m); deasupra farului, la 188,28 m, cu 20 m peste lanternă (fără
+  clădirile de sub cameră, 168,28 m, lipită de ea); după „−” de opt ori (nimic văzut în 8 km),
+  −506,98 m în 3 s (cu pasul refuzat, 0 m);
+- W și S ținute 3 s la 20 m peste plajă, spre 16 faleze de peste 60 m și cu ele în spate, pe tot
+  trunchiul (o grilă de 9 × 7 raze): planul apropiat nu taie nimic, adâncimea minimă 12,75 m,
+  camera cel puțin 20,00 m peste sol, cel mult 10,76 m urcați pe un cadru (urcarea alunecă).
+  Controale: `_solSub` numai pe verticală, 16 zboruri tăiate și 0,80 m; discul de rază NEAR, 2
+  și 9,08 m; mutarea fără amânare, −9,00 m sub sol; partea care nu încape aruncată, 862 m
+  parcurși în loc de 1 197; urcarea dintr-odată, 70,06 m pe un cadru;
+- după o coborâre cu Ctrl la 20 m, E și Q ×6, „−” și „+” ×3, cu amortizare și pe loc: cel puțin
+  20,00 m peste sol (rotirea fără pază, −34,24 m; zoomul fără pază, sau păzit numai spre P,
+  −47,69 m);
+- W și E cu harta ținută de mouse: 0 `start`, 0 `end` (control, 2 și 2);
+- Shift scurt, Shift + Tab, Shift + „+”, Shift cu clicul sau cu rotița, Shift și Ctrl, Ctrl + F,
+  Ctrl + „+”: nicio urcare și nicio coborâre; Shift + W și Ctrl + W: 7 pași înainte cu 6 de
+  urcare sau coborâre (fără anulare, 4 cazuri greșite; fără grație, 11); Shift ținut 300 ms,
+  apoi Tab: 5,92 m (fără oprirea urcării, 26,78);
+- Shift ținut 400 ms, apoi zborul acasă sub reduced-motion: aterizarea la 9·10⁻¹⁴ m (cu urcarea
+  lăsată în coadă, 143,7 m).
+
+În pagină (build, 2026-10-09), cu tastele reale ale panoului Browser: W 25,2 m înainte după 1 s
+(alunecarea încă în curs), E 306° → 321°, Q înapoi la 306°, = și = și − ×1,4 net; cu evenimente
+sintetice, Shift ținut 1 s +142,4 m, x, z și privirea neschimbate, Ctrl ținut 8 s până la
+27,17 m peste mare, Shift + Tab 0 m; fără `#butoane`, fără defilare orizontală la 390 × 844;
+haloul focusului pe busolă, Satelit, „Coordonate” și etichetă; 0 erori și 0 mesaje CSP. După
+paza solului, pe build: Ctrl până la 27,42 m peste mare, apoi Q ×6 (216° → 173°) și W ținut
+1,5 s, cel mai jos tot 27,42 m; cadrul median 16,7 ms, p95 17,5 ms. Pe un telefon, costul pazei
+(33 de puncte de relief pe apel) nu s-a măsurat <!-- NEVERIFICAT: telefon -->.
+
+**Focusul, Escape și contrastul forțat** (2026-10-08):
+- Inelul auriu (`:focus-visible`, 3 px la 2 px de buton) stă pe ce e în spate: pe cerul de la
+  orizont, în jurul busolei, 1,2:1. Busola, Satelit, „Coordonate” și eticheta
+  au haloul `0 0 0 7px var(--bg)` — 2 px până la inel, 3 inelul, 2 dincolo —, cu umbra lor în
+  aceeași declarație: inelul stă pe `--bg` de ambele părți, 8,8:1 (calculat). `verifica-pagina`
+  cere haloul de cel puțin offset + grosime + 2 px, din regula generică, și umbra păstrată;
+  controale: main.css de la 6ad3a47 (0 px), 5 px pe busolă, Satelit fără umbră, offsetul generic
+  de 4 px (ar cere 9), banda dinăuntru a hărții de 1 px. În pagină (build, Tab real): `box-shadow`
+  „rgb(23, 21, 15) 0px 0px 0px 7px, …” pe toate patru (2026-10-09, după plecarea butoanelor hărții), cu inelul la vedere în captură. Contrastul pe
+  pixeli <!-- NEVERIFICAT: pixelii compuși nu se citesc din pagină -->.
+- Escape cu fișa deschisă o închide: focusul din fișă sau de pe `<body>` se întoarce pe
+  etichetă, cel de pe alt control rămâne. Pe telefon foaia acoperă rozeta, Satelit și
+  „Coordonate”, la care Shift+Tab ajunge (WCAG 2.4.11); Escape le dezvăluie fără să mute
+  focusul. Cutia „Coordonate” se minimizează tot cu Escape — focusul din ea trece pe
+  „Coordonate” —, dar numai cu fișa închisă: ascultătorul ei e înscris înaintea etichetei.
+  `verifica-controale`, pe panoul și eticheta adevărate, cu un DOM fals: 9 cazuri; controale
+  care pică: eticheta.js de la 6ad3a47 (focusul pe etichetă), punct.js de la 6ad3a47 (cutia
+  rămâne), focusul întors numai din fișă (`<body>` rămâne pe `<body>`), panoul fără condiția
+  fișei (un Escape minimizează panoul și lasă fișa). În pagină, la 390 × 844: rozeta
+  (306–378 × 712–784) e în foaie (8–382 × 372–836); Escape o lasă cu focusul pe rozetă; din fișă,
+  pe etichetă; din cutie, pe „Coordonate”.
+- Bifa lui Satelit e în afara numelui: `content: "☐ "; content: "☐ " / "";`, deci „Satelit” în
+  ambele stări (înainte „☐ Satelit” / „☑ Satelit”); fără forma cu text alternativ (Firefox sub
+  128, Safari sub 17.4) rămâne prima declarație. Minificatorul le păstrează pe amândouă; în
+  pagină `::before` dă `"☑ " / ""`. Numele din arborele de accesibilitate nu s-a citit
+  <!-- NEVERIFICAT: fără CDP și fără cititor de ecran -->.
+- Contrast forțat: Chromium nu forțează `fill`/`stroke` pe SVG, deci N-ul busolei
+  (`#busola .eticheta.nord`, 1,2,0) bătea regula CanvasText (1,1,0) și rămânea `--accent`,
+  2,54:1 pe o temă albă. Acum CanvasText; pivotul, Canvas cu conturul CanvasText. `verifica-pagina`
+  judecă pe cascadă. În pagină, cu regulile blocului puse fără condiție prin CSSOM: N, E și
+  conturul rgb(255, 255, 255), pivotul rgb(18, 18, 18); control, regulile de la 6ad3a47: N
+  rgb(217, 145, 119). Contrastul forțat adevărat <!-- NEVERIFICAT: Windows High Contrast -->.
 
 **Probele** — `npm run verifica-controale`, cu codul paginii, pe 1600 × 900:
 - treptele, trecute prin `_customWheelEvent` al controalelor: 100 și 120 px, 3 linii, o
@@ -2405,7 +2591,8 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 - **Responsivitate** reală, pe toate dimensiunile și nivelurile de zoom.
 - **Navigare clară:** nav sticky, breadcrumbs, scrollspy.
 - **Degradare grațioasă:** pagina trebuie să rămână lizibilă și fără WebGL.
-  Textul este conținutul; scena 3D îl servește, nu invers.
+  Textul este conținutul; scena 3D îl servește, nu invers. Fără WebGL2, `#continut` are textul
+  fișei sanctuarului, cu sursele; fără JavaScript, o propoziție (vezi „Pornirea”).
 - `prefers-reduced-motion` oprește animațiile automate ale camerei.
 
 ## Acuratețe factuală

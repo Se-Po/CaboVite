@@ -39,8 +39,9 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scena ocupă ecranul; textul curge peste ea. Canvasul e decor, nu conținut,
-   deci nu primește nimic de citit de către tehnologiile asistive.
+/* Scena ocupă ecranul; textul curge peste ea. Cu harta pornită, canvasul e elementul
+   ei pentru tastatură (tastatura.js): se ajunge la el cu Tab, are nume și descrierea
+   tastelor, `role="application"`.
 
    Degetul ținut pe hartă — o mutare lentă, o atingere lungă — nu pornește selecția:
    pe iOS `contextmenu` nu vine la atingere (din cunoștințe; neîncercat pe iPhone),
@@ -59,6 +60,36 @@ html, body {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Inelul de focus al hărții, cât canvasul are focusul de la tastatură. Conturul obișnuit
+   (`:focus-visible`, mai jos) ar sta în afara canvasului de pe tot ecranul, deci nu s-ar
+   vedea; iar unul numai auriu s-ar pierde pe cer (vezi rândul cu sursele). Aici, un element
+   separat (tastatura.js îl pune după canvas): o bandă aurie între două benzi din culoarea
+   fundalului, deci se vede peste cer, peste mare și peste teren. Decor, fără clicuri. */
+#scena:focus-visible { outline: none; }
+.inel-harta {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  pointer-events: none;
+  border: 3px solid var(--bg);
+  box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 0 5px var(--bg);
+}
+#scena:focus-visible ~ .inel-harta { display: block; }
+@media (forced-colors: active) {
+  .inel-harta { border-color: Highlight; }
+}
+
+/* Descrierea tastelor hărții, pentru cititoarele de ecran (`aria-describedby`). */
+#harta-taste {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Butoanele hărții nu se selectează la o atingere lungă. Evidențierea atingerii
@@ -243,8 +274,9 @@ html, body {
    etichetei, și să iasă din arborele de accesibilitate. Canvasul rămâne, cu mărimea lui, dar
    nu primește mouse-ul sau degetele: o tragere pe ecranul încă gol ar fi mutat camera
    nevăzut, iar harta n-ar mai fi apărut pe vederea de pornire. `:where()` ține regula ușoară,
-   ca fără JavaScript versiunea să se poată arăta (mai jos). */
-body:not([data-scena]) > :where(:not(#incarcare):not(#continut):not(#scena)) { visibility: hidden; }
+   ca fără JavaScript versiunea să se poată arăta (mai jos). Titlul paginii (`<header>`, ascuns
+   vizual) și `<noscript>` rămân: fără JavaScript `data-scena` nu vine niciodată. */
+body:not([data-scena]) > :where(:not(#incarcare):not(#continut):not(#scena):not(header):not(noscript)) { visibility: hidden; }
 body:not([data-scena]) #scena { pointer-events: none; }
 
 /* Mesajul de încărcare, în mijlocul ecranului: „Se încarcă harta 3D…”, apoi, cât mai lipsește
@@ -329,8 +361,28 @@ body[data-scena] #incarcare { display: none; }
   #incarcare button { border-color: ButtonText; }
 }
 
-/* Fără scenă, pagina rămâne o pagină obișnuită. */
-body[data-scena="indisponibila"] #continut { background: var(--bg); }
+/* Fără scenă, pagina rămâne o pagină obișnuită: anunțul, apoi capitolul sanctuarului
+   (src/chapters/sanctuar.js), cu sursele fiecărui fapt. Textul `--ink` pe `--bg`, 14,6:1;
+   sursele `--muted`, 7,1:1, pe rândul lor; legăturile `--accent`, 7,2:1, subliniate. Jos,
+   loc pentru versiunea din colț, care stă peste text. */
+body[data-scena="indisponibila"] #continut { background: var(--bg); padding-bottom: 4rem; }
+#continut .capitol-sanctuar h2 { margin: 2rem 0 1rem; font: 700 1.6rem/1.3 var(--serif); }
+#continut .capitol-sanctuar ul { margin: 0; padding-left: 1.2rem; }
+#continut .capitol-sanctuar li { margin-bottom: 1.1rem; }
+#continut .capitol-sanctuar .sursa { display: block; margin-top: 0.2rem; color: var(--muted); font: 1rem/1.5 var(--sans); }
+#continut .capitol-sanctuar a { color: var(--accent); }
+
+/* Fără JavaScript: propoziția din `<noscript>`, ca textul capitolelor. */
+noscript p {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: clamp(24px, 6vw, 64px) 20px;
+  font-family: var(--serif);
+  font-size: 1.11rem;
+  line-height: 1.78;
+}
 /* „Reîncearcă”, sub anunț, când datele n-au mai sosit (main.js), și „Arată relieful acum”, sub
    mesajul de încărcare. Ca butoanele hărții, dar cu marginea --muted: pe fondul gol al
    paginii, --line abia se vedea. */
@@ -351,7 +403,15 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 #incarcare button:hover { border-color: var(--gold); }
 
 /* Un contur de focus vizibil, pentru linkurile din text. Fără el, pagina rămâne
-   cu inelul implicit al browserului, care pe fond cald aproape nu se vede. */
+   cu inelul implicit al browserului, care pe fond cald aproape nu se vede.
+
+   Inelul stă la 2 px în afara elementului, deci pe ce e în spatele lui. Pe butoanele de peste
+   scenă — busola, Satelit, „Coordonate”, eticheta sanctuarului — acolo e
+   harta: pe cerul de la orizont, la vederea de pornire, aurul are 1,2:1 în jurul busolei.
+   Fiecare are deci și un halou din culoarea fundalului, `0 0 0 7px var(--bg)` — 2 px până la
+   inel, 3 px inelul, 2 px dincolo —, iar inelul stă pe `--bg` de ambele părți: 8,8:1. Umbra
+   butonului rămâne, în aceeași declarație. Rândul cu sursele are un halou la fel; harta,
+   `.inel-harta`. `verifica-pagina` păzește haloul și grosimea lui. */
 :focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 2px;
@@ -379,8 +439,9 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * nord și pe litera N (7,2:1 pe discul `--bg`), `--muted` pe rest (7,1:1),
  * `--ink` pe cifră (13,7:1, pe `--surface`). `--gold` NU atinge text sau linii
  * subțiri. Regula vine din tema deschisă de până la v0.1.1, unde avea 3,91:1,
- * sub pragul de 4,5:1; pe cea întunecată are 8,8:1, dar rămâne tot unde 3:1 e
- * de ajuns — inelul de focus și conturul la trecerea cu mouse-ul.
+ * sub pragul de 4,5:1; pe cea întunecată are 8,8:1 față de `--bg`, dar rămâne tot
+ * unde 3:1 e de ajuns — inelul de focus și conturul la trecerea cu mouse-ul. Cele
+ * 8,8:1 țin pentru inel numai cu haloul de mai jos: fără el, inelul stă pe cer.
  *
  * Discul e OPAC, nu translucid. Altfel contrastul acului s-ar măsura față de
  * niște pixeli necunoscuți de teren, iar niciuna din cifrele de mai sus n-ar mai
@@ -420,6 +481,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 }
 
 #busola .roza:hover { border-color: var(--gold); }
+/* Haloul focusului (vezi `:focus-visible`): în spatele busolei, la pornire, e cerul. */
+#busola .roza:focus-visible { box-shadow: 0 0 0 7px var(--bg), 0 4px 18px rgb(0 0 0 / 0.22); }
 
 #busola svg { width: 5.25rem; height: 5.25rem; display: block; }
 
@@ -504,9 +567,14 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   font-weight: 600;
   cursor: pointer;
 }
-#straturi button::before { content: "☐ "; color: var(--muted); }
+/* Bifa e numai pentru ochi: textul alternativ gol (`/ ""`) o ține afară din numele butonului,
+   care rămâne „Satelit” în ambele stări; starea o spune `aria-pressed`. Fără el, numele era
+   „☐ Satelit” sau „☑ Satelit”, după stare. Întâi declarația fără textul alternativ: un browser
+   care nu știe forma (Firefox sub 128, Safari sub 17.4) o aruncă pe a doua și o păstrează pe
+   prima, cu bifa în nume, ca înainte. */
+#straturi button::before { content: "☐ "; content: "☐ " / ""; color: var(--muted); }
 #straturi button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-#straturi button[aria-pressed="true"]::before { content: "☑ "; color: inherit; }
+#straturi button[aria-pressed="true"]::before { content: "☑ "; content: "☑ " / ""; color: inherit; }
 /* Cât se descarcă fotografia: roata în locul bifei și, pe al doilea rând, „se încarcă…”.
    Butonul rămâne apăsabil — un clic înseamnă „rămân pe Relief” (satelit.js) —, deci nu se
    mai estompează. Textul de sub etichetă e numai pentru ochi (`/ ""`, unde browserul știe
@@ -536,6 +604,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   #straturi button[aria-busy="true"]::before { animation: none; }
 }
 #straturi button:hover { border-color: var(--gold); }
+/* Haloul focusului (vezi `:focus-visible`): în spate pot fi platoul sau terreiro-ul, deschise. */
+#straturi button:focus-visible { box-shadow: 0 0 0 7px var(--bg), 0 4px 18px rgb(0 0 0 / 0.22); }
 #straturi .anunt {
   position: absolute;
   width: 1px; height: 1px;
@@ -553,14 +623,20 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 }
 
 /* Modul de contrast forțat înlocuiește culorile autorului cu ale sistemului;
-   `fill` din variabile n-ar mai însemna nimic acolo. */
+   `fill` din variabile n-ar mai însemna nimic acolo. Chromium nu forțează `fill` și `stroke`
+   pe SVG, deci aici decide numai cascada: fiecare regulă are cel puțin specificitatea celei
+   pe care o înlocuiește. `#busola .eticheta` singur (1,1,0) pierdea în fața lui
+   `#busola .eticheta.nord` (1,2,0), iar N rămânea `--accent`: 2,5:1 pe o temă albă. Pivotul
+   oglindește desenul obișnuit — discul pe fundal, conturul pe text —; umplut cu CanvasText,
+   ca acele, s-ar fi topit în ele. */
 @media (forced-colors: active) {
   #straturi button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
   #straturi button[aria-pressed="true"] { background: Highlight; color: HighlightText; }
   #busola .roza { background: Canvas; border-color: CanvasText; }
   #busola .disc { fill: Canvas; stroke: CanvasText; }
   #busola .ac-nord { fill: Highlight; }
-  #busola .ac-sud, #busola .eticheta, #busola .pivot { fill: CanvasText; }
+  #busola .ac-sud, #busola .eticheta, #busola .eticheta.nord { fill: CanvasText; }
+  #busola .pivot { fill: Canvas; stroke: CanvasText; }
   .pivot-rotire { background: Highlight; border-color: Canvas; forced-color-adjust: none; }
 }
 
@@ -601,7 +677,9 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 @media (max-width: 34rem) {
   #versiune { right: 0.75rem; }   /* sub busolă, aliniată la marginea ei */
 }
-#versiune .ascuns {
+/* Ascuns vizual, citit de cititoarele de ecran: numele versiunii și titlul paginii (`h1`,
+   index.html), care nu ocupă loc peste hartă. */
+.ascuns {
   position: absolute;
   width: 1px; height: 1px;
   margin: -1px; padding: 0; border: 0;
@@ -632,7 +710,12 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
  * Culorile după contrast, ca la busolă: `--ink` pe cifrele mari, `--muted` pe
  * etichete și pe rândurile mici, `--accent` pe altitudinea fără acoperire —
  * trebuie să sară în ochi că nu e o măsurătoare. `--gold` numai pe focus și
- * hover, unde 3:1 ajunge.
+ * hover, unde 3:1 ajunge: în cutie inelul stă pe `--surface`, iar pe butonul
+ * minimizat, peste hartă, pe haloul din `--bg` (vezi `:focus-visible`).
+ *
+ * Nimic sub 0,875rem (14 px), nici pe telefon: cititorii pot fi vârstnici. Etichetele și
+ * rândurile mici au fost 0,72–0,8rem. Rândurile mici stau de aceea pe o coloană, eticheta
+ * deasupra cifrelor: pe două, rândul „scenă” n-ar mai încăpea lângă eticheta lui.
  *
  * Rândul de jos e al versiunii paginii (`#versiune`, mai sus): cât există, panoul
  * urcă cu `--versiune`, iar înălțimile maxime scad cu tot atât.
@@ -669,6 +752,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   cursor: pointer;
 }
 #punct .activeaza:hover { border-color: var(--gold); }
+#punct .activeaza:focus-visible { box-shadow: 0 0 0 7px var(--bg), 0 4px 18px rgb(0 0 0 / 0.22); }
 #punct .semn {
   width: 1.15em;
   height: 1.15em;
@@ -735,7 +819,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 
 #punct dt {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   align-self: baseline;
 }
 
@@ -758,7 +842,9 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   font-weight: 500;
 }
 
+/* Pe o coloană: eticheta deasupra, cifrele dedesubt, aliniate la stânga. */
 #punct .mici {
+  grid-template-columns: 1fr;
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--line);
@@ -771,20 +857,32 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
    cu valorile cele mai lungi, sau o bară de defilare clasică — o axă trece întreagă pe
    rândul următor, nu iese din cutie, iar litera nu se desparte de cifra ei. */
 #punct .mici dd {
-  text-align: right;
+  text-align: left;
+  white-space: normal;
   word-spacing: 0.28em;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   color: var(--muted);
   line-height: 1.5;
 }
 #punct .mici .axa { white-space: nowrap; word-spacing: normal; }
+#punct .mici dd + dt { margin-top: 0.3rem; }
 
-#punct .copiaza {
+/* „Măsoară centrul” și „Copiază”, pe un rând cât încap. Pe desktop încap, deci panoul nu
+   crește: fișa sanctuarului se oprește cu 28rem deasupra marginii de jos (mai jos), iar un
+   rând în plus, de 3,35rem, ar fi băgat panoul cu ~1,8rem sub ea. Pe telefon, unde fișa e
+   o foaie jos, stau unul sub altul. */
+#punct .actiuni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+#punct .copiaza,
+#punct .centru {
   pointer-events: auto;
   display: block;
-  width: 100%;
+  flex: 1 1 auto;
   min-height: 2.75rem;         /* 44 px: ținta minimă de atingere, nu mărimea textului */
-  margin-top: 0.6rem;
   padding: 0 0.6rem;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -796,7 +894,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   cursor: pointer;
 }
 
-#punct .copiaza:hover { border-color: var(--gold); }
+#punct .copiaza:hover,
+#punct .centru:hover { border-color: var(--gold); }
 
 /* Anunțul pentru cititoarele de ecran. NU `display: none` — ascuns așa, un
    aria-live nu mai anunță nimic. */
@@ -839,14 +938,13 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
     padding: 0.55rem 0.7rem;
   }
   #punct .mari dd { font-size: 1rem; }
-  #punct .mici dd { font-size: 0.72rem; }
 }
 
 /* Sub 22,5rem (~360 px) cutia n-ar mai încăpea lângă coloană: rândurile mici ar
    ieși din ea. Deschisă, urcă deasupra lui Satelit, pe toată lățimea, iar butonul
    minimizat rămâne pe rândul de jos. Tot aici ajunge telefonul cu pagina mărită
    de două ori (390 px → 195): cutia se oprește sub rândul cu sursele, care are
-   atunci două rânduri, și defilează; rândurile mici trec pe o coloană. */
+   atunci două rânduri, și defilează. */
 @media (max-width: 22.5rem) {
   #punct .cutie {
     position: fixed;
@@ -857,8 +955,6 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
     /* 11rem jos, 6,25rem sus: rândul cu sursele, care aici are două rânduri */
     max-height: calc(var(--vizibil) - 17.25rem - var(--versiune, 0rem) - env(safe-area-inset-bottom, 0px));
   }
-  #punct .mici { grid-template-columns: 1fr; }
-  #punct .mici dd { text-align: left; }
 }
 
 /* Îngust și scund — pagina mărită de patru ori, 1280 × 1024 → 320 × 256: deasupra
@@ -930,6 +1026,7 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 @media (forced-colors: active) {
   #punct .cutie,
   #punct .copiaza,
+  #punct .centru,
   #punct .minimizeaza { background: Canvas; border-color: CanvasText; color: CanvasText; }
   #punct .activeaza { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
   #punct .mari dd.fara { color: Highlight; }
@@ -978,7 +1075,8 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
   text-align: left;
   cursor: pointer;
 }
-#sanctuar-eticheta .poi:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+/* Cu haloul (vezi `:focus-visible`): eticheta stă pe hartă, adesea peste platou sau terreiro. */
+#sanctuar-eticheta .poi:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; box-shadow: 0 0 0 7px var(--bg); }
 #sanctuar-eticheta.ocluzat .poi { border-style: dashed; }
 #sanctuar-eticheta .sageata:not(:empty) { margin-right: 0.4rem; color: var(--accent); }
 
@@ -1026,20 +1124,24 @@ body[data-scena="indisponibila"] #continut { background: var(--bg); }
 /* Pe desktop fișa și panoul punctului stau în aceeași coloană din dreapta: fișa de
    la 10rem în jos, panoul de jos în sus. Deschise amândouă, nu se acoperă — fișa
    ar sta peste panou (z 3 peste 2), cu tot cu butonul de minimizare:
-   - înalt: fișa se oprește deasupra panoului. Pe o clădire panoul ocupă de jos
-     21,64rem, măsurat la 700 × 800 (sacristia de sud), plus rândul versiunii;
-     24rem lasă loc și unui nume pe două rânduri, plus un gol;
-   - mai jos de ~56rem (900 px) nu mai rămâne destul pentru amândouă: își împart
+   - înalt: fișa se oprește deasupra panoului, cu 28rem deasupra marginii de jos, plus
+     rândul versiunii. Cutia are atunci cel mult restul, 26,25rem — 28rem minus 0,75rem
+     de jos și un gol de 1rem —, și defilează: plafonul ei de jumătate creștea mai departe
+     cu ecranul, iar cu spațierea textului din WCAG 1.4.12 cutia intra sub fișă, cu tot cu
+     „–”, cu 60,8 px la 1280 × 1200 (recenzia). Cu 24rem, cât era până la textul de 14 px
+     și rândurile mici pe o coloană, panoul intra sub fișă, la 1280 × 1000, cu 14,4 px (pe
+     far) și 24,8 px;
+   - mai jos de ~65rem (1 046 px) nu mai rămâne destul pentru amândouă: își împart
      înălțimea dintre 10rem și marginea de jos, cu un gol de 1rem, și defilează
      fiecare. Antetul panoului și butonul „Închide" al fișei rămân la vedere.
    Cine e deschis spun atributele de pe <html>, scrise de punct.js și eticheta.js, nu
    `:has()`: în Firefox 115 ESR, fără el, fișa acoperea 250 px din panou, cu antetul. */
 @media not all and (max-width: 34rem) {
   html[data-punct-deschis] #sanctuar-fisa {
-    max-height: max(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), calc(100vh - 34rem - var(--versiune, 0rem)));
+    max-height: max(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), calc(100vh - 38rem - var(--versiune, 0rem)));
   }
   html[data-fisa-deschisa] #punct .cutie {
-    max-height: calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2);
+    max-height: min(calc((100vh - 11.75rem - var(--versiune, 0rem)) / 2), 26.25rem);
   }
 }
 

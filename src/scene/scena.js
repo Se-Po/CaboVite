@@ -19,6 +19,7 @@ import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
 import { creeazaAlpha } from './alpha.js';
 import { creeazaGest } from './gest.js';
+import { creeazaTastatura } from './tastatura.js';
 import { reliefRandat } from './raza.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
 import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
@@ -486,33 +487,8 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   });
   if (busola) deEliberat.push(() => busola.dispose());
 
-  // Tasta Home face același lucru, numai acolo unde nu are deja alt rost: într-un
-  // câmp de text, într-o fișă sau un panou care defilează, în textul capitolelor
-  // sau într-o modală deschisă ea mută cursorul ori duce sus — se lasă așa.
-  //
-  // „Acolo” nu e numai elementul cu focus. Un clic pe text care nu primește focus
-  // (un rând din fișă) lasă focusul pe <body>, deci tasta ar ajunge de pe <body>
-  // și ar închide fișa în loc s-o ducă sus. Atunci decide ultimul loc apăsat.
-  // Ținută apăsată, tasta se repetă de ~30 de ori pe secundă, iar fiecare zbor nou
-  // ar porni de la capăt: se ia numai prima apăsare.
-  const UNDE_NU = 'input, textarea, select, [contenteditable], dialog[open], #sanctuar-fisa, #punct .cutie, #continut';
-  let ultimaApasare = null;
-  const laApasareOriunde = (e) => { ultimaApasare = e.target; };
-  const laTastaAcasa = (e) => {
-    if (e.key !== 'Home' || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    const pePagina = e.target === document.body || e.target === document.documentElement;
-    const unde = pePagina ? ultimaApasare : e.target;
-    if (unde?.closest?.(UNDE_NU)) return;
-    e.preventDefault();
-    if (e.repeat) return;
-    acasa();
-  };
-  document.addEventListener('pointerdown', laApasareOriunde, true);
-  document.addEventListener('keydown', laTastaAcasa);
-  deEliberat.push(() => {
-    document.removeEventListener('pointerdown', laApasareOriunde, true);
-    document.removeEventListener('keydown', laTastaAcasa);
-  });
+  // Tasta Home face același lucru, cu celelalte taste ale hărții: tastatura.js, creată mai
+  // jos, cu harta gata de primul cadru.
 
   // Relieful randat peste tot: alpha unde e alpha, împrejurimile în rest. Pe el merg
   // raza panoului punctului și ocluzia etichetei — un deal din împrejurimi ascunde ce
@@ -547,6 +523,8 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     zMin: relief.meta?.zMin_m,
     loveste: lovesteCladire,
     numeElement: (cheie) => [...(continut?.sanctuar?.nume_elemente ?? []), ...(continut?.cladiri?.nume_elemente ?? [])].find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
+    // „Măsoară centrul”: ținta pe ecran, deci cu fișa deschisă centrul părții libere.
+    centru: () => controale.centruVederii(),
   });
   if (punct) deEliberat.push(() => punct.dispose());
 
@@ -580,18 +558,24 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   }) : null;
   if (eticheta) deEliberat.push(() => eticheta.dispose());
 
+  // Tastatura hărții (tastatura.js): creată abia înaintea buclei, mai jos.
+  let tastatura = null;
+
   // Un cadru. Întoarce true numai după ce `render()` a întors.
   const cadru = () => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
     // doar dacă desenează — deci zborul camerei se agață aici, nu într-un al
     // doilea requestAnimationFrame, pe care regulile proiectului îl interzic.
     zbor.pas();
-    // Treptele rotiței care încă alunecă mută camera și ținta; `update()` de mai jos
-    // le aplică amortizarea și emite `change`.
+    // Tastele ținute fac pașii lor la ritmul lor, numărat aici, nu de repetarea sistemului.
+    tastatura?.pas();
+    // Treptele rotiței și urcarea dronei care încă alunecă mută camera și ținta;
+    // `update()` de mai jos le aplică amortizarea și emite `change`.
     if (controale.rotita.pas()) {
       cerut = true;
       if (!controale.enableDamping) controale.update();
     }
+    if (controale.pasVertical()) cerut = true;
     const seMisca = controale.enableDamping && controale.update();
     // Amortizarea mai împinge ținta după ce utilizatorul a dat drumul, cu pași tot
     // mai mici; sub pragul de `change` al lui OrbitControls ar scăpa de limită.
@@ -650,6 +634,13 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     try { laIncarcare?.({ faza: 'fotografie' }); } catch (e) { console.warn('mesajul de încărcare nu s-a putut schimba:', e?.message ?? e); }
     await asteaptaSatelitul(satelit.gata, faraSatelit);
   }
+
+  // Harta de la tastatură, ca o dronă: săgețile sau W A S D, Q și E, Shift și Ctrl, plus și
+  // minus, Home (tastatura.js). Abia acum, cu harta gata de primul cadru: o tastă apăsată cât
+  // se încarcă ar fi mutat camera nevăzut, ca o tragere pe ecranul încă gol (main.css), iar
+  // harta n-ar mai fi apărut pe vederea de pornire. Tot de acum canvasul se atinge cu Tab.
+  tastatura = creeazaTastatura({ canvas, controale, acasa });
+  deEliberat.push(() => { tastatura?.dispose(); tastatura = null; });
 
   // Cadrele eșuate de la ultima randare reușită. three cere cadrul următor ÎNAINTEA
   // buclei (WebGLAnimation.js:10), deci o excepție nu oprește bucla, ci se repetă:
@@ -720,6 +711,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
       }));
     },
     zbor, eticheta, cadruFisa, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
+    get tastatura() { return tastatura; },
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are

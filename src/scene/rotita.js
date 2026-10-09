@@ -9,6 +9,8 @@ import { punctVazut } from './raza.js';
 // puține (2026-10-07): o treaptă înmulțește distanța cu 1,4, deci tot drumul ține
 // 14 clicuri, în orice browser, iar fiecare alunecă ~0,2 s.
 //
+// De la tastatură, „+” și „−” fac aceeași treaptă, spre centrul vederii (`treaptaTasta`).
+//
 // Spre cursor, ca Google Maps și Mapbox: camera merge pe raza cursorului, deci tot ce
 // e pe raza aceea — și punctul de teren de sub cursor — rămâne pe același pixel, iar
 // orientarea nu se schimbă. Ținta (pivotul) se pune apoi pe raza privirii, la
@@ -77,10 +79,17 @@ const _u = new THREE.Vector3(), _c = new THREE.Vector3();
  * la `dMax`. Recenzia găsise rotița blocată, în ambele sensuri, cu ținta lipită de o
  * muchie a cutiei: retragerea de dinainte, tot prin cutie, cădea și ea.
  *
+ * Cu `liber` — numai pentru „+” și „−” de la tastatură, drona (camera.js) — camera nu ajunge
+ * la mai puțin de `liberMin` peste ce e sub ea, nici spre P, nici la retragere; una deja mai
+ * jos nu coboară mai mult. Fără gardă, după o coborâre cu Ctrl, „−” retrăgea camera în
+ * dealul din spate, la 50,7 m sub sol (recenzia).
+ *
  * @returns {number} logaritmul aplicat de fapt; mai mic decât `ln` la o limită
  */
-export function pasZoom({ camera, tinta, P, ln, dMin, dMax, alpha }) {
+export function pasZoom({ camera, tinta, P, ln, dMin, dMax, alpha, liber = null, liberMin = 0 }) {
   const C = camera.position;
+  const prag = liber ? Math.min(liberMin, liber(C)) - 1e-9 : -Infinity;
+  const peste = (c) => !liber || liber(c) >= prag;
   _u.copy(tinta).sub(C);
   const r = _u.length();
   if (!(r > 0) || !ln) return 0;
@@ -102,6 +111,7 @@ export function pasZoom({ camera, tinta, P, ln, dMin, dMax, alpha }) {
   const incearca = (s, ancora) => {
     _c.copy(C).sub(ancora).multiplyScalar(s).add(ancora);
     if (s < 1 && _c.distanceTo(ancora) < dMin) return null;
+    if (!peste(_c)) return null;
     return asezare(_c);
   };
   const cauta = (ancora) => {
@@ -126,7 +136,13 @@ export function pasZoom({ camera, tinta, P, ln, dMin, dMax, alpha }) {
   }
   if (ln > 0 && aplicat < ln - 1e-12) {
     const rT = C.distanceTo(tinta);
-    const sT = Math.min(Math.exp(ln - aplicat), dMax / rT);
+    let sT = Math.min(Math.exp(ln - aplicat), dMax / rT);
+    const retras = (k) => peste(_c.copy(C).sub(tinta).multiplyScalar(k).add(tinta));
+    if (!retras(sT)) {
+      let a = 1, b = sT;
+      for (let i = 0; i < 40; i++) { const m = Math.sqrt(a * b); if (retras(m)) a = m; else b = m; }
+      sT = a;
+    }
     if (sT > 1 + 1e-12) {
       C.sub(tinta).multiplyScalar(sT).add(tinta);
       aplicat += Math.log(sT);
@@ -147,6 +163,7 @@ export function creeazaRotita({ camera, controale }) {
   let rest = 0;              // logaritmul care mai are de alunecat
   let tPrec = null;
   let tUltim = -Infinity, precedent = null;   // ritmul rotiței: clic sau touchpad
+  let dinTasta = false;      // treapta din coadă e a tastaturii: are garda solului a dronei
   const P = new THREE.Vector3();
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -170,6 +187,7 @@ export function creeazaRotita({ camera, controale }) {
   const aplica = (ln) => pasZoom({
     camera, tinta: controale.target, P, ln,
     dMin: controale.minDistance, dMax: controale.maxDistance, alpha: teren?.alpha ?? null,
+    liber: dinTasta && teren ? controale.liberLa ?? null : null, liberMin: controale.liberMin ?? 0,
   });
 
   return {
@@ -185,6 +203,7 @@ export function creeazaRotita({ camera, controale }) {
       const tr = treapta(ev, { dpr: globalThis.devicePixelRatio || 1, izolat: acum - tUltim > 300, precedent });
       tUltim = acum;
       precedent = Math.abs(ev.deltaY);
+      dinTasta = false;
       if (!tr || !rect?.width || !rect?.height) return false;
       ancoreaza(ev.clientX, ev.clientY, rect);
       if (!controale.enableDamping) {
@@ -199,10 +218,33 @@ export function creeazaRotita({ camera, controale }) {
       return false;
     },
 
+    /**
+     * O treaptă de la tastatură („+” și „−”), spre (clientX, clientY):
+     * `semn` −1 apropie, +1 depărtează, ca `deltaY`. Alunecă la fel ca o treaptă de
+     * rotiță, dar nu atinge ritmul rotiței (`tUltim`, `precedent`): trecută prin
+     * `adauga`, ca rotiță falsă de 100 px, un clic adevărat de 40 px la mărirea de 250%,
+     * venit în 300 ms după ea, ieșea touchpad, 0,4 dintr-o treaptă (recenzia). Fără
+     * amortizare, pe loc. Întoarce true dacă a mutat camera pe loc.
+     */
+    treaptaTasta(semn, clientX, clientY, rect) {
+      if (!semn || !rect?.width || !rect?.height) return false;
+      ancoreaza(clientX, clientY, rect);
+      dinTasta = true;
+      const ln = Math.sign(semn) * LN;
+      if (!controale.enableDamping) {
+        rest = 0;
+        return aplica(ln) !== 0;
+      }
+      rest = Math.max(-COADA, Math.min(COADA, rest + ln));
+      tPrec = null;
+      return false;
+    },
+
     /** Zoom pe loc, cu `ln` dat, spre punctul de sub (clientX, clientY): ciupirea cu degetele. */
     imediat(ln, clientX, clientY, rect) {
       if (!ln || !rect?.width || !rect?.height) return false;
       rest = 0;
+      dinTasta = false;
       ancoreaza(clientX, clientY, rect);
       return aplica(ln) !== 0;
     },

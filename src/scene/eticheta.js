@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { creeazaFisa } from '../chapters/sanctuar.js';
 
 // Eticheta sanctuarului pe hartă și fișa care se deschide din ea.
 //
@@ -18,8 +19,11 @@ import * as THREE from 'three';
 //     căuta clădirile unde nu se văd.
 //
 // Clicul — sau Enter/Space pe buton — cere zborul și deschide fișa. Fișa e un
-// dialog nemodal: harta rămâne vie în spatele ei, Escape o închide și readuce
-// focusul pe etichetă.
+// dialog nemodal: harta rămâne vie în spatele ei, Escape o închide. Focusul din fișă,
+// sau de pe <body> — după un clic pe un rând al ei, care nu ia focus —, se întoarce pe
+// etichetă; cel de pe un alt control rămâne acolo. Pe telefon, ca foaie jos, fișa
+// acoperă busola, Satelit și „Coordonate”, la care Shift+Tab ajunge totuși: Escape le
+// dezvăluie fără să mute focusul de pe ele (WCAG 2.4.11). Înainte, îl ducea pe etichetă.
 
 // Panoul punctului, pe cele două stări: butonul minimizat și cutia deschisă. Amândouă
 // există de la creare, deci observatorul de mai jos le vede; cea ascunsă se sare.
@@ -81,27 +85,9 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
   radacina.append(pin, buton);
 
   // ------------------------------------------------------------ fișa
-  const fisa = el('section', { id: 'sanctuar-fisa', hidden: true });
-  fisa.setAttribute('role', 'dialog');
-  fisa.setAttribute('aria-modal', 'false');
-  fisa.setAttribute('aria-labelledby', 'sanctuar-fisa-titlu');
-  const titlu = el('h2', { id: 'sanctuar-fisa-titlu', tabIndex: -1 }, continut.nume);
-  const inchide = el('button', { type: 'button', className: 'inchide' }, 'Închide');
-  const lista = el('ul');
-  const cuSursa = (text, surse) => {
-    const li = el('li', {}, text + ' ');
-    const s = el('span', { className: 'sursa' });
-    surse.forEach((q, k) => {
-      if (k) s.append('; ');
-      const a = el('a', { href: q.url, rel: 'noopener', target: '_blank' }, q.nume);
-      s.append(a);
-    });
-    li.append(s);
-    return li;
-  };
-  for (const f of continut.fapte) lista.append(cuSursa(f.text, f.surse ?? [f.sursa]));
-  for (const c of continut.conflicte ?? []) lista.append(cuSursa(c.text, c.surse));
-  fisa.append(inchide, titlu, lista, el('p', { className: 'model' }, continut.despre_model));
+  // Textul și forma ei stau în capitolul sanctuarului (src/chapters/sanctuar.js), numai DOM,
+  // din care își face textul și pagina fără scenă.
+  const { fisa, titlu, inchide } = creeazaFisa(continut);
   gazda.append(radacina, fisa);
 
   // Pe <html>, pentru CSS-ul panoului punctului, care împarte coloana cu fișa
@@ -132,7 +118,7 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
   const laTasta = (e) => {
     if (e.key !== 'Escape' || fisa.hidden || e.defaultPrevented || e.target?.closest?.('dialog[open]')) return;
     e.preventDefault();
-    inchideFisa();
+    inchideFisa(fisa.contains(e.target) || e.target === document.body || e.target === document.documentElement);
   };
   buton.addEventListener('click', laClic);
   inchide.addEventListener('click', () => inchideFisa());
