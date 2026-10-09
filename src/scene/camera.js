@@ -91,6 +91,29 @@ const _w = new THREE.Vector3();
 const rectDin = (el) => el?.getBoundingClientRect?.() ?? null;
 
 /**
+ * Cât de departe de cameră ajunge cel mai depărtat colț al planului apropiat, din
+ * fereastra pe care o calculează `updateProjectionMatrix` din r186 — cu decalajul de
+ * obiectiv, dacă e unul. Fără decalaj: NEAR·√(1 + tg²(fov/2)·(1 + aspect²)). Cu imaginea
+ * mutată din calea fișei sau a cutiei „Coordonate” (cadru-liber.js), fereastra nu mai stă
+ * în mijloc, iar colțul dinspre partea mutată iese mai departe: la 320 × 568, cu imaginea sub
+ * cutie, 12,35 m, peste discul de dinainte, de 12,18 m cu tot cu marja de 10%
+ * (verifica-controale).
+ */
+export function razaPlanApropiat(cam) {
+  let top = (cam.near * Math.tan((cam.fov * Math.PI) / 360)) / cam.zoom;
+  let h = 2 * top, w = cam.aspect * h, left = -0.5 * w;
+  const v = cam.view;
+  if (v?.enabled) {
+    left += (v.offsetX * w) / v.fullWidth;
+    top -= (v.offsetY * h) / v.fullHeight;
+    w *= v.width / v.fullWidth;
+    h *= v.height / v.fullHeight;
+  }
+  const x = Math.max(Math.abs(left), Math.abs(left + w)), y = Math.max(Math.abs(top), Math.abs(top - h));
+  return Math.sqrt(cam.near * cam.near + x * x + y * y);
+}
+
+/**
  * MapControls din r186 — stânga mută, dreapta rotește, mutarea pe orizontală, un
  * deget mută și două ciupesc și rotesc —, cu patru lucruri în plus:
  *
@@ -329,8 +352,9 @@ export class ControaleHarta extends MapControls {
   /**
    * Cota a ce e sub (x, z), văzut de la înălțimea y: relieful randat, suprafața mării sau
    * acoperișul unei clădiri — cel mai sus —, pe tot discul pe care îl ocupă planul apropiat
-   * cu camera în (x, z). Raza e a colțurilor planului apropiat, NEAR·√(1 + tg²(fov/2)·(1 +
-   * aspect²)), cu 10% marjă pentru eșantionare: 14,4 m la 16:9, 12,1 m în portret. Centrul,
+   * cu camera în (x, z). Raza e a colțurilor planului apropiat (`razaPlanApropiat`, cu
+   * decalajul de obiectiv), cu 10% marjă pentru eșantionare: fără decalaj, 14,4 m la 16:9 și
+   * 12,1 m în portret. Centrul,
    * 16 puncte pe cerc și 16 la jumătatea razei. Numai pe verticala punctului, drona ținută la
    * 20 m peste plajă ajungea cu planul apropiat în peretele falezei, iar stânca din centrul
    * ecranului la 1,31 m (recenzia); cu un disc de NEAR, pe margini tot rămâneau tăieturi.
@@ -339,8 +363,8 @@ export class ControaleHarta extends MapControls {
     const t = this._teren;
     let sol = COTA_MARE;
     if (!t) return sol;
-    const l = t.lim, cam = this.object, tv = Math.tan((cam.fov * Math.PI) / 360);
-    const raza = 1.1 * cam.near * Math.sqrt(1 + tv * tv * (1 + cam.aspect * cam.aspect));
+    const l = t.lim;
+    const raza = 1.1 * razaPlanApropiat(this.object);
     for (let k = -1; k < 32; k++) {
       const a = (k * Math.PI) / 8, q = k < 0 ? 0 : k < 16 ? raza : raza / 2;
       const px = x + q * Math.cos(a), pz = z + q * Math.sin(a);

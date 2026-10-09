@@ -1,4 +1,5 @@
 import { STARE } from './camera.js';
+import { creeazaCadruLiber } from './cadru-liber.js';
 
 // Cadrul camerei cât e deschisă fișa sanctuarului.
 //
@@ -6,7 +7,9 @@ import { STARE } from './camera.js';
 // pe telefon fișa e foaie jos și acoperă peste jumătate, pe desktop stă la
 // dreapta. Un decalaj de obiectiv (`setViewOffset`), nu altă țintă: camera și
 // pivotul rămân unde le-a pus zborul, deci rozeta, raza panoului punctului și
-// proiecția etichetei merg neschimbate — toate citesc matricea de proiecție.
+// proiecția etichetei merg neschimbate — toate citesc matricea de proiecție. Decalajul
+// îl aplică cadru-liber.js, cu cutia „Coordonate” deschisă scăzută și ea din partea
+// liberă; zborul încadrează complexul în ce rămâne.
 //
 // La redimensionare — telefonul rotit, fereastra trasă — decalajul se reface
 // mereu. Distanța, numai dacă trebuie să CREASCĂ cu peste 10%: din peisaj în
@@ -57,11 +60,13 @@ export function distantaLaFisa(poi, camera, L) {
 /**
  * @param {{camera, controale, zbor, poi: {tinta: number[], distanta: number, azimut: number, elevatie: number},
  *          canvas: {clientWidth: number, clientHeight: number, getBoundingClientRect: () => object},
- *          cutieFisa: () => object|undefined, cereRandare: () => void}} o
- *   `cutieFisa`: cutia fișei de acum; se cere numai cât fișa e deschisă.
+ *          cutieFisa: () => object|undefined, cereRandare: () => void, cadru?: object}} o
+ *   `cutieFisa`: cutia fișei de acum; se cere numai cât fișa e deschisă. `cadru`: cadrul liber
+ *   al scenei (cadru-liber.js), comun cu panoul punctului; fără el, unul numai al fișei.
  */
-export function creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFisa, cereRandare }) {
-  let decalaj = null; // fracțiunile părții libere, sau null cât fișa e închisă
+export function creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFisa, cereRandare, cadru = null }) {
+  const liber = cadru ?? creeazaCadruLiber({ camera, canvas, cereRandare });
+  let decalaj = null; // fracțiunile părții libere de fișă, sau null cât fișa e închisă
   // Utilizatorul a atins controalele de la deschidere: mutare, rotire, rotiță, deget.
   // `start` îl emit toate; zborul nu-l emite.
   let atins = false;
@@ -71,18 +76,14 @@ export function creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFi
   const laStart = () => { atins = true; };
   controale.addEventListener('start', laStart);
 
-  const aplica = () => {
-    const cw = canvas.clientWidth, ch = canvas.clientHeight;
-    if (!decalaj || !cw || !ch) { camera.clearViewOffset(); cereRandare(); return; }
-    camera.setViewOffset(cw, ch, (0.5 - (decalaj.x0 + decalaj.x1) / 2) * cw, (0.5 - (decalaj.y0 + decalaj.y1) / 2) * ch, cw, ch);
-    cereRandare();
-  };
   const potriveste = (fisa) => {
     decalaj = parteLibera(fisa, canvas.getBoundingClientRect());
-    aplica();
+    liber.seteazaFisa(decalaj);
   };
+  // Distanța, pe partea liberă de tot: pe telefon, cutia „Coordonate” deschisă poate
+  // trece de marginea de sus a foii.
   const zboara = () => {
-    ceruta = distantaLaFisa(poi, camera, decalaj);
+    ceruta = distantaLaFisa(poi, camera, liber.parte());
     zbor.spre({ ...poi, distanta: ceruta });
   };
 
@@ -95,7 +96,7 @@ export function creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFi
     },
     laInchidere() {
       decalaj = null;
-      aplica();
+      liber.seteazaFisa(null);
     },
     /** Canvasul și-a schimbat mărimea, iar `camera.aspect` e deja cel nou. */
     laRedimensionare() {
@@ -106,13 +107,14 @@ export function creeazaCadruFisa({ camera, controale, zbor, poi, canvas, cutieFi
       // cel de dinainte (`incheieGestul`) —; starea e a doua gardă, ieftină.
       if (atins || controale.state !== STARE.NIMIC) return;
       const acum = zbor.activ ? ceruta : camera.position.distanceTo(controale.target);
-      if (distantaLaFisa(poi, camera, decalaj) > PRAG_ZBOR_NOU * acum) zboara();
+      if (distantaLaFisa(poi, camera, liber.parte()) > PRAG_ZBOR_NOU * acum) zboara();
     },
     get deschisa() { return decalaj !== null; },
     get atins() { return atins; },
     dispose() {
       controale.removeEventListener('start', laStart);
       decalaj = null;
+      if (!cadru) liber.dispose();
     },
   };
 }

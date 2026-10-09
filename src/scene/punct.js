@@ -29,6 +29,28 @@
 // Fără mouse, butonul „Măsoară centrul” culege, la fel, punctul din centrul vederii.
 // Escape îl minimizează, după fișa sanctuarului, dacă e deschisă.
 //
+// ─────────────────────────────────────────────── semnul și imaginea mutată
+//
+// Punctul cules are pe hartă un semn — crucea de vizare a butonului „Coordonate” —, cât
+// panoul e deschis: se proiectează pe cadrul care se desenează, ca eticheta, iar când
+// relieful sau o clădire îl acoperă se face punctat. Pe telefon cutia deschisă stă jos,
+// peste mijlocul ecranului: centrul vederii, de unde culege „Măsoară centrul”, cădea sub
+// ea, cu punctul cu tot (recenzia: 320 × 568, 640 × 360, 390 × 844 pe o clădire). Cât e
+// deschisă și acoperă mijlocul, imaginea se mută deasupra ei — sau alături, ori dedesubt,
+// unde deasupra nu mai e loc —, cu decalajul de obiectiv al fișei (cadru-liber.js): ținta,
+// deci centrul vederii, cade pe mijlocul părții libere.
+//
+// Cutia are de la deschidere înălțimea pe care o are cu un punct: îndemnul și cifrele stau
+// în aceeași celulă, iar ce nu se arată e `visibility: hidden`, nu `display: none`. Altfel
+// primul clic o creștea peste banda pe care se așezase imaginea, iar punctul cules și
+// centrul vederii ajungeau sub ea (recenzia: 320 × 568, 640 × 360). Mai crește numai cu
+// rândurile unei clădiri — ~70 px la 390 × 844, unde centrul vederii rămâne deasupra —, iar
+// un punct cules chiar în banda aceea rămâne sub ea.
+//
+// Cadrul se reașază la deschidere, la minimizare și după „Măsoară centrul” — punctul de acolo
+// stă pe raza țintei, deci după mutare rămâne pe mijlocul părții libere —, nu după un clic pe
+// hartă: imaginea ar fugi de sub deget (control: semnul de la y 120 la 85,2).
+//
 // ────────────────────────────────────────────────── ce cifre au acoperire
 //
 // Coordonatele sunt ÎNTOTDEAUNA adevărate — pe apă, raza se oprește pe suprafața
@@ -54,11 +76,23 @@
 // alpha din spatele lui.
 
 import * as THREE from 'three';
+import { NEAR } from './camera.js';
 import { inPoligon } from './terrain.js';
 import { punctVazut } from './raza.js';
 import { COTA_MARE } from './mare.js';
 
 const PRAG_CLIC = 5;   // px între apăsare și ridicare; peste atât, harta a fost mutată
+
+/**
+ * Cât de departe de punct poate ieși RELIEFUL văzut de rază dinspre cameră, fără ca punctul
+ * să fie socotit acoperit: punctul a fost cules de pe aceeași suprafață, dar de la altă
+ * cameră, iar o rază razantă taie relieful de lângă el cu câțiva metri mai devreme. Numai
+ * pentru relief și mare: un zid are 0,58–1,27 m, deci cu toleranța asta un punct de pe fața
+ * lui îndepărtată n-ar fi ieșit niciodată acoperit (recenzia).
+ */
+const toleranta = (d) => 2 + 0.002 * d;
+/** Clădirile: Möller–Trumbore e exact, deci ajunge o margine de rotunjire. */
+const margineCladire = (d) => 0.05 + 1e-5 * d;
 
 /**
  * Număr pentru CITIT, în română: virgulă zecimală, fără separator de mii.
@@ -97,9 +131,14 @@ const brut = (v, zec) => v.toFixed(zec);
  * @param {(cheie: string) => string} [o.numeElement] — numele de afișat al unui element
  * @param {() => ({x: number, y: number}|null)} [o.centru] — centrul vederii, în coordonatele
  *   ferestrei, pentru „Măsoară centrul”; implicit, centrul canvasului
- * @returns {{dispose: () => void, culegeLa: Function, activeaza: Function, minimizeaza: Function, activ: boolean}|null}
+ * @param {{seteazaCutie: Function, aplica: Function}} [o.cadru] — cadrul liber al scenei
+ *   (cadru-liber.js): cutia deschisă care acoperă mijlocul mută imaginea deasupra ei
+ * @param {() => void} [o.cereRandare] — un cadru, pe care semnul punctului se așază
+ * @returns {{dispose: () => void, culegeLa: Function, activeaza: Function, minimizeaza: Function, pas: Function,
+ *   activ: boolean, semn: object}|null}
  */
-export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, limiteMars, inAlpha, zMin, loveste, numeElement, centru }) {
+export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDatelor, limiteMars, inAlpha, zMin, loveste, numeElement, centru,
+  cadru, cereRandare }) {
   // Proba e un apel adevărat, nu o verificare de chei: `laGeo` întoarce null
   // dacă lipsesc `colturi_geo` sau `bbox_tm06`, iar un panou care arată
   // longitudinea „null" e mai rău decât unul care lipsește.
@@ -115,6 +154,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   // Suprafața mării, ca în `punctVazut`: y + (−COTA_MARE) = 0.
   const planApa = new THREE.Plane(new THREE.Vector3(0, 1, 0), -COTA_MARE);
   const temp = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  const razaSemn = new THREE.Ray();
 
   // ------------------------------------------------------------ culegerea
 
@@ -140,12 +181,12 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     const t = punctVazut(raza, { inaltimeLa, lim }, maxim);
     if (t !== null) {
       raza.at(t, temp);
-      return cuCladire({ x: temp.x, z: temp.z, t });
+      return cuCladire({ x: temp.x, y: temp.y, z: temp.z, t });
     }
 
     // Marea de dincolo de `maxim`: punctul cade tot pe suprafața ei, ca panoul să
     // spună „în afara zonei alpha”, nu să lase pe ecran punctul de dinainte.
-    if (raza.intersectPlane(planApa, temp)) return cuCladire({ x: temp.x, z: temp.z, t: temp.distanceTo(raza.origin) });
+    if (raza.intersectPlane(planApa, temp)) return cuCladire({ x: temp.x, y: temp.y, z: temp.z, t: temp.distanceTo(raza.origin) });
     return cuCladire(null);
   }
 
@@ -158,7 +199,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     if (!loveste) return pTeren;
     const c = loveste(raycaster.ray);
     if (!c || (pTeren && pTeren.t <= c.t)) return pTeren;
-    return { x: c.x, z: c.z, t: c.t, cladire: { cheie: c.cheie, y: c.y } };
+    return { x: c.x, y: c.y, z: c.z, t: c.t, cladire: { cheie: c.cheie, y: c.y } };
   }
 
   /** Punctul e în zona în care se măsoară? */
@@ -186,30 +227,36 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     + '<svg class="semn" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
     + '<circle cx="12" cy="12" r="6.5"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg>'
     + '<span class="text">Coordonate</span></button>'
-    + '<div class="cutie" id="punct-cutie" hidden>'
+    + '<div class="cutie" id="punct-cutie" data-stare="gol" hidden>'
     + '<div class="antet"><h2 class="titlu">Coordonate</h2>'
     + '<button class="minimizeaza" type="button" aria-label="Minimizează coordonatele"'
     + ' title="Minimizează: clicul pe hartă nu mai măsoară"><span aria-hidden="true">–</span></button></div>'
+    // Îndemnul și cifrele stau în aceeași celulă (`.date`), iar cutia ține starea în
+    // `data-stare`: ce nu se arată e ascuns cu `visibility`, deci cutia are de la deschidere
+    // înălțimea pe care o are cu un punct (main.css). Cifrele pornesc cu „—”, nevăzute: goale,
+    // rândurile ar fi mai scunde, iar cutia tot ar crește la primul punct (cu 49,8 px la 390 × 844).
+    + '<div class="date">'
     + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul, sau măsoară centrul hărții.</p>'
-    + '<dl class="mari" hidden>'
+    + '<div class="valori">'
+    + '<dl class="mari">'
     + '<dt class="cl" hidden>clădire</dt><dd class="cl" hidden></dd>'
-    + '<dt>altitudine</dt><dd class="alt"></dd>'
+    + '<dt>altitudine</dt><dd class="alt">—</dd>'
     + '<dt class="sol" hidden>sol</dt><dd class="sol" hidden></dd>'
-    + '<dt>longitudine</dt><dd class="lon"></dd>'
-    + '<dt>latitudine</dt><dd class="lat"></dd>'
+    + '<dt>longitudine</dt><dd class="lon">—</dd>'
+    + '<dt>latitudine</dt><dd class="lat">—</dd>'
     + '</dl>'
     // Câte un element pe axă, nu un text cu două spații între axe: spațiile la rând se
     // strâng într-unul (`white-space`, CSS Text 3), deci pe ecran rămânea unul singur.
     // Golul îl face CSS-ul, lărgind spațiul dintre ele, care rămâne și pentru textContent,
     // cititoare și selecție: selectat, rândul iese pe o singură linie.
-    + '<dl class="mici" hidden>'
-    + '<dt>scenă (m)</dt><dd class="sc"><span class="axa"></span> <span class="axa"></span> <span class="axa"></span></dd>'
-    + '<dt>TM06 (m)</dt><dd class="tm"><span class="axa"></span> <span class="axa"></span></dd>'
-    + '</dl>'
+    + '<dl class="mici">'
+    + '<dt>scenă (m)</dt><dd class="sc"><span class="axa">X —</span> <span class="axa">Y —</span> <span class="axa">Z —</span></dd>'
+    + '<dt>TM06 (m)</dt><dd class="tm"><span class="axa">X —</span> <span class="axa">Y —</span></dd>'
+    + '</dl></div></div>'
     // Fără mouse: punctul din centrul vederii, cu aceeași culegere ca un clic.
     + '<div class="actiuni">'
     + '<button class="centru" type="button" title="Măsoară punctul din centrul hărții">Măsoară centrul</button>'
-    + '<button class="copiaza" type="button" hidden>Copiază</button>'
+    + '<button class="copiaza" type="button">Copiază</button>'
     + '</div>'
     + '<span class="anunt" role="status" aria-live="polite"></span>'
     + '</div>';
@@ -241,21 +288,73 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
 
   gazda.appendChild(radacina);
 
+  // Semnul punctului cules: aceeași cruce de vizare ca pe butonul „Coordonate”, de două
+  // ori — dedesubt un contur lat din culoarea fundalului, deasupra linia aurie —, ca să se
+  // vadă și pe calcarul alb, și pe marea închisă. Decorativ: punctul îl spune panoul.
+  const semn = document.createElement('span');
+  semn.className = 'punct-semn';
+  semn.setAttribute('aria-hidden', 'true');
+  semn.hidden = true;
+  const CRUCE = '<circle cx="12" cy="12" r="6.5"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/>';
+  semn.innerHTML = '<svg viewBox="0 0 24 24" focusable="false">'
+    + `<g class="contur">${CRUCE}</g><g class="linie">${CRUCE}</g><circle class="mijloc" cx="12" cy="12" r="1.6"/></svg>`;
+  gazda.appendChild(semn);
+
   let viu = true;
   let activ = false;    // minimizat: nu culege nimic
   let ales = null;      // ultimul punct cules, gata de copiat
   let cronoCopiere = 0;
+
+  // ------------------------------------------------------------- semnul
+
+  /** Punctul e acoperit, privit de la cameră? Raza spre el, pe ce se vede: relief, mare, clădiri. */
+  function acoperit(p) {
+    razaSemn.origin.copy(camera.position);
+    razaSemn.direction.set(p.x, p.y, p.z).sub(camera.position);
+    const d = razaSemn.direction.length();
+    if (!(d > NEAR)) return false;
+    razaSemn.direction.divideScalar(d);
+    const t = punctVazut(razaSemn, { inaltimeLa, lim }, d + toleranta(d));
+    if (t !== null && t < d - toleranta(d)) return true;
+    const c = loveste?.(razaSemn);
+    return Boolean(c) && c.t < d - margineCladire(d);
+  }
+
+  /**
+   * Semnul, pe cadrul care se desenează, după `camera.updateMatrixWorld()`: pe punctul cules,
+   * cât panoul e deschis, punctul e în alpha și cade în canvas, în fața camerei.
+   */
+  function pas() {
+    const p = activ ? ales?.p : null;
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    if (!p || !cw || !ch) { semn.hidden = true; return; }
+    v.set(p.x, p.y, p.z).project(camera);
+    const x = (v.x * 0.5 + 0.5) * cw, y = (-v.y * 0.5 + 0.5) * ch;
+    if (!(v.z < 1) || !(x >= 0 && x <= cw && y >= 0 && y <= ch)) { semn.hidden = true; return; }
+    const r = canvas.getBoundingClientRect();
+    semn.style.transform = `translate(${(r.left + x).toFixed(1)}px, ${(r.top + y).toFixed(1)}px)`;
+    semn.classList.toggle('ocluzat', acoperit(p));
+    semn.hidden = false;
+  }
+
+  /**
+   * Cutia s-a deschis, s-a minimizat sau a primit punctul din centru: cadrul liber o măsoară
+   * din nou, iar semnul se așază pe cadrul următor. Până atunci semnul nu se mută: imaginea
+   * de pe ecran e încă a cadrului de dinainte.
+   */
+  const reasaza = () => {
+    cadru?.aplica();
+    cereRandare?.();
+  };
 
   function arata(p) {
     // În afara zonei alpha nu se scrie nicio cifră și nu rămâne nimic de copiat.
     if (!p.cladire && !inZona(p.x, p.z)) {
       for (const r of randuriCladire) r.hidden = true;
       indemn.textContent = 'În afara zonei alpha: aici nu se măsoară. Dă clic pe hartă.';
-      indemn.hidden = false;
-      dlMari.hidden = true;
-      dlMici.hidden = true;
-      buton.hidden = true;
+      cutie.setAttribute('data-stare', 'gol');
       ales = null;
+      cereRandare?.();
       anunt.textContent = 'Punctul e în afara zonei alpha; acolo nu se măsoară.';
       return;
     }
@@ -283,12 +382,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     [`X ${nr(p.x, 2)}`, `Y ${y}`, `Z ${nr(p.z, 2)}`].forEach((s, i) => { camp.sc[i].textContent = s; });
     [`X ${nr(t.x, 2)}`, `Y ${nr(t.y, 2)}`].forEach((s, i) => { camp.tm[i].textContent = s; });
 
-    indemn.hidden = true;
-    dlMari.hidden = false;
-    dlMici.hidden = false;
-    buton.hidden = false;
+    cutie.setAttribute('data-stare', 'punct');
 
     ales = { p, h, eticheta, g, t, numeCl, sol: teren };
+    cereRandare?.();
     anunt.textContent = numeCl
       ? `${numeCl}: punct la altitudinea ${nr(h, 2)} metri; solul de dedesubt la ${teren.h === null ? teren.eticheta : `${nr(teren.h, 2)} metri`}.`
       : h === null
@@ -371,12 +468,13 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   };
 
   // „Măsoară centrul”: panoul se folosește și fără mouse — de la tastatură, cu un cititor
-  // de ecran. Centrul e al vederii (`centru`, din controale): cu fișa deschisă, al părții
-  // libere; fără el, al canvasului.
+  // de ecran. Centrul e al vederii (`centru`, din controale): al părții libere de fișă și de
+  // cutie; fără `centru`, al canvasului. Apoi cadrul se reașază pe cutia crescută.
   const laCentru = () => {
     const r = canvas.getBoundingClientRect();
     const c = centru?.() ?? { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     if (activ && !culege(c.x, c.y)) anunt.textContent = 'În centrul hărții nu se vede niciun punct de măsurat.';
+    if (activ) reasaza();
   };
 
   /**
@@ -395,6 +493,8 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     cutie.hidden = !stare;
     activeazaBtn.hidden = stare;
     activeazaBtn.setAttribute('aria-expanded', String(stare));
+    if (!stare) semn.hidden = true;
+    reasaza();
     if (cuFocus) (stare ? minimizeazaBtn : activeazaBtn).focus();
   }
   const laActivare = () => seteaza(true, true);
@@ -412,6 +512,10 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     e.preventDefault();
     seteaza(false, cutie.contains(e.target));
   };
+
+  // Cutia deschisă, pentru cadrul liber; minimizată, nimic. Cadrul o mai măsoară la fiecare
+  // redimensionare a canvasului și la deschiderea sau închiderea fișei (scena.js).
+  cadru?.seteazaCutie(() => (activ && !cutie.hidden ? cutie.getBoundingClientRect() : null));
 
   canvas.addEventListener('pointerdown', laApasare);
   // Ridicarea se ascultă pe fereastră, nu pe canvas: controalele mută
@@ -432,10 +536,14 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     culegeLa: culege,
     activeaza: () => seteaza(true, false),
     minimizeaza: () => seteaza(false, false),
+    pas,
     get activ() { return activ; },
+    /** Pentru probe: semnul de pe hartă. */
+    semn,
     dispose() {
       if (!viu) return;
       viu = false;
+      cadru?.seteazaCutie(null);
       canvas.removeEventListener('pointerdown', laApasare);
       globalThis.removeEventListener('pointerup', laRidicare);
       globalThis.removeEventListener('pointercancel', laAnulare);
@@ -449,6 +557,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       document.documentElement.removeAttribute('data-punct-deschis');
       apasat = null;
       ales = null;
+      semn.remove();
       radacina.remove();
     },
   };

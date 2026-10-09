@@ -16,12 +16,20 @@ import * as THREE from 'three';
  * mărită pe telefon raportul crește (195 × 422 la 6×), iar canvasul rămâne tot
  * 390 × 844: imaginea, mai grosieră decât ecranul. Un buget de pixeli pe
  * `(pointer: coarse)` n-ar depinde de mărire, dar nu s-a ales.
+ *
+ * Întoarce true și când s-a schimbat numai mărimea CSS a canvasului, cu bufferul la fel:
+ * mărirea paginii cu Ctrl + duce 1280 × 720 la 1× în 640 × 360 la 2×, tot 1280 × 720 de
+ * pixeli. Panourile își schimbă atunci așezarea — la 640 × 360 cutia „Coordonate” trece peste
+ * mijloc —, deci bucla reface decalajul imaginii (cadru-liber.js); fără asta, imaginea rămânea
+ * sub cutie, iar la întoarcerea la 100% mutată degeaba (recenzia).
  */
+const ultimaMarime = new WeakMap(); // canvas → [clientWidth, clientHeight] la chemarea de dinainte
 export function redimensioneaza(renderer, maxPixeli = 2560 * 1440) {
   const canvas = renderer.domElement;
   const raport = Math.min(globalThis.devicePixelRatio || 1, 2);
-  let latime = canvas.clientWidth * raport;
-  let inaltime = canvas.clientHeight * raport;
+  const cw = canvas.clientWidth, ch = canvas.clientHeight;
+  let latime = cw * raport;
+  let inaltime = ch * raport;
   const pixeli = latime * inaltime;
   if (pixeli > maxPixeli) {
     const scara = Math.sqrt(maxPixeli / pixeli);
@@ -34,7 +42,10 @@ export function redimensioneaza(renderer, maxPixeli = 2560 * 1440) {
   const nevoie = canvas.width !== latime || canvas.height !== inaltime;
   // Al treilea argument false: CSS-ul stăpânește dimensiunea afișată.
   if (nevoie) renderer.setSize(latime, inaltime, false);
-  return nevoie;
+  const u = ultimaMarime.get(canvas);
+  const css = !u || u[0] !== cw || u[1] !== ch;
+  if (css) ultimaMarime.set(canvas, [cw, ch]);
+  return nevoie || css;
 }
 
 /** Întoarce rendererul, sau null dacă WebGL nu pornește. */

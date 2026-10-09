@@ -890,6 +890,22 @@ console.log('\nMărimea canvasului: raportul de pixeli cel mult 2, cel mult 2560
   // canvasul rămâne cât al paginii nemărite. Se tipărește, fără prag.
   const [Wz, Hz] = masoara(195, 422, 6);
   console.log(`    informativ: telefonul cu pagina mărită de două ori (195 × 422 la 6×) — ${Wz} × ${Hz}, un pixel randat pe 3 × 3 ai ecranului`);
+  // Mărirea paginii cu Ctrl +: 1280 × 720 la 1× devine 640 × 360 la 2×, cu același buffer de
+  // 1280 × 720. redimensioneaza() întoarce totuși true, ca bucla să refacă decalajul imaginii —
+  // cutia „Coordonate” trece atunci peste mijloc (cadru-liber.js) —, apoi false în repaus.
+  // Control: renderer.js de la 491e7e4, care întorcea numai schimbarea bufferului.
+  const marire = (M) => {
+    const canvas = { clientWidth: 1280, clientHeight: 720, width: 300, height: 150 };
+    const r = { domElement: canvas, setSize(W, H) { canvas.width = W; canvas.height = H; } };
+    const pas = (w, h, dpr) => { globalThis.devicePixelRatio = dpr; canvas.clientWidth = w; canvas.clientHeight = h; return M.redimensioneaza(r); };
+    return [pas(1280, 720, 1), pas(1280, 720, 1), pas(640, 360, 2), pas(640, 360, 2), pas(1280, 720, 1), pas(1280, 720, 1)];
+  };
+  const SIR = [true, false, true, false, true, false];
+  const zi = marire({ redimensioneaza });
+  proba(zi.every((x, i) => x === SIR[i]), `mărirea paginii, 1280 × 720 la 1× → 640 × 360 la 2× → înapoi, cu repaus între ele: ${zi.join(' ')} (cerut ${SIR.join(' ')}); bufferul rămâne 1280 × 720`);
+  const RV = await modulDin(textVechi('src/scene/renderer.js', '491e7e4'));
+  const zv = RV ? marire(RV) : null;
+  proba(zv !== null && !zv.every((x, i) => x === SIR[i]), `control, renderer.js de la 491e7e4: ${zv === null ? 'NECITIT' : zv.join(' ')} — pică`);
   if (DPR) Object.defineProperty(globalThis, 'devicePixelRatio', DPR); else delete globalThis.devicePixelRatio;
 }
 

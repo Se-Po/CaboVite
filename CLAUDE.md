@@ -47,9 +47,9 @@ se poartă în română.
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | construiește alpha și împrejurimile cu codul paginii, în Node: crăpăturile cusăturilor, bugetul și fișierele fiecărui nivel, culoarea peste cusături, netezirea, shaderul fără codul umbrelor |
-| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate” și „Măsoară centrul”, harta cu pagina mărită, tastatura și drona (urcarea, coborârea, paza solului pe tot trunchiul vederii, la mutare, rotire și zoom, Shift și Ctrl ca taste de modificare), anunțul busolei, Escape pe fișă și pe cutia „Coordonate” |
+| `npm run verifica-controale` | mânuirea hărții, cu codul paginii, în Node: treptele rotiței, zoomul spre cursor și limitele lui, stările gesturilor, punctul panoului „Coordonate” și „Măsoară centrul”, harta cu pagina mărită, tastatura și drona (urcarea, coborârea, paza solului pe tot trunchiul vederii, la mutare, rotire și zoom, Shift și Ctrl ca taste de modificare), anunțul busolei, Escape pe fișă și pe cutia „Coordonate”, imaginea mutată din calea cutiei „Coordonate” și semnul punctului cules, planul apropiat cu imaginea mutată |
 | `npm run verifica-livrare` | după `npm run build`: cache-ul și antetele de securitate din `vercel.json` pe fiecare fișier publicat, CSP-ul față de ce face pagina, garda numelor publicate, blocurile `static {}` din `dist/assets` și plasa ES5, titlul (`h1`) și `<noscript>` în afara lui `#continut`; `-- --live` le compară cu sebastians.life |
-| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion, haloul focusului peste hartă, golul dintre fișă și cutia „Coordonate” pe ecrane înalte, bifa lui Satelit în afara numelui, busola în contrast forțat, panoul „Coordonate” fără text sub 14 px; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit la pornire (cele șase texturi întregi cerute înaintea construcției, procentul, garda fotografiei, ieșirea fără Satelit; peticul oprit fără compresie); harta o singură dată (pe sursă: compilarea, apoi așteptarea fotografiei, apoi bucla; panourile ascunse și canvasul fără pointer până la `data-scena`; mesajul cu procentul și butonul „Arată relieful acum”); pagina fără scenă (textul fișei sanctuarului cu sursele, un `h1`, niciun id dublu; fișa etichetei neschimbată la outerHTML) |
+| `npm run verifica-pagina` | ce nu acoperă celelalte probe, cu codul paginii, în Node: textura Satelit când transcodorul KTX2 nu răspunde (limita de timp, abandonul, pagina ascunsă, verificarea dinaintea descărcării); foaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă, animațiile numai pe transform/opacity și oprite sub reduced-motion, haloul focusului peste hartă, golul dintre fișă și cutia „Coordonate” pe ecrane înalte, bifa lui Satelit în afara numelui, busola în contrast forțat, panoul „Coordonate” fără text sub 14 px; ordinea de desenare (cerul ultimul, marea după teren); mărimea canvasului (raportul de pixeli cel mult 2; mărirea paginii, cu bufferul neschimbat, tot o redimensionare); cascada încărcării (stratul NDVI cerut odată cu sidecarul hărții); garda pornirii (20 s fără niciun octet abandonează pornirea); Satelit la pornire (cele șase texturi întregi cerute înaintea construcției, procentul, garda fotografiei, ieșirea fără Satelit; peticul oprit fără compresie); harta o singură dată (pe sursă: compilarea, apoi așteptarea fotografiei, apoi bucla; panourile ascunse și canvasul fără pointer până la `data-scena`; mesajul cu procentul și butonul „Arată relieful acum”); pagina fără scenă (textul fișei sanctuarului cu sursele, un `h1`, niciun id dublu; fișa etichetei neschimbată la outerHTML) |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
 
 Scripturile de construit hărți (`build-zona`, `build-petic`) cer date-sursă care
@@ -750,8 +750,8 @@ clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeL
 Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
 rămâne. Mișcarea camerei nu depinde de el. Fără mouse, butonul **„Măsoară centrul”**
 (următorul după „–” cu Tab) culege, cu aceeași culegere ca un clic, punctul din centrul
-vederii — ținta camerei pe ecran (`centruVederii` din camera.js), deci cu fișa deschisă
-centrul părții libere. Stă pe un rând cu „Copiază” pe desktop, pe telefon unul sub altul.
+vederii — ținta camerei pe ecran (`centruVederii` din camera.js), deci centrul părții
+libere de fișă și de cutie (mai jos). Stă pe un rând cu „Copiază” pe desktop, pe telefon unul sub altul.
 Escape îl minimizează (vezi „Focusul, Escape și contrastul forțat”). Unde stă:
 - pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
@@ -759,6 +759,54 @@ Escape îl minimizează (vezi „Focusul, Escape și contrastul forțat”). Und
 - sub 22,5rem, deschis, urcă deasupra lui Satelit, pe toată lățimea; sub 17rem
   butonul rămâne numai cu semnul. Așa ajunge și un telefon de 390 px cu pagina
   mărită de două ori. Îngust și sub 30rem înălțime, cutia coboară peste Satelit.
+
+**Imaginea din calea cutiei și semnul punctului** (2026-10-09, alegerea autorului). Pe ecranele
+mici cutia deschisă stă peste mijlocul hărții, iar „Măsoară centrul” culegea un loc acoperit
+chiar de ea, fără niciun semn pe hartă (recenzia: 640 × 360, adică 1280 × 720 la 200%, 320 × 568,
+390 × 844 pe o clădire). Acum:
+- cât cutia intră în partea liberă și stă în coloana ei din mijloc, imaginea se mută cu decalajul
+  de obiectiv al fișei — `cadru-liber.js`, unul pentru amândouă —: deasupra cutiei, dacă rămâne
+  un sfert din înălțime, altfel alături, în partea mai lată, altfel dedesubt. Pe desktop și pe
+  telefonul culcat cutia stă într-o parte și nu mută nimic; la 195 × 422 acoperă aproape tot,
+  deci nu se mută nimic, iar punctul rămâne sub ea. Fișa pe telefon, peste panou, ia partea de
+  deasupra foii; la 320 × 568, cu amândouă deschise, cutia trece de foaie până la y 100 și nu
+  mai rămâne loc nicăieri, deci ținta stă sub ea, ca înainte;
+- cutia are de la deschidere înălțimea pe care o are cu un punct: îndemnul și cifrele stau în
+  aceeași celulă, iar ce nu se arată e `visibility: hidden` (`data-stare`), cu cifrele „—”
+  nevăzute. Cu `display: none`, primul clic o creștea peste partea pe care se așezase imaginea,
+  cu punctul și centrul vederii sub ea (recenzia). Mai crește numai cu rândurile unei clădiri,
+  ~70 px la 390 × 844: un punct cules chiar în banda aceea rămâne sub cutie;
+- se reașază la deschidere, la minimizare, după „Măsoară centrul” (punctul stă pe raza țintei,
+  deci ajunge pe mijlocul părții libere), la redimensionare — și la mărirea paginii, cu bufferul
+  neschimbat (`redimensioneaza` întoarce true și la o mărime CSS nouă) — și cu fișa; nu după un
+  clic pe hartă, care ar muta imaginea de sub deget;
+- punctul cules are pe hartă un semn, cât panoul e deschis: crucea de vizare a butonului, aurie pe
+  un contur din culoarea fundalului, proiectată pe cadrul desenat, ca eticheta. Punctat când e
+  acoperit: relieful cu toleranța de 2 m + 0,2% (o rază razantă îl taie lângă punct), clădirile
+  exact — un zid are 0,58–1,27 m. `aria-hidden`: punctul îl spune panoul;
+- cu imaginea mutată, fereastra planului apropiat nu mai stă în mijloc: paza solului (`_solSub`)
+  îi ia colțurile din fereastra reală (`razaPlanApropiat`), nu din formula fără decalaj.
+
+`verifica-controale`, cu panoul, cadrul și camera adevărate, pe un DOM fals care pornește ca
+marcajul și pe cutiile măsurate în pagină: deschis, primul clic pe centru, „Măsoară centrul”,
+minimizat — semnul pe centrul vederii, în afara cutiei, în ecran, (195; 232,5) la 390 × 844,
+(187,5; 144) la 375 × 667, (160; 470,8) la 320 × 568, sub cutie și în afara busolei și a lui
+Satelit, (120; 180) la 640 × 360; fără decalaj la 1600 × 900, la 844 × 390 și la 195 × 422; minimizat,
+fără decalaj și fără semn. La 390 × 844 un clic pe o clădire lasă decalajul (189,45 px) și pune
+semnul pe pixelul clicului, iar „Măsoară centrul” pe far îl reașază pe cutia crescută (224,25 px).
+Un zid de 1 m la 0,3 m de punct îl face punctat. Raza planului apropiat e cel mai depărtat colț, la
+5·10⁻¹⁵ m, pe șapte decalaje, iar `_solSub` vede un inel de relief dincolo de colț. Pe sursă:
+celula comună și `visibility`. `verifica-pagina`: mărirea paginii, 1280 × 720 la 1× → 640 × 360
+la 2× → înapoi, `true false true false true false`. Controale, care pică: punct.js, main.css și
+renderer.js de la `491e7e4`; cutia goală de dinainte, cu îndemnul singur (la 320 × 568, 640 × 360
+și 195 × 422 semnul sub cutie după primul clic); numai deasupra cutiei; cadrul refăcut și după clic
+(semnul fuge de la y 120 la 85,2); „Măsoară centrul” fără reașezare (189,45 în loc de 224,25);
+clădirile cu toleranța reliefului (zidul nu acoperă); formula fără decalaj (12,18 m față de colțul
+de la 12,35 m la 320 × 568). În pagină (build, 2026-10-09, fila ascunsă, deci cadrele desenate de
+mână): aceleași cutii și poziții la toate șapte ecranele, deschis = cu un punct, `elementFromPoint`
+pe canvas sub semn; capturile la 390 × 844, 320 × 568 și 640 × 360; fișa pe telefon peste panou și
+închisă la loc; 0 erori în consolă. Mărirea adevărată cu Ctrl + și un telefon adevărat nu s-au
+încercat <!-- NEVERIFICAT: Ctrl + în browser, telefon -->.
 
 Cutia deschisă primește clicurile: are înălțime maximă și defilează, cu antetul
 lipit sus, deci „–” se vede mereu. Prin ea nu se culege și nu se rotește camera;
@@ -1060,8 +1108,9 @@ ecranului: conturul obișnuit ar sta în afara canvasului.
   după „−” de opt ori, Ctrl nu cobora deloc (recenzia).
 - **Paza solului.** Niciun pas de la tastatură — mutarea, rotirea, zoomul, coborârea — nu duce
   camera la mai puțin de 20 m peste ce e sub ea: relief, mare sau acoperiș, pe tot discul
-  planului apropiat (`_solSub`: raza colțurilor lui, cu 10% marjă, 14,4 m la 16:9; centrul și
-  32 de puncte). Numai pe verticala punctului, drona ținută jos ajungea cu planul apropiat în
+  planului apropiat (`_solSub`: raza colțurilor lui, `razaPlanApropiat`, din fereastra reală
+  și cu imaginea mutată de fișă sau de cutia „Coordonate”, cu 10% marjă: fără decalaj, 14,4 m la
+  16:9; centrul și 32 de puncte). Numai pe verticala punctului, drona ținută jos ajungea cu planul apropiat în
   peretele falezei, iar stânca din centrul ecranului la 1,3 m (recenzia). Cât alunecă un pas,
   `pasVertical` (din buclă, și din `comanda()` înaintea lui `update()`) știe unde ajunge camera
   la cadrul acesta: la mutare, urcarea care lipsește alunecă odată cu ea, iar partea din mutare
@@ -1454,6 +1503,8 @@ telefon de 390 × 844 la 3× avea 1170 × 2532 (2,96 MP), sub plafonul de pixeli
 1662 × 2217) nu se schimbă. Bufferul de desen la 390 × 844 la 3× e, calculat și nemăsurat,
 35,5–47,4 MB cu rezolvarea MSAA implicită și 118,5–130,3 MB cu cea explicită; la 2× e de
 2,25 ori mai mic <!-- NEVERIFICAT: ce rezolvare MSAA alege Chrome pe telefon -->.
+Întoarce true și la o mărime CSS nouă cu același buffer — mărirea paginii, 1280 × 720 la 1× →
+640 × 360 la 2× —, ca bucla să refacă decalajul imaginii (vezi „Punctul de sub clic”).
 
 Ce a costat: un telefon în peisaj pornește cu umbrele pe cutia unită (vezi „Umbrele pe
 grupuri”), iar cu pagina mărită de două ori pe telefon (195 × 422 la 6×) canvasul rămâne
@@ -2294,6 +2345,8 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
   deschisă, un decalaj de obiectiv (`setViewOffset`) mută imaginea în partea liberă —
   foaia de jos pe telefon, panoul din dreapta pe desktop — iar distanța crește cât
   să încapă complexul (~110 m în jurul terreiro-ului). Camera și pivotul nu se mută.
+  Decalajul îl aplică `cadru-liber.js`, comun cu cutia „Coordonate” deschisă (vezi „Punctul
+  de sub clic”); distanța se socotește pe partea liberă de amândouă.
   Pe telefon, fără el, biserica ieșea din ecran la x = −18. Fișa laterală contează
   de la un sfert din lățime: între 545 și 666 px trece de 60%, iar un prag la 40%
   lăsa complexul sub ea. Regulile stau în `src/scene/fisa-cadru.js`, ca proba Node

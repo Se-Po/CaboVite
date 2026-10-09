@@ -11,6 +11,7 @@ import { creeazaSanctuar } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
 import { creeazaCadruFisa } from './fisa-cadru.js';
+import { creeazaCadruLiber } from './cadru-liber.js';
 import { creeazaUmbre } from './umbre.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
 import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './palette.js';
@@ -509,10 +510,16 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // Pe același relief, cu clădirile, merg zoomul spre cursor, apucarea hărții și pivotul.
   if (geo?.limite) controale.seteazaTeren({ inaltimeLa: inaltimeRandata, lim: imprejurimi?.limite ?? geo.limite, alpha, loveste: lovesteCladire });
 
+  // Partea de ecran pe care n-o acoperă fișa sanctuarului și cutia „Coordonate”: imaginea
+  // se mută în ea cu un decalaj de obiectiv (cadru-liber.js). Unul singur, pentru amândouă.
+  const cadruLiber = creeazaCadruLiber({ camera, canvas: renderer.domElement, cereRandare });
+  deEliberat.push(() => cadruLiber.dispose());
+
   // Panoul punctului. Primește `inaltimeLa` COMPUS — cel care alege peticul de
   // 1 m acolo unde există — fiindcă e o unealtă de măsurat, iar diferența dintre
   // plase pe cusătură s-a măsurat la 0,153 m. Întoarce null dacă harta nu poate
-  // exprima un punct în longitudine/latitudine.
+  // exprima un punct în longitudine/latitudine. Cutia lui deschisă, pe telefon peste
+  // mijlocul ecranului, mută imaginea deasupra ei; punctul cules are un semn pe hartă.
   const punct = creeazaPunct({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, geo,
@@ -523,8 +530,10 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     zMin: relief.meta?.zMin_m,
     loveste: lovesteCladire,
     numeElement: (cheie) => [...(continut?.sanctuar?.nume_elemente ?? []), ...(continut?.cladiri?.nume_elemente ?? [])].find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
-    // „Măsoară centrul”: ținta pe ecran, deci cu fișa deschisă centrul părții libere.
+    // „Măsoară centrul”: ținta pe ecran, deci centrul părții libere.
     centru: () => controale.centruVederii(),
+    cadru: cadruLiber,
+    cereRandare,
   });
   if (punct) deEliberat.push(() => punct.dispose());
 
@@ -546,6 +555,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   const cadruFisa = sanctuar?.poi?.zbor ? creeazaCadruFisa({
     camera, controale, zbor, poi: sanctuar.poi.zbor, canvas: renderer.domElement, cereRandare,
     cutieFisa: () => document.getElementById('sanctuar-fisa')?.getBoundingClientRect(),
+    cadru: cadruLiber,
   }) : null;
   if (cadruFisa) deEliberat.push(() => cadruFisa.dispose());
   eticheta = cadruFisa ? creeazaEticheta({
@@ -584,8 +594,9 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
       const c = renderer.domElement;
       camera.aspect = c.clientWidth / c.clientHeight;
       camera.updateProjectionMatrix();
-      // Fișa și canvasul și-au schimbat mărimea: decalajul se socotește din nou, iar
-      // distanța crește, dacă trebuie, cu un zbor.
+      // Panourile și canvasul și-au schimbat mărimea: decalajul se socotește din nou, iar
+      // cu fișa deschisă distanța crește, dacă trebuie, cu un zbor.
+      cadruLiber.aplica();
       cadruFisa?.laRedimensionare();
       cerut = true;
     }
@@ -599,6 +610,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     camera.updateMatrixWorld();
     eticheta?.pas();
     gest.pas();
+    punct?.pas();
     // Camera s-a apropiat de alt grup de clădiri, sau s-a depărtat: harta de umbre se
     // strânge pe cutia potrivită, în cadrul acesta.
     umbreGrup?.pas();
@@ -710,7 +722,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
         satelit?.reanunta?.();
       }));
     },
-    zbor, eticheta, cadruFisa, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
+    zbor, eticheta, cadruFisa, cadruLiber, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
     get tastatura() { return tastatura; },
     get relief() { return viu ? relief : null; },
     nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
