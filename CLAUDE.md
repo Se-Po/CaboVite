@@ -194,7 +194,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - Nu se dă raycast pe plasă: raza merge pe câmpul de înălțimi (`marsPeTeren`, raza.js). Panoul,
   zoomul și apucarea culeg același `punctVazut`. → punctul
 - „Coordonate” pornește minimizat și, minimizat, nu culege nimic; textul copiat are punct
-  zecimal. → punctul
+  zecimal. Se măsoară numai la clic sau la atingere: „Măsoară centrul” a ieșit, fără
+  înlocuitor de la tastatură (alegerea autorului). → punctul
 - Harta se mânuiește ca o hartă (stânga mută, dreapta rotește, rotița spre cursor), iar
   tastatura ca o dronă; harta n-are butoane pe ecran. Mutarea, rotirea, Shift și Ctrl se recunosc
   după poziție (`code`, și pe AZERTY); plusul, minusul și Home, după semn (`key`). → controale

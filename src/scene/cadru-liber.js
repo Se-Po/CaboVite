@@ -5,7 +5,7 @@
 // un decalaj de obiectiv (`setViewOffset`), nu cu altă țintă: camera și pivotul rămân, deci
 // raza panoului punctului, proiecția etichetei și a semnului, zoomul spre centru și rotirea
 // merg neschimbate — toate citesc matricea de proiecție. Ținta cade pe mijlocul părții
-// libere: de acolo culege „Măsoară centrul”, spre el apropie „+”.
+// libere: spre el apropie „+”.
 //
 // Fișa își dă singură partea liberă (`parteLibera`, în fisa-cadru.js). Cutia „Coordonate”
 // contează numai cât intră în ea și stă în coloana ei din mijloc: pe telefon, unde stă jos,

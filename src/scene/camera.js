@@ -338,7 +338,7 @@ export class ControaleHarta extends MapControls {
   /**
    * Unde cade ținta pe ecran, în coordonatele ferestrei: centrul vederii. Fără decalaj de
    * obiectiv e centrul canvasului; cu fișa deschisă, centrul părții libere. Spre el apropie
-   * „+” și de acolo culege „Măsoară centrul” (punct.js). Null fără canvas cu mărime.
+   * „+”. Null fără canvas cu mărime.
    */
   centruVederii() {
     const r = rectDin(this.domElement);

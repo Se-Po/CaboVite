@@ -13,10 +13,7 @@ panoul e text românesc și se citește, textul copiat pleacă în altă parte.
 clicul pe scenă nu culege nimic — nicio rază, niciun rând —, iar `culegeLa()`
 întoarce `null`; o apăsare începută înainte de minimizare nu mai culege nici ea.
 Activat, focusul trece pe „–”, care îl minimizează la loc, iar ultimul punct
-rămâne. Mișcarea camerei nu depinde de el. Fără mouse, butonul **„Măsoară centrul”**
-(următorul după „–” cu Tab) culege, cu aceeași culegere ca un clic, punctul din centrul
-vederii — ținta camerei pe ecran (`centruVederii` din camera.js), deci centrul părții
-libere de fișă și de cutie (mai jos). Stă pe un rând cu „Copiază” pe desktop, pe telefon unul sub altul.
+rămâne. Mișcarea camerei nu depinde de el. Sub cifre stă numai „Copiază”.
 Escape îl minimizează (vezi `docs/controale.md`, „Focusul, Escape și contrastul forțat”). Unde stă:
 - pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
@@ -39,15 +36,29 @@ afara…”, mouse-ul, cu mesajul locului păstrat; controale, care pică: point
 schimbarea neascultată, ascultătorul rămas după `dispose()`, schimbarea care rescrie îndemnul de
 început.
 
+**Fără „Măsoară centrul”** (2026-10-14, alegerea autorului). Butonul culegea, fără mouse, punctul
+din centrul vederii, și era singura cale de măsurat de la tastatură. A ieșit la cererea autorului,
+care a ales să nu-l înlocuiască (nici cu o tastă pe hartă): panoul măsoară numai la clic sau la
+atingere, iar de la tastatură „Coordonate” se deschide, dar n-are ce culege. Pe telefon, unde
+butoanele stăteau unul sub altul, cutia a pierdut un rând: 52 px la 390 × 844 și la 375 × 667.
+
+**Semnul, o cruce fină** (2026-10-14, alegerea autorului, varianta B din patru arătate). Aceeași
+cruce de vizare ca iconița butonului „Coordonate”, de 24 px (1,5rem) în loc de 36, cu linia aurie
+de 1,25 px peste un contur din `--bg` de 3 px (înainte 2 și 4,5) și punctul din mijloc de rază 1,1
+(înainte 1,6, cu contur). Ocluzia: linia punctată 2 / 1,5. În contrast forțat, ca înainte.
+`verifica-pagina`, pe foaie: 1,5rem, linia cel mult 1,25, conturul cel mult 3 și mai lat decât ea,
+culorile de sistem; control: main.css de la `a8e4834`, cu semnul de 36 px.
+
 **Imaginea din calea cutiei și semnul punctului** (2026-10-09, alegerea autorului). Pe ecranele
-mici cutia deschisă stă peste mijlocul hărții, iar „Măsoară centrul” culegea un loc acoperit
-chiar de ea, fără niciun semn pe hartă (recenzia: 640 × 360, adică 1280 × 720 la 200%, 320 × 568,
-390 × 844 pe o clădire). Acum:
+mici cutia deschisă stă peste mijlocul hărții, iar „Măsoară centrul”, cât a existat, culegea un loc
+acoperit chiar de ea, fără niciun semn pe hartă (recenzia: 640 × 360, adică 1280 × 720 la 200%,
+320 × 568, 390 × 844 pe o clădire). Acum:
 - cât cutia intră în partea liberă și stă în coloana ei din mijloc, imaginea se mută cu decalajul
   de obiectiv al fișei — `cadru-liber.js`, unul pentru amândouă —: deasupra cutiei, dacă rămâne
   un sfert din înălțime, altfel alături, în partea mai lată, altfel dedesubt. Pe desktop și pe
-  telefonul culcat cutia stă într-o parte și nu mută nimic; la 195 × 422 acoperă aproape tot,
-  deci nu se mută nimic, iar punctul rămâne sub ea. Fișa pe telefon, peste panou, ia partea de
+  telefonul culcat cutia stă într-o parte și nu mută nimic. La 195 × 422 cutia acoperea aproape
+  tot, deci nu se muta nimic; fără „Măsoară centrul” goală stă sus la 113,5 px, lasă sfertul, iar
+  imaginea urcă deasupra ei (154,26 px, în pagină). Fișa pe telefon, peste panou, ia partea de
   deasupra foii; la 320 × 568, cu amândouă deschise, cutia trece de foaie până la y 100 și nu
   mai rămâne loc nicăieri, deci ținta stă sub ea, ca înainte;
 - cutia are de la deschidere înălțimea pe care o are cu un punct: îndemnul și cifrele stau în
@@ -55,36 +66,37 @@ chiar de ea, fără niciun semn pe hartă (recenzia: 640 × 360, adică 1280 × 
   nevăzute. Cu `display: none`, primul clic o creștea peste partea pe care se așezase imaginea,
   cu punctul și centrul vederii sub ea (recenzia). Mai crește numai cu rândurile unei clădiri,
   ~70 px la 390 × 844: un punct cules chiar în banda aceea rămâne sub cutie;
-- se reașază la deschidere, la minimizare, după „Măsoară centrul” (punctul stă pe raza țintei,
-  deci ajunge pe mijlocul părții libere), la redimensionare — și la mărirea paginii, cu bufferul
+- se reașază la deschidere, la minimizare, la redimensionare — și la mărirea paginii, cu bufferul
   neschimbat (`redimensioneaza` întoarce true și la o mărime CSS nouă) — și cu fișa; nu după un
   clic pe hartă, care ar muta imaginea de sub deget;
-- punctul cules are pe hartă un semn, cât panoul e deschis: crucea de vizare a butonului, aurie pe
-  un contur din culoarea fundalului, proiectată pe cadrul desenat, ca eticheta. Punctat când e
+- punctul cules are pe hartă un semn, cât panoul e deschis: crucea de vizare a butonului, fină,
+  aurie pe un contur din culoarea fundalului, proiectată pe cadrul desenat, ca eticheta. Punctat când e
   acoperit: relieful cu toleranța de 2 m + 0,2% (o rază razantă îl taie lângă punct), clădirile
   exact — un zid are 0,58–1,27 m. `aria-hidden`: punctul îl spune panoul;
 - cu imaginea mutată, fereastra planului apropiat nu mai stă în mijloc: paza solului (`_solSub`)
   îi ia colțurile din fereastra reală (`razaPlanApropiat`), nu din formula fără decalaj.
 
 `verifica-controale`, cu panoul, cadrul și camera adevărate, pe un DOM fals care pornește ca
-marcajul și pe cutiile măsurate în pagină: deschis, primul clic pe centru, „Măsoară centrul”,
-minimizat — semnul pe centrul vederii, în afara cutiei, în ecran, (195; 232,5) la 390 × 844,
-(187,5; 144) la 375 × 667, (160; 470,8) la 320 × 568, sub cutie și în afara busolei și a lui
-Satelit, (120; 180) la 640 × 360; fără decalaj la 1600 × 900, la 844 × 390 și la 195 × 422; minimizat,
-fără decalaj și fără semn. La 390 × 844 un clic pe o clădire lasă decalajul (189,45 px) și pune
-semnul pe pixelul clicului, iar „Măsoară centrul” pe far îl reașază pe cutia crescută (224,25 px).
-Un zid de 1 m la 0,3 m de punct îl face punctat. Raza planului apropiat e cel mai depărtat colț, la
-5·10⁻¹⁵ m, pe șapte decalaje, iar `_solSub` vede un inel de relief dincolo de colț. Pe sursă:
-celula comună și `visibility`. `verifica-pagina`: mărirea paginii, 1280 × 720 la 1× → 640 × 360
-la 2× → înapoi, `true false true false true false`. Controale, care pică: punct.js, main.css și
-renderer.js de la `491e7e4`; cutia goală de dinainte, cu îndemnul singur (la 320 × 568, 640 × 360
-și 195 × 422 semnul sub cutie după primul clic); numai deasupra cutiei; cadrul refăcut și după clic
-(semnul fuge de la y 120 la 85,2); „Măsoară centrul” fără reașezare (189,45 în loc de 224,25);
-clădirile cu toleranța reliefului (zidul nu acoperă); formula fără decalaj (12,18 m față de colțul
-de la 12,35 m la 320 × 568). În pagină (build, 2026-10-09, fila ascunsă, deci cadrele desenate de
-mână): aceleași cutii și poziții la toate șapte ecranele, deschis = cu un punct, `elementFromPoint`
-pe canvas sub semn; capturile la 390 × 844, 320 × 568 și 640 × 360; fișa pe telefon peste panou și
-închisă la loc; 0 erori în consolă. Pe un telefon adevărat (Pixel 8 Pro, 448 × 867, 2026-10-14),
+marcajul și pe cutiile măsurate în pagină: deschis, primul clic pe centrul vederii, minimizat —
+semnul pe pixelul clicului, în afara cutiei, în ecran, cu decalajul de la deschidere: (195; 258,5)
+la 390 × 844, (187,5; 170) la 375 × 667, (160; 470,8) la 320 × 568, sub cutie și în afara busolei
+și a lui Satelit, (120; 180) la 640 × 360, (97,5; 56,7) la 195 × 422; fără decalaj la 1600 × 900 și
+la 844 × 390; minimizat, fără decalaj și fără semn. La 390 × 844 un clic pe o clădire lasă
+decalajul (163,45 px), cu cutia crescută, și pune semnul pe pixelul clicului. Un zid de 1 m la 0,3 m
+de punct îl face punctat. Raza planului apropiat e cel mai depărtat colț, la 5·10⁻¹⁵ m, pe șapte
+decalaje, iar `_solSub` vede un inel de relief dincolo de colț. Pe sursă: celula comună și
+`visibility`; „Măsoară centrul” ieșit din punct.js, scena.js și main.css. `verifica-pagina`:
+mărirea paginii, 1280 × 720 la 1× → 640 × 360 la 2× → înapoi, `true false true false true false`.
+Controale, care pică: punct.js, main.css și renderer.js de la `491e7e4`; cutia goală de dinainte,
+cu îndemnul singur (la 320 × 568, 640 × 360 și 195 × 422 semnul sub cutie după primul clic); numai
+deasupra cutiei; cadrul refăcut și după clic (semnul fuge de la y 144 la 109,2); clădirile cu
+toleranța reliefului (zidul nu acoperă); formula fără decalaj (12,18 m față de colțul de la
+12,35 m la 320 × 568); punct.js, scena.js și main.css de la `a8e4834`, cu butonul. În pagină
+(build, 2026-10-09, fila ascunsă, deci cadrele desenate de mână): aceleași cutii și poziții la toate
+șapte ecranele, deschis = cu un punct, `elementFromPoint` pe canvas sub semn; capturile la
+390 × 844, 320 × 568 și 640 × 360; fișa pe telefon peste panou și închisă la loc; 0 erori în
+consolă. Cutiile, măsurate din nou pe 2026-10-14, fără buton; la 195 × 422 cutia cu un punct (sus
+la 100) e mai înaltă decât cea goală (113,5). Pe un telefon adevărat (Pixel 8 Pro, 448 × 867, 2026-10-14),
 cu atingeri prin CDP: cutia deschisă mută imaginea, punctul atins are semn, o clădire își scrie
 numele, iar „Copiază” răspunde „Copiat”. Mărirea adevărată cu Ctrl + nu s-a încercat
 <!-- NEVERIFICAT: Ctrl + în browser -->.

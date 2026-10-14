@@ -750,6 +750,27 @@ console.log('\nAccesibilitatea foii: haloul focusului, numele lui Satelit, busol
   const p2 = muta(CSS, ['#punct .mici {\n  grid-template-columns: 1fr;\n', '#punct .mici {\n']);
   const mp = [[`main.css de la ${REPER_ACCES}`, pv], ['rândurile mici la 0,78rem', p1 === null ? null : panoul(p1)], ['pe două coloane', p2 === null ? null : panoul(p2)]];
   proba(mp.every(([, x]) => x !== null && !bunPanou(x)), `control: ${mp.map(([t, x]) => `${t}: ${x === null ? NEAPLICATA : descriePanou(x)}`).join('; ')} — pică`);
+
+  // Semnul punctului cules: o cruce fină, ca iconița butonului „Coordonate” (2026-10-14, alegerea
+  // autorului): 1,5rem, linia aurie de cel mult 1,25, conturul din `--bg` de cel mult 3, dar mai
+  // lat decât linia, altfel pe calcar nu se mai vede; în contrast forțat, conturul `Canvas`, linia
+  // și mijlocul `Highlight`. Control: main.css de la REPER_SEMN, cu semnul de 36 px.
+  const REPER_SEMN = 'a8e4834';
+  const semnul = (css) => {
+    const R = reguliCss(css);
+    const v = (sel, prop, medii = []) => R.filter((r) => r.sel.includes(sel) && r.medii.join() === medii.join())
+      .map((r) => ultima(r, prop)).filter(Boolean).at(-1) ?? null;
+    return { latura: v('.punct-semn', 'width'), linie: parseFloat(v('.punct-semn .linie', 'stroke-width')),
+      contur: parseFloat(v('.punct-semn .contur', 'stroke-width')),
+      fortat: [v('.punct-semn .contur', 'stroke', FORTAT), v('.punct-semn .linie', 'stroke', FORTAT), v('.punct-semn .mijloc', 'fill', FORTAT)] };
+  };
+  const bunSemn = (x) => x.latura === '1.5rem' && x.linie <= 1.25 && x.contur <= 3 && x.contur > x.linie && x.fortat.join() === 'Canvas,Highlight,Highlight';
+  const descrieSemn = (x) => `${x.latura}, linia ${x.linie}, conturul ${x.contur}; în contrast forțat ${x.fortat.join(' / ')}`;
+  const sm = semnul(CSS);
+  proba(bunSemn(sm), `semnul punctului, cruce fină: ${descrieSemn(sm)}`);
+  const smVechi = textVechi('src/styles/main.css', REPER_SEMN);
+  const sv = smVechi === null ? null : semnul(smVechi);
+  proba(sv !== null && !bunSemn(sv), `control, main.css de la ${REPER_SEMN}: ${sv === null ? 'NECITIT' : descrieSemn(sv)} — pică`);
 }
 
 // ------------------------------------------------------------ fișa și cutia „Coordonate”

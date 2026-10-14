@@ -534,8 +534,6 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     zMin: relief.meta?.zMin_m,
     loveste: lovesteCladire,
     numeElement: (cheie) => numeElement(cheie, continut),
-    // „Măsoară centrul”: ținta pe ecran, deci centrul părții libere.
-    centru: () => controale.centruVederii(),
     cadru: cadruLiber,
     cereRandare,
   });

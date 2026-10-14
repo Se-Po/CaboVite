@@ -1,6 +1,6 @@
 // Verifică, în Node, mânuirea hărții: rotița, apucarea, pivotul și stările gesturilor,
-// plus punctul pe care îl culege panoul „Coordonate” — același „ce e sub cursor” —,
-// „Măsoară centrul”, tastatura și drona (tastatura.js, `comanda` din camera.js), anunțul busolei,
+// plus punctul pe care îl culege panoul „Coordonate” — același „ce e sub cursor” —, ieșirea
+// lui „Măsoară centrul”, tastatura și drona (tastatura.js, `comanda` din camera.js), anunțul busolei,
 // Escape pe fișa sanctuarului și pe cutia „Coordonate” (eticheta.js, punct.js), imaginea mutată
 // din calea cutiei și semnul punctului cules (cadru-liber.js), îndemnul panoului după pointer,
 // planul apropiat cu imaginea mutată, eticheta sanctuarului lângă rândul surselor (`alegePozitie`).
@@ -626,37 +626,6 @@ console.log('\nPanoul „Coordonate”: punctul e ce se vede sub cursor, ca la r
     + `(cel mult ${maxV.toFixed(2)} m) de suprafața văzută — pică`);
   panou.dispose();
 
-  // „Măsoară centrul”: panoul fără mouse. Clicul pe buton culege punctul din centrul vederii
-  // (`centru`, din controale; implicit centrul canvasului), cu aceeași culegere ca un clic pe
-  // hartă; minimizat, nimic. Control: punct.js de la REPER_VECHI, fără buton.
-  const centrul = (M, centru) => {
-    noduri.clear();
-    const p = M.creeazaPunct({ gazda: { appendChild() {} }, canvas: { ...fals(), getBoundingClientRect: () => RECT }, camera,
-      geo: creeazaGeo(relief.meta), inaltimeLa: inaltimeRandata, limitaDatelor, limiteMars: lim, inAlpha: alpha.contine,
-      zMin: relief.meta.zMin_m, loveste, centru });
-    const apasaButonul = () => { const f = unul('.centru').asc?.click; f?.(); return Boolean(f); };
-    const scris = () => ['.alt', '.lon', '.lat'].map((s) => unul(s).textContent).join(' / ');
-    const exista = apasaButonul();
-    const minimizat = scris();
-    p.activeaza();
-    apasaButonul();
-    const dinButon = scris();
-    p.culegeLa(100, 820);
-    const altul = scris();
-    const c = centru?.() ?? { x: W / 2, y: H / 2 };
-    p.culegeLa(c.x, c.y);
-    const dinClic = scris();
-    p.dispose();
-    return { exista, minimizat, dinButon, altul, dinClic };
-  };
-  const bunCentru = (r) => r.exista && r.minimizat === ' /  / ' && /\d/.test(r.dinButon) && r.dinButon === r.dinClic && r.dinButon !== r.altul;
-  const cImplicit = centrul(PUNCT), cDat = centrul(PUNCT, () => ({ x: 400, y: 300 }));
-  proba(bunCentru(cImplicit) && bunCentru(cDat) && cImplicit.dinButon !== cDat.dinButon,
-    `„Măsoară centrul”: minimizat nu scrie nimic; activat, scrie „${cImplicit.dinButon}” — cât un clic în centrul canvasului; `
-    + `cu centrul vederii dat la (400, 300), „${cDat.dinButon}”, cât un clic acolo`);
-  const PV = await modulDin(textVechi('src/scene/punct.js'));
-  const cv = PV ? centrul(PV) : null;
-  proba(cv !== null && !bunCentru(cv), `control, punct.js de la ${REPER_VECHI}: ${cv === null ? 'NECITIT' : cv.exista ? 'butonul există' : 'niciun buton, nicio cale fără mouse'} — pică`);
   delete globalThis.document;
   delete globalThis.addEventListener;
   delete globalThis.removeEventListener;
@@ -2107,9 +2076,12 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
 {
   // Panoul adevărat, cu cadrul liber al scenei (cadru-liber.js) și camera paginii, pe un DOM
   // fals care pornește ca marcajul: cutia ascunsă, rândurile clădirii ascunse, starea „gol”.
-  // Cutia are, pe fiecare ecran, mărimea măsurată în pagină (build, 2026-10-09): aceeași goală
-  // și cu un punct — îndemnul și cifrele stau în aceeași celulă —, iar la 390 × 844 și cu
-  // rândurile unei clădiri. `golVechi`: cutia goală de dinainte, cu îndemnul singur, măsurată
+  // Cutia are, pe fiecare ecran, mărimea măsurată în pagină: aceeași goală și cu un punct —
+  // îndemnul și cifrele stau în aceeași celulă —, iar la 390 × 844 și cu rândurile unei clădiri
+  // (apeductul). Măsurată din nou pe 2026-10-14, după ieșirea lui „Măsoară centrul”: pe telefon,
+  // unde butoanele stăteau unul sub altul, cutia e cu 52 px mai scundă (390 × 844, 375 × 667), la
+  // 195 × 422 cu 13,5 px; la 320 × 568, 640 × 360, 1600 × 900 și 844 × 390 a rămas cum era pe
+  // 2026-10-09. `golVechi`: cutia goală de dinainte, cu îndemnul singur, măsurată
   // pe același build înainte de celula comună; pe ea primul clic creștea cutia peste partea
   // liberă. Busola și Satelit, unde s-au măsurat. Recenzia: la 640 × 360 (1280 × 720 la 200%)
   // și la 320 × 568 punctul din centru cădea sub cutie, la 390 × 844 numai cu o clădire.
@@ -2120,21 +2092,23 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
   };
   const dr = (l, r, t, b) => ({ left: l, right: r, top: t, bottom: b, width: r - l, height: b - t });
   const ECRANE = [
-    { nume: '390 × 844', w: 390, h: 844, punct: dr(42, 274, 465.1, 813.6), golVechi: dr(42, 274, 631.6, 813.6), cladire: dr(42, 274, 395.5, 813.6), mutat: true },
-    { nume: '375 × 667', w: 375, h: 667, punct: dr(27, 259, 288.1, 636.6), golVechi: dr(27, 259, 454.6, 636.6), mutat: true },
+    { nume: '390 × 844', w: 390, h: 844, punct: dr(42, 274, 517.1, 813.6), golVechi: dr(42, 274, 631.6, 813.6), cladire: dr(42, 274, 447.5, 813.6), mutat: true },
+    { nume: '375 × 667', w: 375, h: 667, punct: dr(27, 259, 340.1, 636.6), golVechi: dr(27, 259, 454.6, 636.6), mutat: true },
     { nume: '320 × 568', w: 320, h: 568, punct: dr(12, 308, 100, 373.6), golVechi: dr(12, 308, 213, 373.6), mutat: true,
       alte: [dr(236, 308, 435.7, 507.7), dr(212, 308, 381.6, 428)] },
     { nume: '640 × 360', w: 640, h: 360, punct: dr(240, 512, 60, 329.6), golVechi: dr(240, 512, 164.2, 329.6), mutat: true },
     { nume: '1600 × 900', w: 1600, h: 900, punct: dr(1312, 1584, 560.5, 869.6), golVechi: dr(1312, 1584, 704.2, 869.6), mutat: false },
     { nume: '844 × 390', w: 844, h: 390, punct: dr(444, 716, 60, 359.6), golVechi: dr(444, 716, 194.2, 359.6), mutat: false },
-    // Cutia acoperă aproape tot: nicăieri nu rămâne un sfert, deci imaginea nu se mută, iar
-    // punctul rămâne sub cutie. Limita cunoscută.
-    { nume: '195 × 422', w: 195, h: 422, punct: dr(12, 183, 100, 410), golVechi: dr(12, 183, 206.7, 410), mutat: false, plin: true },
+    // Până pe 2026-10-14 cutia acoperea aproape tot (sus la 100): nu rămânea un sfert, deci
+    // imaginea nu se muta, iar punctul rămânea sub cutie. Fără „Măsoară centrul”, goală stă sus la
+    // 113,5 și lasă sfertul: imaginea urcă deasupra ei (în pagină, decalajul 154,26 px). Aici
+    // cutia cu un punct e mai înaltă decât cea goală (`gol`), oprită de înălțimea maximă.
+    { nume: '195 × 422', w: 195, h: 422, punct: dr(12, 183, 100, 410), gol: dr(12, 183, 113.5, 410), golVechi: dr(12, 183, 206.7, 410), mutat: true },
   ];
-  const RAZA_SEMN = 18; // px, jumătate din 2,25rem
+  const RAZA_SEMN = 12; // px, jumătate din 1.5rem (main.css)
   const geo = creeazaGeo(relief.meta);
   /** O sesiune: camera la vederea de pornire pe canvasul ecranului, cadrul liber, panoul. `gol`: cutia goală. */
-  const sesiune = (e, { P = PUNCT, CL = { creeazaCadruLiber }, gol = e.punct, loveste = TEREN.loveste } = {}) => {
+  const sesiune = (e, { P = PUNCT, CL = { creeazaCadruLiber }, gol = e.gol ?? e.punct, loveste = TEREN.loveste } = {}) => {
     const noduri = new Map();
     const nod = () => {
       const n = { hidden: false, textContent: '', title: '', style: {}, atribute: {}, asc: {},
@@ -2165,8 +2139,7 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
     const cadru = CL.creeazaCadruLiber({ camera: b.camera, canvas: b.el, cereRandare: () => {} });
     const gazda = { appendChild(n) { if (n.className === 'punct-semn') semn = n; } };
     const panou = P.creeazaPunct({ gazda, canvas: b.el, camera: b.camera, geo, inaltimeLa: inaltimeRandata, limitaDatelor,
-      limiteMars: imp.limite, inAlpha: alpha.contine, zMin: relief.meta.zMin_m, loveste,
-      centru: () => b.controale.centruVederii(), cadru, cereRandare: () => {} });
+      limiteMars: imp.limite, inAlpha: alpha.contine, zMin: relief.meta.zMin_m, loveste, cadru, cereRandare: () => {} });
     /** Ce e pe ecran acum: cutia, decalajul, centrul vederii, semnul pe cadrul următor. */
     const ecran = () => {
       b.camera.updateMatrixWorld();
@@ -2177,9 +2150,7 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
       return { cutie: cut.getBoundingClientRect(), decalaj: v ? [v.offsetX, v.offsetY] : null, c, semn: m ?? null,
         ocluzat: Boolean(semn?.classList.contains('ocluzat')) };
     };
-    return { b, panou, cadru, unul, ecran,
-      apasaCentrul() { unul('.centru').asc.click?.(); },
-      dispose() { panou.dispose(); b.dispose(); } };
+    return { b, panou, cadru, unul, ecran, dispose() { panou.dispose(); b.dispose(); } };
   };
   // Pătratul semnului, de latură 2·RAZA_SEMN în jurul lui (x, y), atinge dreptunghiul?
   const atinge = (r, x, y, m = RAZA_SEMN) => x + m > r.left && x - m < r.right && y + m > r.top && y - m < r.bottom;
@@ -2187,9 +2158,9 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
   const liber = (e, cutie, p) => p !== null && !atinge(cutie, p[0], p[1]) && inEcran(e, p[0], p[1]) && !(e.alte ?? []).some((o) => atinge(o, p[0], p[1]));
 
   /**
-   * Pe un ecran: deschis; primul clic, chiar pe centrul vederii; „Măsoară centrul”; minimizat.
-   * Cere, unde cutia lasă loc: centrul vederii liber la deschidere, semnul liber după clic și
-   * după „Măsoară centrul”, pe centrul vederii. Minimizat, fără decalaj și fără semn.
+   * Pe un ecran: deschis; primul clic, chiar pe centrul vederii; minimizat. Cere, unde cutia
+   * lasă loc: centrul vederii liber la deschidere, semnul liber după clic, pe pixelul clicului,
+   * cu decalajul de la deschidere. Minimizat, fără decalaj și fără semn.
    */
   const pe = (e, o = {}) => {
     const s = sesiune(e, o);
@@ -2201,15 +2172,11 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
       r.centruLiber = liber(e, d.cutie, [d.c.x, d.c.y]);
       s.panou.culegeLa(d.c.x, d.c.y);
       const k = s.ecran();
-      r.clic = k.semn;
-      r.clicLiber = liber(e, k.cutie, k.semn);
-      s.apasaCentrul();
-      const m = s.ecran();
-      r.decalaj = m.decalaj;
-      r.semn = m.semn;
+      r.decalaj = k.decalaj;
+      r.semn = k.semn;
       r.scris = /\d/.test(s.unul('.lon').textContent);
-      r.liber = liber(e, m.cutie, m.semn);
-      r.peCentru = m.semn !== null && Math.hypot(m.semn[0] - m.c.x, m.semn[1] - m.c.y) < 0.06;
+      r.liber = liber(e, k.cutie, k.semn);
+      r.peCentru = k.semn !== null && Math.hypot(k.semn[0] - d.c.x, k.semn[1] - d.c.y) < 0.06;
       s.panou.minimizeaza();
       const z = s.ecran();
       r.minimizat = { decalaj: z.decalaj, semn: z.semn };
@@ -2218,19 +2185,17 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
     return r;
   };
   const bun = (e, r) => !r.eroare && r.scris && r.minimizat.decalaj === null && r.minimizat.semn === null
-    && (e.plin ? r.deschis === null && r.decalaj === null
-      : r.centruLiber && r.clicLiber && r.liber && r.peCentru && (e.mutat ? r.decalaj !== null : r.decalaj === null));
+    && r.centruLiber && r.liber && r.peCentru && r.decalaj?.[1] === r.deschis?.[1] && (e.mutat ? r.decalaj !== null : r.decalaj === null);
   const xy = (p) => (p ? `(${p.map((x) => x.toFixed(1)).join('; ')})` : 'LIPSĂ');
   const text = (r) => (r.eroare ? `${r.nume}: aruncă: ${r.eroare}` : `${r.nume}: decalaj ${r.decalaj ? xy(r.decalaj) : 'niciunul'}${r.deschis?.[1] !== r.decalaj?.[1] ? ` (la deschidere ${r.deschis ? xy(r.deschis) : 'niciunul'})` : ''}, `
-    + `semnul după clic ${xy(r.clic)}${r.clicLiber ? '' : ' ACOPERIT'}, după centru ${xy(r.semn)}${r.liber ? '' : ' ACOPERIT'}`);
+    + `semnul după clic ${xy(r.semn)}${r.liber ? '' : ' ACOPERIT'}`);
   const azi = ECRANE.map((e) => pe(e));
   proba(azi.every((r, i) => bun(ECRANE[i], r)),
-    `deschis, primul clic pe centru, „Măsoară centrul”, minimizat — ${azi.map(text).join('; ')}; la 195 × 422 cutia acoperă aproape tot, `
-    + `deci nimic nu se mută; minimizat, fără decalaj și fără semn`);
+    `deschis, primul clic pe centru, minimizat — ${azi.map(text).join('; ')}; minimizat, fără decalaj și fără semn`);
 
-  // Clicul pe hartă nu mută imaginea, iar centrul pe o clădire o reașază pe cutia crescută. La
-  // 390 × 844 camera privește terenul de la 60 m de vârful farului — găsit pe o grilă de raze
-  // verticale —, de la 400 m spre sud și 200 m în sus; apoi ținta pe vârful farului.
+  // Clicul pe hartă nu mută imaginea, nici când cutia crește cu rândurile clădirii. La 390 × 844
+  // camera privește terenul de la 60 m de vârful farului — găsit pe o grilă de raze verticale —,
+  // de la 400 m spre sud și 200 m în sus.
   const jos = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
   let varf = null;
   for (let x = -1160; x <= 1160; x += 10) for (let z = -1490; z <= 1490; z += 10) {
@@ -2248,36 +2213,23 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
       s.b.camera.position.set(tx, inaltimeRandata(tx, tz) + 200, tz + 400);
       s.b.controale.update();
       s.panou.activeaza();
-      s.apasaCentrul();
       const d0 = s.ecran().decalaj;
       let gasit = null;
       for (let y = 6; y < E390.h && !gasit; y += 6) for (let x = 6; x < E390.w && !gasit; x += 6) {
         if (s.panou.culegeLa(x, y)?.cladire) gasit = [x, y];
       }
       const m = s.ecran();
-      r = { gasit, d0, d1: m.decalaj, semn: m.semn };
-      // Centrul pe vârful farului: cutia crește cu rândurile clădirii, cadrul se reașază pe ea.
-      s.b.controale.target.set(varf.x, varf.y, varf.z);
-      s.b.camera.position.set(varf.x, varf.y + 200, varf.z + 400);
-      s.b.controale.update();
-      s.apasaCentrul();
-      const f = s.ecran();
-      r.far = { cladire: !s.unul('.cl, .sol 0').hidden, decalaj: f.decalaj, semn: f.semn, liber: liber(E390, f.cutie, f.semn) };
+      r = { gasit, d0, d1: m.decalaj, semn: m.semn, cladire: !s.unul('.cl, .sol 0').hidden };
     } catch (err) { r = { eroare: err.message }; }
     s.dispose();
     return r;
   };
-  const DECALAJ_CLADIRE = E390.h / 2 - E390.cladire.top / 2; // ținta pe mijlocul părții de deasupra cutiei
-  const bunClic = (r) => r && !r.eroare && r.gasit && r.d0 && r.d1 && r.d0[1] === r.d1[1] && r.semn
+  const bunClic = (r) => r && !r.eroare && r.gasit && r.cladire && r.d0 && r.d1 && r.d0[1] === r.d1[1] && r.semn
     && Math.hypot(r.semn[0] - r.gasit[0], r.semn[1] - r.gasit[1]) < 0.06;
-  const bunFar = (r) => r && !r.eroare && r.far.cladire && r.far.liber && Math.abs(r.far.decalaj?.[1] - DECALAJ_CLADIRE) < 1e-6;
   const textClic = (r) => (!r ? 'NECITIT' : r.eroare ? `aruncă: ${r.eroare}` : !r.gasit ? 'nicio clădire găsită'
     : `clicul pe o clădire la (${r.gasit.join('; ')}): decalajul ${r.d0?.[1].toFixed(2)} → ${r.d1?.[1].toFixed(2)} px, semnul ${xy(r.semn)}`);
-  const textFar = (r) => (!r || r.eroare ? 'NECITIT' : `centrul pe far (clădire ${r.far.cladire ? 'da' : 'NU'}): decalajul ${r.far.decalaj?.[1].toFixed(2)} px `
-    + `(cerut ${DECALAJ_CLADIRE.toFixed(2)}), semnul ${xy(r.far.semn)}${r.far.liber ? '' : ' ACOPERIT'}`);
   const k = clic();
   proba(bunClic(k), `la 390 × 844, ${textClic(k)} — imaginea nu fuge de sub deget`);
-  proba(bunFar(k), `la 390 × 844, „Măsoară centrul” cu ${textFar(k)} — cadrul se reașază pe cutia crescută`);
 
   // Cutia, fără să crească la primul punct: îndemnul și cifrele în aceeași celulă, ascunse cu
   // `visibility` după `data-stare` (main.css), și niciun `hidden` pe cifre, pe îndemn sau pe
@@ -2290,6 +2242,20 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
   proba(celula(PUNCT_JS, CSS), 'cutia nu crește la primul punct: îndemnul și cifrele în aceeași celulă, ascunse cu `visibility` după `data-stare`');
   proba(!celula(textLa(REPER_E, 'src/scene/punct.js'), textLa(REPER_E, 'src/styles/main.css')),
     `control, punct.js și main.css de la ${REPER_E}: cifrele, îndemnul și „Copiază” cu \`hidden\` — pică`);
+
+  // „Măsoară centrul” a ieșit (2026-10-14, alegerea autorului): niciun buton `.centru`, nicio
+  // opțiune `centru` în punct.js și în scena.js, niciun selector `.centru` în main.css, iar
+  // îndemnul nu-l mai pomenește. Pe sursă, fără comentarii, care îi țin istoria. Control: cele
+  // trei fișiere de la REPER_CENTRU, cu butonul.
+  const REPER_CENTRU = 'a8e4834';
+  const faraComentarii = (t) => t?.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '') ?? null;
+  const faraCentru = (p, sc, css) => [p, sc, css].every((t) => t !== null)
+    && !/class="centru"|laCentru|centruBtn|măsoară centrul/i.test(faraComentarii(p))
+    && !/\bcentru: \(\) => controale\.centruVederii\(\)/.test(sc) && !/#punct \.centru\b/.test(faraComentarii(css));
+  const SCENA_JS = textSursa('src/scene/scena.js');
+  proba(faraCentru(PUNCT_JS, SCENA_JS, CSS), '„Măsoară centrul” a ieșit: niciun buton, nicio opțiune `centru`, niciun selector, îndemnul fără el');
+  proba(!faraCentru(textLa(REPER_CENTRU, 'src/scene/punct.js'), textLa(REPER_CENTRU, 'src/scene/scena.js'), textLa(REPER_CENTRU, 'src/styles/main.css')),
+    `control, punct.js, scena.js și main.css de la ${REPER_CENTRU}, cu butonul — pică`);
 
   // Controale.
   const PE = await modulDin(textLa(REPER_E, 'src/scene/punct.js'));
@@ -2308,9 +2274,6 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
     '    ales = { p, h, eticheta, g, t, numeCl, sol: teren };\n    reasaza();\n']));
   const kc = PC ? clic({ P: PC }) : null;
   proba(kc !== null && !bunClic(kc), `control, cadrul refăcut și după clic: ${kc === null ? NEAPLICATA : textClic(kc)} — pică`);
-  const PR = await modulDin(muta(PUNCT_JS, ['    if (activ) reasaza();\n', '']));
-  const kr = PR ? clic({ P: PR }) : null;
-  proba(kr !== null && !bunFar(kr), `control, „Măsoară centrul” fără reașezare: ${kr === null ? NEAPLICATA : textFar(kr)} — pică`);
 
   // Ocluzia: un punct de pe teren, iar între el și cameră un zid de 1 m grosime, la 0,3 m de
   // punct — mai subțire decât toleranța reliefului (2 m + 0,2%). Privit de partea zidului,
@@ -2341,7 +2304,8 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
       s.b.camera.position.set(px, py + 40, pz - 80);
       s.b.controale.update();
       s.panou.activeaza();
-      s.apasaCentrul();
+      const c = s.b.controale.centruVederii();
+      s.panou.culegeLa(c.x, c.y);
       r.punct = s.ecran().semn !== null && !s.ecran().ocluzat;
       s.b.camera.position.set(px, py + 40, pz + 80);
       s.b.controale.update();
@@ -2490,7 +2454,9 @@ console.log('\nEticheta sanctuarului ocolește rândul surselor: atribuirea nu s
   // 2,25), build v0.1.6, 2026-10-14, cu getBoundingClientRect: rândul surselor, rozeta busolei,
   // Satelit, versiunea, „Coordonate” minimizat, cutia goală (pe telefon la fel de înaltă cu un
   // punct simplu) și cutia cu o clădire (Casa da Ronca: numele pe trei rânduri și rândul „sol”);
-  // eticheta are 256 × 60. Citirea busolei e luată din captură. Cu cutia deschisă, ancora a ajuns
+  // eticheta are 256 × 60. Citirea busolei e luată din captură. Cutiile sunt cele de atunci, când
+  // panoul mai avea „Măsoară centrul”: o geometrie măsurată, bună de încercat și după ce cutia
+  // s-a scurtat pe telefon (2026-10-14). Cu cutia deschisă, ancora a ajuns
   // la (290,2; 0,9), iar eticheta stătea peste „© OpenStreetMap”.
   //
   // Se cer: pe telefon, „jos” mutat chiar sub rând, la (162,2; 60); pe o grilă de 4 px, pe tot
