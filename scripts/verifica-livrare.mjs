@@ -25,9 +25,8 @@ import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { CACHE_IMPLICIT, antetePentru, regexSursa, reguliVercel } from './comun/vercel.mjs';
 import { blobHead, blobPentru, scrieNepublicat } from './comun/publicat.mjs';
+import { proba, rezumat } from './comun/proba.mjs';
 
-let picate = 0;
-const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
 const scurt = (a, n = 4) => (a.length > n ? `${a.slice(0, n).join(', ')} și încă ${a.length - n}` : a.join(', '));
 const git = (args, input) => spawnSync('git', args, { input, encoding: 'utf8', maxBuffer: 64 << 20 }).stdout;
 
@@ -420,5 +419,4 @@ if (iLive >= 0) {
   }
 }
 
-console.log(picate ? `\n${picate} probe au picat` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });

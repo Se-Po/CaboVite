@@ -15,12 +15,7 @@
 import { existsSync } from 'node:fs';
 import { anuleazaPredictor, decodeazaLzw } from './comun/lzw.mjs';
 import { citesteTiffDGT } from './comun/tiff.mjs';
-
-let picate = 0;
-const proba = (bun, text) => {
-  console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`);
-  if (!bun) picate++;
-};
+import { proba, rezumat, sari } from './comun/proba.mjs';
 
 // ------------------------------------------------------------ codorul de probă
 
@@ -134,7 +129,7 @@ const MDT2_105162 = 'date-sursa/lidar/MDT-2m-105162-06-2024_v01.tif';
 const apa = (v) => v === -999 || v === 0;
 
 if (![MDT50_105162, MDT50_105163, MDT2_105162].every(existsSync)) {
-  console.log('\n(dalele MDT din date-sursa/ lipsesc — probele pe date reale se sar)');
+  sari('dalele MDT din date-sursa/ lipsesc, deci probele pe date reale');
 } else {
   const m = citesteTiffDGT(MDT50_105162);
   const n = citesteTiffDGT(MDT50_105163);
@@ -212,5 +207,4 @@ if (![MDT50_105162, MDT50_105163, MDT2_105162].every(existsSync)) {
     `peste cusătură ${peste.d.toFixed(3)} m (${peste.k} px), între rânduri vecine în dală ${inauntru.toFixed(3)} m — cerut sub 1,5×`);
 }
 
-console.log(picate ? `\n${picate} probe picate.` : '\nToate probele au trecut.');
-process.exitCode = picate ? 1 : 0;
+rezumat();

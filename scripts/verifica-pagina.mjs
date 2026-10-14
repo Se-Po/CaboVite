@@ -73,9 +73,8 @@ import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { redimensioneaza } from '../src/scene/renderer.js';
 import { materialMareSatelit } from '../src/scene/satelit.js';
 import { incarcaImprejurimi, NIVELURI_IMPREJURIMI } from '../src/scene/imprejurimi.js';
-
-let picate = 0;
-const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
+import { proba, rezumat } from './comun/proba.mjs';
+import { LF, modulDin, muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 
 // ------------------------------------------------------------ uneltele
 
@@ -86,35 +85,10 @@ const REPER_VECHI = '30a22c9';
 // Reperul accesibilității (lotul E): 0.1.5.04, dinaintea reparațiilor din foaie și din index.html.
 const REPER_ACCES = '6ad3a47';
 
-// Capetele de rând. În index toate fișierele sunt LF, dar cu core.autocrlf copia de lucru poate
-// avea, fișier cu fișier, CRLF sau LF. Textul paginii — src/ și index.html, de pe disc sau din
-// istoric — se citește numai prin funcțiile de aici, care îl aduc la LF o singură dată; probele,
-// mutațiile și inserțiile se scriu numai cu '\n'.
-const LF = (t) => t.replace(/\r\n/g, '\n');
-/** Un fișier al paginii, de pe disc, ca text cu LF. */
-const textSursa = (cale) => LF(readFileSync(cale, 'utf8'));
-/** Același fișier la REPER_VECHI — sau la alt reper —, ca text cu LF; `null` fără git sau fără reper. */
-const textVechi = (cale, reper = REPER_VECHI) => {
-  try {
-    return LF(execFileSync('git', ['show', `${reper}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
-  } catch { return null; }
-};
-
-/**
- * O mutație a unui text, din perechi [text sau regex, înlocuire], aplicate pe rând. `null` dacă
- * una nu se aplică — textul de înlocuit nu mai există —, ca un control să nu treacă degeaba pe
- * codul neschimbat: fiecare control pică atunci cu NEAPLICATA. Un text se înlocuiește ca atare
- * (fără `$&` și rudele lui); un regex, cu grupurile lui.
- */
-const muta = (text, ...perechi) => {
-  let s = text;
-  for (const [din, inLoc] of perechi) {
-    if (typeof din === 'string' ? !s.includes(din) : !din.test(s)) return null;
-    s = typeof din === 'string' ? s.replace(din, () => inLoc) : s.replace(din, inLoc);
-  }
-  return s;
-};
-const NEAPLICATA = 'MUTAȚIA NU S-A APLICAT';
+// Textul paginii — src/ și index.html, de pe disc sau din istoric — se citește numai cu LF, prin
+// scripts/comun/mutatii.mjs, unde stau și mutațiile și modulele din text.
+/** Un fișier la REPER_VECHI — sau la alt reper —, ca text cu LF; `null` fără git sau fără reper. */
+const textVechi = (cale, reper = REPER_VECHI) => textLa(reper, cale);
 
 /**
  * Specificitatea unui selector, [id, clasă, tip], pe subsetul din foaie: `:where()` 0,
@@ -161,16 +135,6 @@ const specificitate = (sel) => {
     } else if (/[\w-]/.test(ch)) { nume(); v[2]++; } else i++;
   }
   return v;
-};
-
-/** Un modul din text, cu importurile relative și `three` duse la fișierele de azi din src/scene. */
-let nrModul = 0;
-const modulDin = async (src) => {
-  src = src.replaceAll("from 'three'", `from '${import.meta.resolve('three')}'`)
-    .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`);
-  const f = join(tmpdir(), `cabo-proba-${process.pid}-${nrModul++}.mjs`);
-  writeFileSync(f, src);
-  try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
 };
 
 /** Starea unei promisiuni, citită fără s-o aștepte: codul vechi nu se termină deloc. */
@@ -2688,13 +2652,14 @@ console.log('\nPagina fără scenă: titlul, capitolul sanctuarului cu sursele, 
   const CAPITOL_JS = textSursa('src/chapters/sanctuar.js');
   const URL_CAPITOL = new URL('../src/chapters/sanctuar.js', import.meta.url).href;
   const temporare = [];
+  let nrFaraScena = 0;
   /** Un modul din text, scris în directorul temporar; `capitol`: adresa capitolului de folosit. */
   const modul = async (src, { capitol = URL_CAPITOL, pastreaza = false } = {}) => {
     src = src.replace(/from '(three(?:\/[^']*)?)'/g, (_, s) => `from '${import.meta.resolve(s)}'`)
       .replace(/from '(?:\.\.|\.)\/chapters\/sanctuar\.js'/g, () => `from '${capitol}'`)
       .replace(/from '\.\/((?:content)\/[^']+)'/g, (_, f) => `from '${new URL(`../src/${f}`, import.meta.url).href}'`)
       .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`);
-    const f = join(tmpdir(), `cabo-farascena-${process.pid}-${nrModul++}.mjs`);
+    const f = join(tmpdir(), `cabo-farascena-${process.pid}-${nrFaraScena++}.mjs`);
     writeFileSync(f, src);
     if (pastreaza) { temporare.push(f); return pathToFileURL(f).href; }
     try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
@@ -2988,5 +2953,4 @@ console.log('\nAnunțurile după apariția hărții (scena.js, busola.js)');
 
 console.warn = warn;
 console.info = info;
-console.log(picate ? `\n${picate} probe picate.` : '\nToate probele au trecut.');
-process.exitCode = picate ? 1 : 0;
+rezumat();

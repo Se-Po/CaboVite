@@ -25,6 +25,8 @@ import { creeazaImprejurimi, incarcaImprejurimi, NIVELURI_IMPREJURIMI, NIVELURI_
 import { buclaNoduri, dreptunghiExterior, dreptunghiGrila, fermoar, geometriaGrilei, ndviNod } from '../src/scene/cusatura.js';
 import { laOklab } from './comun/oklab.mjs';
 import { gama } from './comun/oklab.mjs';
+import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, proba, rezumat } from './comun/proba.mjs';
+import { modulDin, muta, textSursa } from './comun/mutatii.mjs';
 
 const BUGET = { triunghiuri: 600000, octeti_fisiere: 8 * 1048576 };
 const TRIUNGHIURI_ALPHA = 1923948;
@@ -59,33 +61,14 @@ const AMPRENTA = {
 // uscat, 645 357.
 const NORMALE_MAXIM = 160000;
 
-let picate = 0;
-const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
-const cuantila = (v, q) => { const s = Float64Array.from(v).sort(); return s.length ? s[Math.min(s.length - 1, Math.floor(q * s.length))] : NaN; };
-
-// ------------------------------------------------------------ fetch din public/
-
-const INDEX = readFileSync('index.html');
-const dinDisc = async (url) => {
-  const f = 'public' + url;
-  if (!existsSync(f)) return new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } });
-  return new Response(readFileSync(f), { status: 200 });
-};
 globalThis.fetch = dinDisc;
-let avertismente = [];
-const warnOriginal = console.warn;
-console.warn = (...a) => { avertismente.push(a.join(' ')); };
 
 // ------------------------------------------------------------ 1. încărcătorul
 
 console.log('\nÎncărcătorul: o cale de eșec dă null și un singur avertisment, fără să arunce');
-const cuFetch = async (f, cerere) => {
-  globalThis.fetch = f; avertismente = [];
-  try { return { r: await cerere(), e: null, avert: avertismente.slice() }; } catch (e) { return { r: undefined, e, avert: avertismente.slice() }; } finally { globalThis.fetch = dinDisc; }
-};
 {
   const lipsa = await cuFetch(async (url) => (url.includes('harta_v7-dem') ? new Response(INDEX, { status: 200 }) : dinDisc(url)), () => incarcaImprejurimi());
-  proba(lipsa.r === null && !lipsa.e && lipsa.avert.length >= 1, `un nivel lipsă (serverul dă index.html): ${lipsa.r === null ? 'null' : 'a trecut'}, „${lipsa.avert.at(-1)?.slice(0, 70)}”`);
+  proba(lipsa.r === null && !lipsa.e && lipsa.avert.length === 1, `un nivel lipsă (serverul dă index.html): ${lipsa.r === null ? 'null' : 'a trecut'}, ${lipsa.avert.length} avertisment(e), „${lipsa.avert.at(-1)?.slice(0, 70)}”`);
   const strain = await cuFetch(async (url) => {
     if (!url.includes('harta_v7-dem.json')) return dinDisc(url);
     const m = JSON.parse(readFileSync('public' + url, 'utf8'));
@@ -103,7 +86,8 @@ const cuFetch = async (f, cerere) => {
   const farăStrat = await cuFetch(async (url) => (url.includes('harta_v8-ndvi') ? new Response('', { status: 404 }) : dinDisc(url)), () => incarcaImprejurimi());
   proba(Array.isArray(farăStrat.r) && farăStrat.r.every((L) => !L.ndvi), 'un strat NDVI lipsă: niciun nivel nu-și folosește stratul (totul sau nimic)');
   const bun = await cuFetch(dinDisc, () => incarcaImprejurimi());
-  proba(Array.isArray(bun.r) && bun.r.length === NIVELURI_IMPREJURIMI.length && bun.r.every((L) => L.ndvi), `fișierele adevărate se încarcă, cu toate cele ${NIVELURI_IMPREJURIMI.length} straturi (${bun.avert.length} avertismente)`);
+  proba(Array.isArray(bun.r) && bun.r.length === NIVELURI_IMPREJURIMI.length && bun.r.every((L) => L.ndvi) && bun.avert.length === 0,
+    `fișierele adevărate se încarcă, cu toate cele ${NIVELURI_IMPREJURIMI.length} straturi și fără avertismente (${bun.avert.length})`);
 }
 
 // ------------------------------------------------------------ 2. construcția
@@ -122,8 +106,19 @@ proba(teren.nrTriunghiuri + petic.nrTriunghiuri === TRIUNGHIURI_ALPHA, `alpha r�
 
 const niveluri = await incarcaImprejurimi();
 const t0 = performance.now();
-const imp = creeazaImprejurimi({ niveluri, margineAlpha, paleta });
+const { r: imp, e: eImp, avert: avertImp } = await cuAvertismente(() => creeazaImprejurimi({ niveluri, margineAlpha, paleta }));
 const ms = performance.now() - t0;
+if (eImp) throw eImp;
+proba(avertImp.length === 0, `construcția împrejurimilor, fără avertismente (${avertImp.length}${avertImp.length ? `: ${avertImp.slice(0, 2).join(' | ')}` : ''})`);
+{
+  // Controlul: un avertisment în construcție, pe care azi nu-l citea nimeni, trebuie prins.
+  const M = await modulDin(muta(textSursa('src/scene/imprejurimi.js'),
+    ['export function creeazaImprejurimi({ niveluri, margineAlpha, paleta, culoare, cer = null }) {\n',
+      "export function creeazaImprejurimi({ niveluri, margineAlpha, paleta, culoare, cer = null }) {\n  console.warn('probă');\n"]));
+  const c = M ? await cuAvertismente(() => M.creeazaImprejurimi({ niveluri, margineAlpha, paleta })) : null;
+  c?.r?.dispose();
+  proba(c && c.avert.length === 1, `control: cu un console.warn pus în creeazaImprejurimi, proba de mai sus pică (${c ? `${c.avert.length} avertisment` : 'MUTAȚIA NU S-A APLICAT'})`);
+}
 let total = 0;
 for (const p of imp.plase) {
   console.log(`    ${p.nume}: ${p.teren.nrTriunghiuri} triunghiuri, din care fâșia ${p.cusatura.triunghiuri} (${p.cusatura.aruncate} aruncate: apă sau degenerate)`);
@@ -618,6 +613,4 @@ console.log('\nConstrucția împrejurimilor, la bit și pe numărătoare');
 
 imp.dispose();
 teren.dispose(); petic.dispose();
-console.warn = warnOriginal;
-console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });

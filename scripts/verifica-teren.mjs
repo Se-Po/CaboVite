@@ -22,6 +22,7 @@ import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
 import { ORTOFOTO_ALPHA, aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
+import { dinDisc, proba, rezumat, sari } from './comun/proba.mjs';
 
 const TRIUNGHIURI = 1923948;          // bază 1 422 064 + petic 501 884 (harta_v4 + harta_v5)
 const OCTETI_ATRIBUTE = 103893192;    // 54 × TRIUNGHIURI: position Float32 + color Uint16, ambele plase
@@ -52,22 +53,8 @@ const AMPRENTA = {
 // nu sunt apă; pe codul de dinainte, câte celule are cutia: 1 735 196.
 const APELURI_PASTREAZA = 774562;
 
-let picate = 0;
-const proba = (bun, text) => {
-  console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`);
-  if (!bun) picate++;
-};
-
 // ------------------------------------------------------------ fetch din public/
 
-// Ca Vite: o cale care nu există întoarce 200 și pagina index, nu 404. Exact
-// cazul pe care încărcătorul trebuie să-l prindă din conținut.
-const INDEX = readFileSync('index.html');
-const dinDisc = async (url) => {
-  const f = 'public' + url;
-  if (!existsSync(f)) return new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } });
-  return new Response(readFileSync(f), { status: 200 });
-};
 globalThis.fetch = dinDisc;
 
 // Avertismentele se numără, nu se tipăresc: la căile de eșec sunt chiar proba.
@@ -324,7 +311,7 @@ async function main() {
       + `(prag ${PRAG_ORTOFOTO}; griul de rezervă, pe aceleași fațete: ${qGri.toFixed(2)}), `
       + `mediană ${q.mediana.toFixed(2)}, p90 ${q.p90.toFixed(2)}`);
   } else {
-    console.log('      față de ortofoto: sărit, dala nu e în date-sursa/ortofoto');
+    sari('față de ortofoto: dala nu e în date-sursa/ortofoto');
   }
 
   console.log('\n5. Construcția, la bit și pe numărătoare');
@@ -383,8 +370,7 @@ async function main() {
   }
 
   console.warn = warnOriginal;
-  console.log(picate ? `\n${picate} probe picate.` : '\nToate probele au trecut.');
-  process.exitCode = picate ? 1 : 0;
+  rezumat();
 }
 
 await main();

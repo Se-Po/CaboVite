@@ -31,29 +31,22 @@ se poartă în română.
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 | `npm run build-zona` / `build-petic` | baza și peticul lui alpha → `public/data/harta_vN-dem.*`; un nume nou pe fiecare hartă |
-| `npm run verifica-teren` | plasa și culoarea terenului, cu codul paginii, în Node |
-| `npm run verifica-tiff` | decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT |
 | `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface |
 | `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele dalelor, straturile, candidații |
 | `npm run masoara-sanctuar` | formele sanctuarului, măsurate pe MDS → `date-sursa/derivate/` |
 | `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`; un nume se scrie o singură dată |
-| `npm run verifica-sanctuar` | sanctuarul, cu codul paginii, în Node, față de LiDAR, de numărătoarea din 1880 și de el însuși |
 | `npm run masoara-zbor` | soarele, deplasarea și înclinarea ortofotoului → `date-sursa/derivate/zbor.json` |
 | `npm run textura-ortofoto` | texturile Satelit ale lui alpha (KTX2 UASTC) → `public/data/<hartă>-orto_v1.*`; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul; măsurătoare, nefolosită de pagină |
 | `npm run osm-cladiri` | instantaneul OSM al celorlalte clădiri, cu versiuni fixate; `-- --din-manifest` îl reface |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
-| `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul |
 | `npm run surse-imprejurimi` | aduce o singură dată Copernicus DEM și Sentinel-2, cu manifestul `scripts/imprejurimi/surse.json` |
 | `npm run build-imprejurimi -- harta_vN` | un nivel al împrejurimilor, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit și NDVI-ul împrejurimilor; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
-| `npm run verifica-imprejurimi` | alpha și împrejurimile, cu codul paginii, în Node: cusăturile, bugetul, culoarea, netezirea |
-| `npm run verifica-controale` | mouse-ul, degetele, tastatura și drona, busola, Escape, panoul „Coordonate”, eticheta, cu codul paginii, în Node |
-| `npm run verifica-livrare` | după build: cache, antete și CSP, numele publicate, ES5, marcajul; `-- --live` pe sebastians.life |
-| `npm run verifica-pagina` | restul, cu codul paginii, în Node: Satelit, foaia de stil, ordinea de desenare, canvasul, pornirea, pagina fără scenă |
-| `npm run verifica-documentatie` | CLAUDE.md și `docs/`: mărimea, indexul, trimiterile, căile decodoarelor, comentariile vechi, sursele etichetelor |
+| `npm run verifica` | toate probele Node, în paralel, cu un rezumat; `-- --strict`: o probă sărită e un eșec |
+| `npm run verifica-<nume>` | una singură: `tiff`, `teren`, `sanctuar`, `cladiri`, `imprejurimi`, `controale`, `pagina`, `documentatie`; `livrare` după build, cu `-- --live` pe sebastians.life |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.*`, `apple-touch-icon.png` |
 
 Pe larg: `docs/comenzi.md`. Scripturile de construit hărți și texturi cer `date-sursa/`, care nu e
@@ -100,10 +93,8 @@ când lucrezi în `src/scene/`.
 
 Înainte să spui că o modificare e gata:
 
-1. `npm run build` trebuie să treacă fără erori, apoi probele Node: `npm run verifica-tiff`,
-   `-teren`, `-sanctuar`, `-cladiri`, `-imprejurimi`, `-controale`, `-pagina` și `-documentatie`
-   (`verifica-livrare`, la pasul 5). Fără `date-sursa/`, probele pe date reale se sar, cu mesaj:
-   asta nu e un eșec.
+1. `npm run build` trebuie să treacă fără erori, apoi `npm run verifica`: toate probele Node.
+   Fără `date-sursa/`, probele pe date reale se sar, numărate (`SĂRIT`): asta nu e un eșec.
 2. Deschide panoul Browser (Ctrl+Shift+B / Cmd+Shift+B), încarcă pagina,
    fă un screenshot și **uită-te la el**. O scenă 3D poate compila perfect și
    afișa un ecran negru.
@@ -262,6 +253,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - Fiecare probă de fond are un control negativ: aceeași probă pe o greșeală cunoscută, care
   trebuie să pice. Codul încercat e al paginii, importat, nu copiat; valoarea de referință se
   calculează independent în probă, nu se importă. → sanctuar, controale, teren, imprejurimi
+- Probele stau pe `scripts/comun/proba.mjs` (rândurile, săriturile numărate, codul de ieșire) și
+  `mutatii.mjs`; un `console.warn` pe care nu-l prinde o probă e un eșec. → comenzi
 - O probă pe sursă aduce textul la LF, iar o mutație care nu se aplică pică singură: probele trec
   pe o clonă LF și pe una CRLF. → satelit
 - `AMPRENTA` (sha256 pe atribute) ține refactorizările la bit; o schimbare voită o rescrie, cu

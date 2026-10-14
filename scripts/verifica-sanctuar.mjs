@@ -33,6 +33,7 @@ import { creeazaScriitor, turn, yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
 import { creeazaCamera } from '../src/scene/camera.js';
 import { creeazaCadruFisa, distantaLaFisa, parteLibera, PRAG_ZBOR_NOU, RAZA_COMPLEX } from '../src/scene/fisa-cadru.js';
+import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, opreste, proba, rezumat, sari } from './comun/proba.mjs';
 import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
@@ -71,33 +72,13 @@ const AMPRENTA_DRAPAJ = {
 // Celulele pe care le cercetează drapajul. Azi 35 783; cu toată cutia, 151 750.
 const CELULE_DRAPAJ = 40000;
 
-let picate = 0;
-const proba = (bun, text) => {
-  console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`);
-  if (!bun) picate++;
-};
-const cuantila = (v, q) => { const s = v.slice().sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
-
-// ------------------------------------------------------------ fetch din public/
-
-// Ca Vite: o cale care nu există întoarce 200 și pagina index, nu 404.
-const INDEX = readFileSync('index.html');
-const dinDisc = async (url) => {
-  const f = 'public' + url;
-  if (!existsSync(f)) return new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } });
-  return new Response(readFileSync(f), { status: 200 });
-};
 globalThis.fetch = dinDisc;
-
-let avertismente = [];
-console.warn = (...a) => { avertismente.push(a.join(' ')); };
-const cuAvertismente = async (f) => { avertismente = []; let r, e = null; try { r = await f(); } catch (x) { e = x; } return { r, e, avert: avertismente.slice() }; };
 
 // ------------------------------------------------------------ 1. încărcătorul
 
 console.log('\nÎncărcătorul: fiecare cale de eșec întoarce null, cu un avertisment, fără să arunce');
 const original = JSON.parse(readFileSync(FISIER, 'utf8'));
-const cuRaspuns = (raspuns) => async () => { globalThis.fetch = async () => raspuns(); try { return await incarcaSanctuar(); } finally { globalThis.fetch = dinDisc; } };
+const cuRaspuns = (raspuns) => cuFetch(async () => raspuns(), () => incarcaSanctuar());
 const json = (o) => new Response(JSON.stringify(o), { status: 200 });
 const cai = [
   ['fișier lipsă (serverul dă index.html cu 200)', () => new Response(INDEX, { status: 200 })],
@@ -109,11 +90,11 @@ const cai = [
   ['listă lipsă', () => { const o = { ...original }; delete o.turnuri; return json(o); }],
 ];
 for (const [nume, r] of cai) {
-  const { r: d, e, avert } = await cuAvertismente(cuRaspuns(r));
+  const { r: d, e, avert } = await cuRaspuns(r);
   proba(d === null && !e && avert.length === 1, `${nume}: ${e ? `ARUNCĂ ${e.message}` : d === null ? `null, „${avert[0]?.slice(0, 70)}"` : 'a trecut'}`);
 }
 {
-  const { r: d, avert } = await cuAvertismente(cuRaspuns(() => json(original)));
+  const { r: d, avert } = await cuRaspuns(() => json(original));
   proba(d?.nume === original.nume && avert.length === 0, 'fișierul adevărat se încarcă, fără avertismente');
 }
 
@@ -139,7 +120,7 @@ const { r: sanctuar, avert: avertConstructie } = await cuAvertismente(() => cree
 const tSanctuar = performance.now();
 console.log(`       terenul în ${(tTeren - t0).toFixed(0)} ms, sanctuarul în ${(tSanctuar - tTeren).toFixed(0)} ms`);
 proba(sanctuar !== null, 'sanctuarul se construiește');
-if (!sanctuar) { console.log(`\n${picate} probe picate`); process.exit(1); }
+if (!sanctuar) await opreste('fără sanctuar, restul probelor n-are pe ce rula');
 proba(avertConstructie.length === 0, `niciun element sărit (${avertConstructie.length} avertismente${avertConstructie.length ? `: ${avertConstructie.slice(0, 3).join(' | ')}` : ''})`);
 const kib = readFileSync(FISIER).length / 1024;
 proba(sanctuar.nrTriunghiuri.cladiri <= BUGET.cladiri, `clădiri: ${sanctuar.nrTriunghiuri.cladiri} triunghiuri, buget ${BUGET.cladiri}`);
@@ -322,7 +303,7 @@ console.log('\nSuprafețele de pe teren stau pe triunghiurile randate');
 
 console.log('\nFață de LiDAR (cere rastrul din date-sursa/)');
 const RASTRU = 'date-sursa/derivate/sanctuar-rastru.json';
-if (!existsSync(RASTRU)) console.log('       SĂRIT: lipsește rastrul; rulează `npm run nmds-sanctuar` cu dalele MDS pe disc');
+if (!existsSync(RASTRU)) sari('lipsește rastrul; rulează `npm run nmds-sanctuar` cu dalele MDS pe disc');
 else {
   const { incarcaRastru } = await import('./comun/rastru-sanctuar.mjs');
   const r = incarcaRastru();
@@ -766,5 +747,4 @@ console.log('\nPanoul punctului: ce lovește o rază');
 }
 
 sanctuar.dispose();
-console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });

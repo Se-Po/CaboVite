@@ -54,9 +54,8 @@ import { numeElement } from '../src/scene/nume.js';
 import { SANCTUAR } from '../src/content/sanctuar.js';
 import { CLADIRI } from '../src/content/cladiri.js';
 
-let picate = 0;
-const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
-const sarit = (text) => console.log(`  --    ${text}`);
+import { proba, rezumat, sari } from './comun/proba.mjs';
+
 const scurt = (a, n = 4) => (a.length > n ? `${a.slice(0, n).join('; ')} și încă ${a.length - n}` : a.join('; '));
 const grupat = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const LF = (s) => s.replace(/\r\n/g, '\n');
@@ -109,7 +108,7 @@ const descrieMarime = (m) => `${grupat(m.octeti)} B, ${grupat(m.caractere)} de c
   const m = marime(readFileSync('CLAUDE.md'));
   proba(incape(m), `CLAUDE.md, pe disc: ${descrieMarime(m)}`);
   const vechi = dinGit(`${COMMIT_VECHI}:CLAUDE.md`);
-  if (!vechi) sarit(`control sărit: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
+  if (!vechi) sari(`control: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
   else proba(!incape(marime(vechi)), `control: CLAUDE.md de la ${COMMIT_VECHI}, ${descrieMarime(marime(vechi))} — pică`);
 }
 
@@ -377,7 +376,7 @@ function cautaInterzise(c) {
   const r = cautaInterzise(CORPUS);
   proba(r.citite > 2 && r.gasite.length === 0, `${r.citite} fișiere citite, ${r.gasite.length ? `GĂSITE: ${scurt(r.gasite)}` : 'niciun tipar'}`);
   const vechi = dinGit(`${COMMIT_VECHI}:.claude/rules/three-scene.md`);
-  if (!vechi) sarit(`control sărit: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
+  if (!vechi) sari(`control: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
   else {
     const v = cautaInterzise(cu({ '.claude/rules/three-scene.md': LF(vechi.toString('utf8')) }));
     const regula = v.gasite.filter((x) => x.startsWith('.claude/rules/three-scene.md:'));
@@ -426,7 +425,7 @@ function cautaVechi(c) {
     .binar.filter((x) => x.startsWith('CLAUDE.md:'));
   proba(binar.length === 1, `control: rândul „(MB = 2^20 octeți)” în CLAUDE.md — ${pica(true, binar)}`);
   const mare = dinGit(`${COMMIT_VECHI}:src/scene/mare.js`);
-  if (!mare) sarit(`control sărit: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
+  if (!mare) sari(`control: git sau commitul ${COMMIT_VECHI} nu e disponibil`);
   else {
     const v = cautaVechi(cu({ 'src/scene/mare.js': LF(mare.toString('utf8')) }));
     const m = v.vechi.filter((x) => x.startsWith('src/scene/mare.js:'));
@@ -488,5 +487,4 @@ function surseEtichete(lista, text, fisier) {
   proba(!forme.length && !altele.length, `folosința „bar” prinde bar, barul, barului, baruri, barurile, nu bară, bara, barieră${forme.length || altele.length ? `; SCAPĂ: ${forme.join(', ') || '—'}; PRINDE GREȘIT: ${altele.join(', ') || '—'}` : ''}`);
 }
 
-console.log(picate ? `\n${picate} probe au picat` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });

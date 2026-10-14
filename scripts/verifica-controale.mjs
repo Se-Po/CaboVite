@@ -39,58 +39,28 @@ import { creeazaGeo } from '../src/scene/geo.js';
 import { creeazaTastatura, DESCRIERE_TASTE } from '../src/scene/tastatura.js';
 import * as BUSOLA from '../src/scene/busola.js';
 import * as ETICHETA from '../src/scene/eticheta.js';
+import { dinDisc, proba, rezumat } from './comun/proba.mjs';
+import { LF, modulDin, muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 
 const { creeazaPunct } = PUNCT;
-let picate = 0;
-const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
 const LN = Math.log(FACTOR_TREAPTA);
 
 // Controalele pe codul de dinainte: modulele de la REPER_VECHI, din git, sau mutații ale celor
-// de azi. Textul se citește cu capetele de rând aduse la LF, deci proba nu depinde de
-// core.autocrlf; o mutație care nu se mai aplică întoarce null, iar controlul ei pică
-// („MUTAȚIA NU S-A APLICAT”). Fără git, controalele pe un reper din istoric și comparațiile cu
-// el pică fiecare cu mesajul lui, iar probele pe codul de azi rulează mai departe.
+// de azi (scripts/comun/mutatii.mjs). O mutație care nu se mai aplică întoarce null, iar
+// controlul ei pică („MUTAȚIA NU S-A APLICAT”). Fără git, controalele pe un reper din istoric și
+// comparațiile cu el pică fiecare cu mesajul lui, iar probele pe codul de azi rulează mai departe.
 const REPER_VECHI = '6ad3a47';
-const LF = (t) => t.replace(/\r\n/g, '\n');
-const textSursa = (cale) => LF(readFileSync(cale, 'utf8'));
-const textVechi = (cale, reper = REPER_VECHI) => {
-  try {
-    return LF(execFileSync('git', ['show', `${reper}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
-  } catch { return null; }
-};
-const NEAPLICATA = 'MUTAȚIA NU S-A APLICAT';
-const muta = (text, ...perechi) => {
-  if (text === null) return null;
-  let s = text;
-  for (const [din, inLoc] of perechi) {
-    if (!s.includes(din)) return null;
-    s = s.replace(din, () => inLoc);
-  }
-  return s;
-};
-/** Un modul din text, cu `three` și importurile relative duse la fișierele de azi din src/scene. */
-let nrModul = 0;
-const modulDin = async (src) => {
-  if (src === null) return null;
-  src = src.replace(/from '(three(?:\/[^']*)?)'/g, (_, s) => `from '${import.meta.resolve(s)}'`)
-    .replace(/from '\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/scene/${f}`, import.meta.url).href}'`)
-    .replace(/from '\.\.\/([^']+)'/g, (_, f) => `from '${new URL(`../src/${f}`, import.meta.url).href}'`);
-  const f = join(tmpdir(), `cabo-controale-${process.pid}-${nrModul++}.mjs`);
-  writeFileSync(f, src);
-  try { return await import(pathToFileURL(f).href); } finally { rmSync(f, { force: true }); }
-};
+const textVechi = (cale, reper = REPER_VECHI) => textLa(reper, cale);
+let nrRotita = 0;
 
-const INDEX = readFileSync('index.html');
-globalThis.fetch = async (url) => {
-  const f = 'public' + url;
-  if (!existsSync(f)) return new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } });
-  return new Response(readFileSync(f), { status: 200 });
-};
-const warn = console.warn;
-console.warn = () => {};
+globalThis.fetch = dinDisc;
 
 // ------------------------------------------------------------ relieful paginii
 
+// Construcția nu avertizează: un avertisment de aici ar fi un nivel, un strat sau o clădire
+// sărite, pe care probele de mai jos le-ar ocoli fără să știe. Se numără, nu se înghit.
+const avertConstructie = [], warn = console.warn;
+console.warn = (...a) => { avertConstructie.push(a.join(' ')); };
 await incarcaPaleta();
 const paleta = paletaCurenta();
 const incarcat = await incarcaRelief();
@@ -107,6 +77,7 @@ const bb = relief.meta.bbox_tm06;
 const dateCladiri = await incarcaCladiri();
 const cladiri = creeazaSanctuar({ date: dateCladiri, inaltimeLa, ancora: { x: (bb.xMin + bb.xMax) / 2, y: (bb.yMin + bb.yMax) / 2 }, eticheta: 'clădiri' });
 console.warn = warn;
+proba(avertConstructie.length === 0, `construcția scenei de probă, fără avertismente (${avertConstructie.length}${avertConstructie.length ? `: ${avertConstructie.slice(0, 2).join(' | ')}` : ''})`);
 const alpha = creeazaAlpha(relief.meta);
 const inaltimeRandata = reliefRandat({ alpha, inaltimeLa, imprejurimi: imp });
 const TEREN = { inaltimeLa: inaltimeRandata, lim: imp.limite, alpha, loveste: (raza) => cladiri.loveste(raza) };
@@ -1729,7 +1700,7 @@ const VARF_FAR = 380 - TEREN.loveste(new THREE.Ray(new THREE.Vector3(xFar, 380, 
     if (ce.startsWith('zoom')) {
       const R = muta(textSursa('src/scene/rotita.js'), ...perechi);
       if (R !== null) {
-        const f = join(tmpdir(), `cabo-rotita-${process.pid}-${nrModul++}.mjs`);
+        const f = join(tmpdir(), `cabo-rotita-${process.pid}-${nrRotita++}.mjs`);
         writeFileSync(f, R.replace(/from '(three(?:\/[^']*)?)'/g, (_, s) => `from '${import.meta.resolve(s)}'`)
           .replace(/from '\.\/([^']+)'/g, (_, g) => `from '${new URL(`../src/scene/${g}`, import.meta.url).href}'`));
         M = await modulDin(muta(CAMERA_JS, ["import { creeazaRotita } from './rotita.js';", `import { creeazaRotita } from '${pathToFileURL(f).href}';`]));
@@ -2087,9 +2058,6 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
   // și la 320 × 568 punctul din centru cădea sub cutie, la 390 × 844 numai cu o clădire.
   const D0 = globalThis.document, A0 = globalThis.addEventListener, R0 = globalThis.removeEventListener;
   const REPER_E = '491e7e4';
-  const textLa = (ref, cale) => {
-    try { return LF(execFileSync('git', ['show', `${ref}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 })); } catch { return null; }
-  };
   const dr = (l, r, t, b) => ({ left: l, right: r, top: t, bottom: b, width: r - l, height: b - t });
   const ECRANE = [
     { nume: '390 × 844', w: 390, h: 844, punct: dr(42, 274, 517.1, 813.6), golVechi: dr(42, 274, 631.6, 813.6), cladire: dr(42, 274, 447.5, 813.6), mutat: true },
@@ -2655,5 +2623,4 @@ console.log('\nEticheta sanctuarului ocolește rândul surselor: atribuirea nu s
   if (A0 === undefined) { delete globalThis.addEventListener; delete globalThis.removeEventListener; } else { globalThis.addEventListener = A0; globalThis.removeEventListener = R0; }
 }
 
-console.log(picate ? `\n${picate} probe au picat` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });

@@ -20,6 +20,7 @@ import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { fereastraLidar, fisierDala, daleFereastra } from './comun/lidar.mjs';
+import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, opreste, proba, rezumat, sari } from './comun/proba.mjs';
 
 const BUGET = { triunghiuri: 6000, json_kib: 20 };
 const FISIER = 'public/data/cladiri_v1.json';
@@ -34,33 +35,13 @@ const AMPRENTA = {
   ocluzie: '8fde375fe2512c2d8febc45c1d50a736937aefb9576f485a54b341604cf950ed',
 };
 
-let picate = 0;
-const proba = (bun, text) => {
-  console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`);
-  if (!bun) picate++;
-};
-const cuantila = (v, q) => { const s = v.slice().sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
-
-// ------------------------------------------------------------ fetch din public/
-
-// Ca Vite: o cale care nu există întoarce 200 și pagina index, nu 404.
-const INDEX = readFileSync('index.html');
-const dinDisc = async (url) => {
-  const f = 'public' + url;
-  if (!existsSync(f)) return new Response(INDEX, { status: 200, headers: { 'content-type': 'text/html' } });
-  return new Response(readFileSync(f), { status: 200 });
-};
 globalThis.fetch = dinDisc;
-
-let avertismente = [];
-console.warn = (...a) => { avertismente.push(a.join(' ')); };
-const cuAvertismente = async (f) => { avertismente = []; let r, e = null; try { r = await f(); } catch (x) { e = x; } return { r, e, avert: avertismente.slice() }; };
 
 // ------------------------------------------------------------ 1. încărcătorul
 
 console.log('\nÎncărcătorul: fiecare cale de eșec întoarce null, cu un avertisment, fără să arunce');
 const original = JSON.parse(readFileSync(FISIER, 'utf8'));
-const cuRaspuns = (raspuns) => async () => { globalThis.fetch = async () => raspuns(); try { return await incarcaCladiri(); } finally { globalThis.fetch = dinDisc; } };
+const cuRaspuns = (raspuns) => cuFetch(async () => raspuns(), () => incarcaCladiri());
 const json = (o) => new Response(JSON.stringify(o), { status: 200 });
 const cai = [
   ['fișier lipsă (serverul dă index.html cu 200)', () => new Response(INDEX, { status: 200 })],
@@ -73,11 +54,11 @@ const cai = [
   ['listă lipsă', () => { const o = { ...original }; delete o.cupole; return json(o); }],
 ];
 for (const [nume, r] of cai) {
-  const { r: d, e, avert } = await cuAvertismente(cuRaspuns(r));
+  const { r: d, e, avert } = await cuRaspuns(r);
   proba(d === null && !e && avert.length === 1, `${nume}: ${e ? `ARUNCĂ ${e.message}` : d === null ? `null, „${avert[0]?.slice(0, 70)}"` : 'a trecut'}`);
 }
 {
-  const { r: d, avert } = await cuAvertismente(cuRaspuns(() => json(original)));
+  const { r: d, avert } = await cuRaspuns(() => json(original));
   proba(d?.nume === original.nume && avert.length === 0, 'fișierul adevărat se încarcă, fără avertismente');
 }
 
@@ -98,7 +79,7 @@ const ancora = { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 };
 const date = await incarcaCladiri();
 const { r: cladiri, avert: avertConstructie } = await cuAvertismente(() => creeazaSanctuar({ date, inaltimeLa, ancora, eticheta: 'clădiri' }));
 proba(cladiri !== null, 'clădirile se construiesc');
-if (!cladiri) { console.log(`\n${picate} probe picate`); process.exit(1); }
+if (!cladiri) await opreste('fără clădiri, restul probelor n-are pe ce rula');
 proba(avertConstructie.length === 0, `niciun element sărit (${avertConstructie.length} avertismente${avertConstructie.length ? `: ${avertConstructie.slice(0, 3).join(' | ')}` : ''})`);
 proba(cladiri.nrTriunghiuri.cladiri <= BUGET.triunghiuri, `${cladiri.nrTriunghiuri.cladiri} triunghiuri, buget ${BUGET.triunghiuri}`);
 const kib = readFileSync(FISIER).length / 1024;
@@ -166,7 +147,7 @@ const lipsa = [...familii.values()].flatMap((f) => {
   const [a0, a1, b0, b1] = cutie(f.flat()); const [x0, y1] = laTM(a0 - 4, b0 - 4), [x1, y0] = laTM(a1 + 4, b1 + 4);
   return ['MDS', 'MDT'].flatMap((tip) => daleFereastra({ x0: Math.floor(x0), x1: Math.ceil(x1), y0: Math.floor(y0), y1: Math.ceil(y1) }).filter((d) => !fisierDala(tip, d)).map((d) => `${tip}-${d}`));
 });
-if (lipsa.length) console.log(`       SĂRIT: lipsesc dalele ${[...new Set(lipsa)].join(', ')}`);
+if (lipsa.length) sari(`lipsesc dalele ${[...new Set(lipsa)].join(', ')}`);
 else {
   void X0; void X1; void Z0; void Z1;
   // Câte o fereastră pe clădire, cu 4 m de margine; pixelul (x, z) al scenei → MDS, MDT.
@@ -229,5 +210,4 @@ else {
   proba(Math.max(...mutate) < f0 - 0.08, `control negativ: mutate 2 m, cel mult ${(100 * Math.max(...mutate)).toFixed(1)}% (${mutate.map((v) => (100 * v).toFixed(1)).join(' / ')}) — proba le deosebește`);
 }
 
-console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
-process.exit(picate ? 1 : 0);
+await rezumat({ iesi: true });
