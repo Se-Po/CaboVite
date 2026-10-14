@@ -7,7 +7,7 @@
 // aceeași pantă mediană (14,1° față de 12,6°) și aceeași altitudine mediană
 // (103,4 m amândouă). Cea mai bună regulă posibilă pe cele două iese la
 // întâmplare între ele, pe date nevăzute. Informația stă în banda de infraroșu a
-// ortofotoului — iar dala de 283 MB nu intră în depozit, deci pagina primește
+// ortofotoului — iar dala de 296 MB nu intră în depozit, deci pagina primește
 // NDVI-ul gata măsurat, într-un fișier mic, ca relieful.
 //
 // Scrie public/data/<nume>-ndvi.bin + .json. Un strat al aceleiași grile, nu o

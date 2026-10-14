@@ -11,8 +11,9 @@ export const CLADIRI = {
     ['far.', 'Farol do Cabo Espichel'],
     ['cladire.156262936', 'clădirea lipită de far'],
     ['cladire.', 'clădire de lângă far'],
+    // Eticheta își spune sursa pe ecran (alegerea autorului, 2026-10-09); vecinele, nu.
     // OSM, calea 96521141: name=Casa da Ronca, ruins=yes. NEVERIFICAT într-o sursă primară.
-    ['ruina.96521141', 'Casa da Ronca'],
+    ['ruina.96521141', 'Casa da Ronca (nume din OpenStreetMap)'],
     ['ruina.', 'clădire de lângă Casa da Ronca'],
   ],
 };

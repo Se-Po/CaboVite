@@ -36,7 +36,7 @@ import { creeazaCadruFisa, distantaLaFisa, parteLibera, PRAG_ZBOR_NOU, RAZA_COMP
 import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
-const BUGET = { cladiri: 70000, drapaj: 80000, json_kb: 150 };
+const BUGET = { cladiri: 70000, drapaj: 80000, json_kib: 150 };
 const FISIER = 'public/data/sanctuar_v2.json';
 // Amprenta plasei clădirilor, sha256 pe atributele ei, pe `sanctuar_v2` așezat pe
 // `harta_v5` + `harta_v4` (talpa pereților vine din relief). O refactorizare a formelor
@@ -141,10 +141,10 @@ console.log(`       terenul în ${(tTeren - t0).toFixed(0)} ms, sanctuarul în $
 proba(sanctuar !== null, 'sanctuarul se construiește');
 if (!sanctuar) { console.log(`\n${picate} probe picate`); process.exit(1); }
 proba(avertConstructie.length === 0, `niciun element sărit (${avertConstructie.length} avertismente${avertConstructie.length ? `: ${avertConstructie.slice(0, 3).join(' | ')}` : ''})`);
-const kb = readFileSync(FISIER).length / 1024;
+const kib = readFileSync(FISIER).length / 1024;
 proba(sanctuar.nrTriunghiuri.cladiri <= BUGET.cladiri, `clădiri: ${sanctuar.nrTriunghiuri.cladiri} triunghiuri, buget ${BUGET.cladiri}`);
 proba(sanctuar.nrTriunghiuri.drapaj <= BUGET.drapaj, `suprafețe pe teren: ${sanctuar.nrTriunghiuri.drapaj} triunghiuri, buget ${BUGET.drapaj}`);
-proba(kb <= BUGET.json_kb, `${FISIER}: ${kb.toFixed(1)} KB, buget ${BUGET.json_kb} KB`);
+proba(kib <= BUGET.json_kib, `${FISIER}: ${kib.toFixed(1)} KiB, buget ${BUGET.json_kib} KiB`);
 
 // ancora greșită și un element cu o coordonată lipsă
 {

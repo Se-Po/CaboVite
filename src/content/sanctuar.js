@@ -7,6 +7,9 @@
 // (monumentos.gov.pt) nu mai răspunde; se citește din Arquivo.pt, arhiva web
 // portugheză. La fel fișa Património Cultural, a cărei adresă nouă refuză
 // cererile automate. Unde sursele se contrazic, se spune.
+//
+// Excepția sunt etichetele din `nume_elemente`, pe care le scrie panoul „Coordonate”: ele
+// n-au `surse`, iar sursa lor stă în comentariul de deasupra lor sau al listei.
 
 const SIPA = {
   nume: 'SIPA, fișa IPA.00006165',
@@ -98,6 +101,8 @@ export const SANCTUAR = {
     ['biserica.', 'Igreja de Nossa Senhora do Cabo'],
     ['aripa_n.corp_legatura', 'corpul de legătură dintre biserică și aripa de nord'],
     ['aripa_s.corp_legatura', 'corpul de legătură dintre biserică și aripa de sud'],
+    // Observat de autor la fața locului, 2026-08-02; OSM, calea 473617324, are numai
+    // building=commercial. NEVERIFICAT într-o sursă primară.
     ['aripa_s.est_cafenea', 'capătul de est al aripii de sud (cafeneaua)'],
     ['aripa_n.', 'casele pelerinilor, aripa de nord'],
     ['aripa_s.', 'casele pelerinilor, aripa de sud'],
@@ -111,6 +116,7 @@ export const SANCTUAR = {
     ['apeduct', 'apeductul Casei da Água'],
     ['cruzeiro', 'cruzeiro-ul terreiro-ului'],
     ['ruine_spate_n', 'încăperi în ruină din spatele aripii de nord'],
+    // OSM, nodul 2345722720: amenity=toilets.
     ['toalete', 'toaletele'],
     ['casuta_cercado', 'căsuța de lângă colțul de sud-est al cercado-ului'],
   ],

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "copy-decoders": "node scripts/copy-decoders.mjs",
     "build-zona": "node scripts/build-zona.mjs",
     "build-petic": "node scripts/build-petic.mjs",
     "citeste-poze": "node scripts/citeste-poze.mjs",
@@ -37,6 +36,7 @@
     "verifica-controale": "node scripts/verifica-controale.mjs",
     "verifica-livrare": "node scripts/verifica-livrare.mjs",
     "verifica-pagina": "node scripts/verifica-pagina.mjs",
+    "verifica-documentatie": "node scripts/verifica-documentatie.mjs",
     "iconite": "node scripts/iconite.mjs"
   },
   "dependencies": {

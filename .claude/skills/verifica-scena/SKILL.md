@@ -1,9 +1,9 @@
 ---
 name: verifica-scena
-description: Listă de verificare pentru o modificare în scena 3D, în panoul Browser. Invocă cu /verifica-scena.
+description: Listă de verificare pentru o modificare în scena 3D — build-ul, probele Node și pagina în panoul Browser. Invocă cu /verifica-scena.
 argument-hint: [ce s-a schimbat]
 disable-model-invocation: true
-allowed-tools: Bash(npm run build *)
+allowed-tools: Bash(npm run build *), Bash(npm run verifica-*)
 ---
 
 Verifică modificarea: $ARGUMENTS
@@ -12,22 +12,29 @@ O scenă 3D poate compila perfect și afișa un ecran negru. Testele nu prind as
 ochii prind. Parcurge lista și raportează fiecare punct cu dovadă.
 
 1. **Build** — rulează `npm run build`. Trebuie să treacă fără erori.
-2. **Se vede ceva?** Deschide pagina în panoul Browser, fă un screenshot și
+2. **Probele Node** — înaintea browserului rulează `npm run verifica-tiff`,
+   `npm run verifica-teren`, `npm run verifica-sanctuar`, `npm run verifica-cladiri`,
+   `npm run verifica-imprejurimi`, `npm run verifica-controale`,
+   `npm run verifica-pagina` și `npm run verifica-documentatie`, iar după build
+   `npm run verifica-livrare`. Fiecare trebuie să iasă fără nicio probă picată.
+   Fără `date-sursa/`, care nu e în depozit, probele pe date reale se sar cu un
+   mesaj: asta nu e un eșec, dar spune în raport care s-au sărit.
+3. **Se vede ceva?** Deschide pagina în panoul Browser, fă un screenshot și
    uită-te efectiv la el. Descrie ce vezi. Ecran negru, model lipsă sau cameră
    în interiorul geometriei sunt eșecuri, nu detalii.
-3. **Consola** — citește mesajele. Avertismentele WebGL, texturile 404 și
+4. **Consola** — citește mesajele. Avertismentele WebGL, texturile 404 și
    avertismentele de deprecare three.js contează toate.
-4. **Interacțiune** — mișcă camera. Se rotește lin? Controalele răspund?
+5. **Interacțiune** — mișcă camera. Se rotește lin? Controalele răspund?
    Se blochează la limite? Ținta nu iese din zona alpha, iar busola și tasta
    Home duc acasă? Dincolo de alpha, împrejurimile continuă fără crăpături?
-5. **Mobil** — redimensionează la 390px lățime. Vederea de pornire e aceeași pe
+6. **Mobil** — redimensionează la 390px lățime. Vederea de pornire e aceeași pe
    orice ecran, cu lateralele tăiate: sanctuarul rămâne în cadru? Butoanele și
    panourile nu se ating între ele? Textul rămâne lizibil? Nu apare scroll
    orizontal?
-6. **Memorie** — dacă modificarea schimbă capitolul sau încarcă/descarcă obiecte,
+7. **Memorie** — dacă modificarea schimbă capitolul sau încarcă/descarcă obiecte,
    loghează `renderer.info.memory` înainte și după. Numerele trebuie să revină
    la loc. Dacă urcă monoton, e scurgere.
-7. **Fără motion** — cu `prefers-reduced-motion: reduce` activ, animațiile
+8. **Fără motion** — cu `prefers-reduced-motion: reduce` activ, animațiile
    automate ale camerei trebuie să fie oprite.
 
 Raportează ce ai verificat și cum. Dacă un punct nu a putut fi verificat, spune

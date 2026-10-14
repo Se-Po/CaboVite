@@ -6,7 +6,7 @@ noi ale subsistemului se scriu aici, nu în CLAUDE.md.
 ## Vederea Satelit
 
 Butonul „Satelit”, jos-stânga (pe telefon deasupra busolei), comută între
-fotografia aeriană pe relief și vederea Relief — culorile din albedo, de mai sus.
+fotografia aeriană pe relief și vederea Relief — culorile din albedo (`docs/teren.md`, „Cum se colorează terenul”).
 Pornește pe Satelit, iar harta apare abia cu fotografia întreagă pe placă — vezi „O singură
 încărcare”, mai jos. Alegerea se ține în `localStorage`, în try/catch.
 
@@ -14,7 +14,7 @@ Pornește pe Satelit, iar harta apare abia cu fotografia întreagă pe placă �
 
 Scrie `public/data/<hartă>-orto_v1.ktx2` + `.json`, pentru bază și petic. Textura are
 versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Un nume publicat se rescrie numai
-cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”). Cere KTX-Software 4.4
+cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea.md`, „Cache-ul”). Cere KTX-Software 4.4
 (`ktx`); scriptul îl caută și în `C:/Program Files/KTX-Software/bin` sau în
 `KTX_BIN`, fiindcă un shell pornit înainte de instalare nu vede PATH-ul nou.
 
@@ -37,9 +37,9 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
   primesc direct. Amestecul e copt în RGB, fără canal alfa: mipurile ar media
   altfel culoarea și ponderea separat. Planul mării din afara texturii are exact
   culoarea aceasta, deci marginea nu se vede.
-- **Codarea.** UASTC, calitate 2, cu RDO și zstd 18 — aleasă de autor: 3,88 MB baza
-  și 6,03 MB peticul (9,9 MB), ΔE_OK×100 după decodare 0,25 / 0,52 (p99 1,42 /
-  1,94). ETC1S ar fi dat 0,77 + 1,20 MB, cu ΔE 1,32 / 1,34 (p99 5,8 / 6,6).
+- **Codarea.** UASTC, calitate 2, cu RDO și zstd 18 — aleasă de autor: 3,88 MiB baza
+  și 6,03 MiB peticul (9,9 MiB), ΔE_OK×100 după decodare 0,25 / 0,52 (p99 1,42 /
+  1,94). ETC1S ar fi dat 0,77 + 1,20 MiB, cu ΔE 1,32 / 1,34 (p99 5,8 / 6,6).
   `--threads 1` și `--uastc-rdo-m`: aceleași date dau același fișier, la octet;
   numai cu al doilea, peticul ieșea diferit de la o rulare la alta. Pe GPU, UASTC
   devine ASTC 4×4 pe telefon și BC7 pe desktop, un octet pe pixel: ~18 MB cu tot
@@ -55,7 +55,8 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
 - **Coordonatele texturii se calculează în shader**, din `position.xz` (matricea
   plaselor e identitatea): `vMapUv = mapTransform · (x, z, 1)`, cu `texture.matrix`
   scris din bbox. v crește spre SUD — KTX2 comprimat nu se întoarce la încărcare.
-  Un atribut `uv` ar fi costat 16–33 MB.
+  Un atribut `uv` ar fi costat 23–46 MB (5 771 844 de vârfuri ale lui alpha, cu 4 sau 8 octeți
+  pe vârf).
 - **Soarele** trece pe al zborului (94,0° / 39,5°), ca clădirile modelate și cerul
   să arate ora fotografiei; umbrele se reîncadrează (`umbre.potriveste()`), cerul
   își reface expunerea, ceața și fundalul iau noul orizont. Înapoi, soarele se pune
@@ -103,7 +104,7 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
 - **O singură încărcare** (2026-10-08, la cererea autorului: harta o singură dată, direct pe
   Satelit, cu tot la detaliul întreg). `descarcaSatelit`, chemată de scena.js după TOATE datele
   pornirii și înaintea construcției plaselor, cere deodată cele șase texturi întregi — baza,
-  peticul și cele patru împrejurimi, 14,44 MB (15 138 469 de octeți; MB = 2^20). Sidecarul și
+  peticul și cele patru împrejurimi, 14,44 MiB (15 138 469 de octeți). Sidecarul și
   fișierul pleacă deodată (`cereOrto`); transcodorul, după sidecarul bazei, deci un deploy fără
   texturi nu-l descarcă. Pornit, nu se mai poate opri: `init()` din r186 nu primește semnal. Un
   încărcător eliberat cu transcodorul în drum îi revocă URL-ul workerului la sosire
@@ -146,12 +147,12 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi „Livrarea”
   500 KB/s pe cerere (server de probă): procentul urcă de la 1% (416 ms) la 100% (13 202 ms), harta
   apare la 13 359 ms, pe Satelit; „Arată relieful acum” la 75% o arată după 2 ms, pe Relief, cu
   cererile bazei și peticului oprite și preferința neatinsă; Satelit cerut apoi din buton se aplică
-  după 13,3 s, fără avertisment. Pe un telefon prima imagine vine abia după 14,44 MB: ~13,5 s la
+  după 13,3 s, fără avertisment. Pe un telefon prima imagine vine abia după 14,44 MiB: ~13,5 s la
   9 Mbit/s <!-- NEVERIFICAT: calculat; telefon și rețea mobilă nemăsurate -->.
 
   `npm run verifica-pagina`, cu fișierele adevărate, un `fetch` fals și ceasul virtual: 6 din 6
   `.ktx2` cerute înaintea construcției, 0 `-mic`; la `gata` peticul pe `harta_v5-orto_v1`,
-  `harta_v9` la 2432 de texeli, 14,44 MB transcodate; cu baza sosită singură procentul e 0,26 =
+  `harta_v9` la 2432 de texeli, 14,44 MiB transcodate; cu baza sosită singură procentul e 0,26 =
   ⌊100 × 4 069 665 / 15 138 469⌋ / 100, iar 1 vine o dată, înaintea compilării; baza tăcută după
   1 KB e în așteptare la 19,999 s și `false` la 20 s, cu un avertisment și 0 temporizatoare, dar o
   bază în 10 bucăți la 15 s și o transcodare de 25 s după ultimul octet trec; ieșirea în descărcare
@@ -236,7 +237,9 @@ Probele, în pagină (panoul Browser):
 - **culoarea:** ferestrele de referință din sidecar (terreiro, platoul de lângă far,
   versantul de nord) ies în pagină cu aceiași octeți, ΔE 0; textura citită fără sRGB
   ar da 2,72 pe terreiro. Marea din larg, privită de la 2 m, iese 25, 54, 84;
-- **resursele:** zece comutări lasă programele (11) și texturile (6) neschimbate;
+- **resursele:** zece comutări lasă programele (11) și texturile (9: cele șase hărți orto — baza, peticul,
+  `harta_v6`, `harta_v9`, `harta_v7`, `harta_v8` —, culoarea și adâncimea hărții de umbre,
+  `DFG_LUT`) neschimbate;
   după `dispose()`, 0 geometrii și o singură textură — `DFG_LUT`, tabelul de 16 × 16
   pe care three îl ține global pentru materialele PBR, și fără Satelit;
 - **căile de eșec:** sidecar lipsă (Vite dă index.html), KTX2 trunchiat, un octet

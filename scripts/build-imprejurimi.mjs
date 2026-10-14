@@ -103,7 +103,7 @@ async function dinDGT() {
     if (d.epsg !== 3763 || d.tipRaster !== 1 || d.nodata !== '-999' || d.rezolutie !== REZ)
       throw new Error(`${d.f}: EPSG ${d.epsg}, raster ${d.tipRaster}, NoData ${d.nodata}, pas ${d.rezolutie}`);
     if (d.x0 !== (col - 200) * 1000 || d.y0 !== (rand - 300) * 1000) {
-      // Dalele 104xxx au colțul la x −95441 (vezi „Dalele 104xxx” în CLAUDE.md). Dincolo
+      // Dalele 104xxx au colțul la x −95441 (vezi `docs/harti-relief.md`, „Dalele 104xxx”). Dincolo
       // de alpha nu au uscat — verificat la construcție, mai jos —, deci se sar.
       sarite.push({ dala: d.f, motiv: `colțul (${d.x0}, ${d.y0}) nu e cel al indicelui; dincolo de alpha numai apă` });
       continue;
@@ -597,6 +597,6 @@ const meta = {
 };
 writeFileSync(join(IESIRE, `${nume}-dem.bin`), Buffer.from(u16.buffer));
 writeFileSync(join(IESIRE, `${nume}-dem.json`), JSON.stringify(meta, null, 2));
-console.log(`\nscris ${IESIRE}/${nume}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MB) + .json`);
+console.log(`\nscris ${IESIRE}/${nume}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MiB) + .json`);
 console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
 process.exit(picate ? 1 : 0);

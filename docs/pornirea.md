@@ -107,7 +107,7 @@ termen cu ceasul încă armat —, nu se numără. `curata()` oprește cererile 
 orice eșec. Ceasul se oprește imediat după ce au sosit toate datele (`garda.opreste()` în
 `construieste`): cât se construiește și cât se așteaptă fotografia ar fi expirat fals, iar o
 excepție de mai târziu ar fi ieșit drept „datele n-au mai sosit”. Fotografia are garda ei
-(vezi „Vederea Satelit”); cererile ei pleacă abia după datele pornirii, deci nu le țin la coadă.
+(vezi `docs/satelit.md`, „Garda fotografiei”); cererile ei pleacă abia după datele pornirii, deci nu le țin la coadă.
 
 Proba, `verifica-pagina`, pe ceas virtual: corpul bazei tace după 1 KB — în așteptare la
 19,999 s, TimeoutError la 20 s, 0 avertismente (control, fără gardă: în așteptare după

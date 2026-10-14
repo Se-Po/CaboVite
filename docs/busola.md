@@ -55,7 +55,7 @@ elementul cu focus, iar când acela e `<body>` — după un clic pe text care nu
 focus, un rând din fișă —, locul ultimei apăsări: altfel Home închidea fișa în loc
 s-o ducă sus. Ținută apăsată, contează numai prima apăsare; repetările ar fi pornit
 zborul de la capăt la fiecare 33 ms. Home stă în `tastatura.js`, cu celelalte taste ale
-hărții (vezi „Mouse-ul, degetele și cursorul”).
+hărții (vezi `docs/controale.md`, „Mouse-ul, degetele și cursorul”).
 
 **Anunțul busolei** (regiunea live, 600 ms după ce camera s-a liniștit) se scrie numai
 când textul se schimbă: o mutare sau un zoom fără rotire îl rescriau identic, 10 din 10.
@@ -77,7 +77,7 @@ amortizare (:808), iar `_sphericalDelta` e privat, deci aceea e toată calea
 publică spre el: amortizarea se stinge, `update()` se cheamă o dată, apoi se
 repune. Butonul rozetei nu e copil al canvasului, deci OrbitControls nu emite
 „start" la clicul pe el. Tot acolo se golesc treptele rotiței care încă alunecă
-(vezi „Mouse-ul, degetele și cursorul”): sub reduced-motion zborul sare direct la
+(vezi `docs/controale.md`, „Mouse-ul, degetele și cursorul”): sub reduced-motion zborul sare direct la
 capăt, iar treptele rămase l-ar fi împins de acolo — măsurat, 375,7 m.
 
 Cât greșea, măsurat pe vechiul zbor al busolei, care rotea numai theta: după o

@@ -39,8 +39,8 @@ export const GRI_REZERVA = 0x8a8578;
  * sRGB → liniar, o dată pentru fiecare din cele 256 de valori posibile.
  *
  * `culoare.setHex(hex, SRGBColorSpace)` face trei `Math.pow` la fiecare apel, iar
- * plasa cheamă o dată pe fațetă: 1,36 milioane de fațete, deci 4 milioane de
- * `pow` la fiecare pornire. Intrarea are însă doar 256 de valori distincte pe
+ * plasa cheamă o dată pe fațetă: numai alpha are 1,92 milioane de fațete, deci 5,8 milioane
+ * de `pow` la fiecare pornire. Intrarea are însă doar 256 de valori distincte pe
  * canal — e un octet.
  *
  * Tabelul e BIT-IDENTIC cu ce face three, nu doar apropiat: aceeași formulă din

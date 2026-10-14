@@ -117,9 +117,11 @@ const brut = (v, zec) => v.toFixed(zec);
  * @param {HTMLElement} o.gazda
  * @param {HTMLCanvasElement} o.canvas
  * @param {import('three').PerspectiveCamera} o.camera
- * @param {(x: number, z: number) => number} o.inaltimeLa — cel COMPUS: peticul
- *   de 1 m acolo unde există, baza de 2 m în rest. Diferența măsurată pe cusătură
- *   a fost 0,153 m, deci nu e o alegere cosmetică.
+ * @param {(x: number, z: number) => number} o.inaltimeLa — relieful randat (scena.js îi dă
+ *   `inaltimeRandata`, raza.js): în alpha cel COMPUS, peticul de 1 m acolo unde există,
+ *   baza de 2 m în rest — diferența măsurată pe cusătură a fost 0,153 m, deci nu e o
+ *   alegere cosmetică —, iar dincolo de alpha împrejurimile, pe care raza se oprește.
+ *   Altitudinea se citește numai în zona lui `inAlpha`.
  * @param {object} o.geo — de la creeazaGeo()
  * @param {Array<{x,z}>} [o.limitaDatelor] — `poligon_scena` din sidecar
  * @param {{xMin: number, xMax: number, zMin: number, zMax: number}} [o.limiteMars] — cât

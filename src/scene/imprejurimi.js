@@ -5,13 +5,15 @@ import { campNeted, creeazaTeren } from './terrain.js';
 import { buclaNoduri, dreptunghiExterior, dreptunghiGrila, fermoar, geometriaGrilei } from './cusatura.js';
 
 // Împrejurimile zonei alpha: peisajul care continuă dincolo de marginile tăiate ale
-// hărții, până unde ceața scenei îl acoperă de tot (~45 km).
+// hărții, până unde ceața scenei îl acoperă de tot: datele merg până la 48–50 km (harta_v8:
+// pătratul grilei, ~48,1 km de la centrul lui alpha pe axe, cu colțurile tăiate de discul de
+// 50 km, `RAZA_V8` din scripts/comun/imprejurimi.mjs).
 //
 // Patru niveluri, fiecare o hartă cu gaură, cusută de cel dinăuntru:
 //   harta_v6 — LiDAR DGT la 4 m, banda de ~400 m de lângă marginile de nord și est;
 //   harta_v9 — LiDAR DGT la 12 m, până la ~2,4 km de alpha;
 //   harta_v7 — Copernicus GLO-30 la 32 m, ~4,5 km mai încolo;
-//   harta_v8 — Copernicus GLO-30 la 256 m, până la ~48 km.
+//   harta_v8 — Copernicus GLO-30 la 256 m, până la 48–50 km.
 // Numele nu urmează ordinea: harta_v9 s-a adăugat după celelalte, când autorul a adus
 // dalele DGT ale benzii. Ordinea e cea din listă și din cheia `interior` a fiecăruia.
 // Le construiește `npm run build-imprejurimi`; vezi acolo de unde vin și ce s-a făcut

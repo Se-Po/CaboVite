@@ -147,7 +147,7 @@ function refaDin50cm(d, g) {
   // unde ambele sunt aliniate, RMS e 0,097 m la (0, 0) și 0,54 m la 1 m.
   //
   // Proba e RELATIVĂ: două antete greșite la fel ar trece. Proba absolută e
-  // cusătura cu dala vecină, făcută pe harta scrisă (vezi CLAUDE.md).
+  // cusătura cu dala vecină, făcută pe harta scrisă (vezi `docs/harti-relief.md`, „Dalele 104xxx”).
   const pixeli = [];
   for (let r = 0; r < d.inaltime; r++) {
     const rand = randTiff(d, r);
@@ -420,7 +420,7 @@ const main = () => {
     },
   }, null, 2));
 
-  console.log(`scris: public/data/${nume}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MB) + .json`);
+  console.log(`scris: public/data/${nume}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MiB) + .json`);
 };
 
 main();

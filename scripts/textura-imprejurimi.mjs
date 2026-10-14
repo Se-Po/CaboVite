@@ -48,8 +48,8 @@ const VERSIUNE = 'orto_v1';
 const ORTO = ['464-3', '464-1'].map((d) => `date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_${d}_v02.tif`);
 const ZBOR = 'date-sursa/derivate/zbor.json';
 const IESIRE = 'public/data';
-const PRAG_MB = 4;
-for (const f of ORTO) cereFisier(f, `dala de ortofoto ORTOS-2025 ${f.match(/464-\d/)[0]}`, 'Vezi „Ortofotoul” în CLAUDE.md.');
+const PRAG_MIB = 4;
+for (const f of ORTO) cereFisier(f, `dala de ortofoto ORTOS-2025 ${f.match(/464-\d/)[0]}`, 'Vezi „Ortofotoul” în docs/fotografii.md.');
 cereFisier(ZBOR, 'măsurătorile zborului', 'Rulează întâi: npm run masoara-zbor');
 const zbor = JSON.parse(readFileSync(ZBOR, 'utf8'));
 const bazaOrto = JSON.parse(readFileSync(join(IESIRE, `harta_v4-${VERSIUNE}.json`), 'utf8'));
@@ -603,8 +603,8 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
   const f = join('date-sursa/derivate/textura', `${nume}-${VERSIUNE}`, 'uastc.ktx2');
   const b = codeazaKtx(pnguri, f, 'uastc');
   const p = pierdere(f, niveluri[0].b, c.W, c.H);
-  console.log(`  KTX2 UASTC: ${(b.length / 1048576).toFixed(2)} MB; după decodare ΔE medie ${p.medie}, p99 ${p.p99}`);
-  proba(b.length <= PRAG_MB * 1048576, `${nume}: ${(b.length / 1048576).toFixed(2)} MB, sub pragul de ${PRAG_MB} MB`);
+  console.log(`  KTX2 UASTC: ${(b.length / 1048576).toFixed(2)} MiB; după decodare ΔE medie ${p.medie}, p99 ${p.p99}`);
+  proba(b.length <= PRAG_MIB * 1048576, `${nume}: ${(b.length / 1048576).toFixed(2)} MiB, sub pragul de ${PRAG_MIB} MiB`);
   scrieNepublicat(join(IESIRE, `${nume}-${VERSIUNE}.ktx2`), b);
   const surse = [...surseFolosite].map((s) => (s === 'orto'
     ? { nume: 'Ortofotomapa digital de Portugal Continental 2025, 25 cm', fisiere: daleCadru, producator: 'Direção-Geral do Território (DGT)', licenta: 'CC BY 4.0', atributie: 'Ortofotos: © Direção-Geral do Território, ORTOS-2025, CC BY 4.0', portal: 'https://cdd.dgterritorio.gov.pt/' }

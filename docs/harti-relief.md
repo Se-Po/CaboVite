@@ -8,7 +8,7 @@ noi ale subsistemului se scriu aici, nu în CLAUDE.md.
 Hărțile se numesc `harta_vN` și trăiesc în `public/data/<nume>-dem.bin` +
 `.json`. O hartă nouă — alt contur, altă rezoluție sau alt conținut — primește un nume nou;
 nu se suprascrie una existentă. Numele e scris și în sidecar, la cheia `nume`. Regula nu e
-numai de ordine: un nume publicat stă un an în cache-ul cititorilor (vezi „Livrarea”).
+numai de ordine: un nume publicat stă un an în cache-ul cititorilor (vezi `docs/livrarea.md`, „Cache-ul”).
 
 | hartă | sursă | acoperire |
 |---|---|---|
@@ -22,13 +22,16 @@ numai de ordine: un nume publicat stă un an în cache-ul cititorilor (vezi „L
 `harta_v4` cu peticul ei sunt **zona alpha**, harta pe care se lucrează;
 `harta_v6`, `harta_v9`, `harta_v7` și `harta_v8`, în ordinea asta, din interior spre orizont, sunt
 decorul din jur. Numele nu urmează ordinea: `harta_v9` s-a adăugat ultima, între v6 și v7.
-Vezi „Zona alpha și împrejurimile”.
+Vezi `docs/imprejurimi.md`, „Zona alpha și împrejurimile”.
 
 O hartă poate avea cheia `baza`: atunci e un **petic** de rezoluție mai mare,
 iar `incarcaRelief()` încarcă și baza. Scena generează două plase — baza, cu o
 gaură exact sub petic, și peticul deasupra. Nodurile peticului cad peste ale
 bazei din doi în doi, iar inelul lui exterior ia relieful bazei, așa că muchia
 comună e aceeași linie și nu rămâne nicio crăpătură.
+
+Stratul NDVI cerut odată cu sidecarul hărții și garda pornirii:
+`docs/pornirea.md`, „Încărcarea datelor: stratul NDVI și garda pornirii”.
 
 Pagina încarcă o singură hartă (plus baza ei), aleasă în `src/scene/loaders.js`, plus cele patru
 niveluri ale împrejurimilor (`src/scene/imprejurimi.js`). Datele-sursă
@@ -77,8 +80,8 @@ Acceptarea, față de `harta_v2`, pe `.bin`-uri:
 
 Plasa crește la 1 923 948 de triunghiuri (bază 1 422 064), adică +561 826, și
 103 893 192 de octeți de atribute (+30,3 MB). Marginile de nord și de est ale cutiei
-taie uscat drept; dincolo de ele continuă împrejurimile (vezi „Zona alpha și
-împrejurimile”).
+taie uscat drept; dincolo de ele continuă împrejurimile
+(vezi `docs/imprejurimi.md`, „Zona alpha și împrejurimile”).
 
 `ortofoto.mjs` scrie acum un raport pe hartă, `ortofoto-culori.<hartă>.json`:
 `paleta.mjs` citește fix raportul lui `harta_v2`, ca albedourile vederii Relief să

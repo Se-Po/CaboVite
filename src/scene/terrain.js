@@ -206,8 +206,9 @@ export function campNeted(relief, { paleta, ndvi, culoare } = {}) {
  *
  * Funcție de modul și numai cu scalari. Bucla de dinainte, o închidere în creeazaTeren,
  * făcea patru tablouri pe celulă și un tablou cu iterator pe fiecare triunghi; mutată
- * aici, baza se construiește mai repede, cu cifrele în CLAUDE.md („Cum se generează
- * plasa terenului”). Aritmetica e aceeași, operație cu operație — produsul vectorial și
+ * aici, baza se construiește mai repede; cifrele sunt în
+ * `docs/teren.md`, „Cum se generează plasa terenului”.
+ * Aritmetica e aceeași, operație cu operație — produsul vectorial și
  * `normalize()` din Vector3 r186, scrise de mână, `Xc`/`Zr` chiar valorile lui X(c) și
  * Z(r) —, deci atributele ies identice la bit: sha256-ul lor e probă în
  * `npm run verifica-teren` și `verifica-imprejurimi`.
@@ -452,7 +453,7 @@ export function creeazaTeren(relief, optiuni = {}) {
   //
   // Înainte, `pastreaza` se chema o dată la numărat și încă o dată la scris:
   // 3 470 392 de apeluri pe bază, fiecare cu o buclă peste laturile poligonului.
-  // Masca costă 1 735 196 de octeți temporari — 3,7% din atributele bazei — și
+  // Masca costă 1 735 196 de octeți temporari — 2,26% din atributele bazei — și
   // închide și o gaură de regresie: alocarea de mai jos se sprijinea pe faptul
   // că `pastreaza` dă de două ori exact același răspuns.
   //
@@ -488,7 +489,7 @@ export function creeazaTeren(relief, optiuni = {}) {
 
   // `let`, golite după ce intră în geometrie: `scrieTriunghi` le citește, deci
   // altfel ar sta în contextul închiderilor lângă `inaltimeLa` și `dispose`, iar
-  // după dispose() cei ~73 MB ai ambelor plase ar rămâne în RAM cât trăiește
+  // după dispose() cei ~104 MB ai ambelor plase ar rămâne în RAM cât trăiește
   // `globalThis.__scena`. Aceeași capcană ca la `grila` și la strat.
   const cus = optiuni.cusatura ?? null;
   const nrCusatura = cus ? cus.triunghiuri.length / 3 : 0;

@@ -130,7 +130,7 @@ for (const p of imp.plase) {
   total += p.teren.nrTriunghiuri;
 }
 const atribute = imp.plase.reduce((a, p) => a + Object.values(p.teren.obiect.geometry.attributes).reduce((b, at) => b + at.array.byteLength, 0), 0);
-proba(total <= BUGET.triunghiuri, `împrejurimile: ${total} triunghiuri (+${(100 * total / TRIUNGHIURI_ALPHA).toFixed(1)}% față de alpha), buget ${BUGET.triunghiuri}; ${(atribute / 1048576).toFixed(1)} MB de atribute; construite în ${ms.toFixed(0)} ms`);
+proba(total <= BUGET.triunghiuri, `împrejurimile: ${total} triunghiuri (+${(100 * total / TRIUNGHIURI_ALPHA).toFixed(1)}% față de alpha), buget ${BUGET.triunghiuri}; ${(atribute / 1048576).toFixed(1)} MiB de atribute; construite în ${ms.toFixed(0)} ms`);
 {
   // Fiecare nivel are în public/data exact ce cere pagina — relieful, stratul NDVI, textura
   // Satelit întreagă —, deci nici varianta mică a lui harta_v9 (`-orto_v1-mic`), scoasă când
@@ -143,7 +143,9 @@ proba(total <= BUGET.triunghiuri, `împrejurimile: ${total} triunghiuri (+${(100
     const inPlus = peDisc.filter((f) => f.startsWith(`${n}-`) && !FISIERE.includes(f.slice(n.length)));
     proba(inPlus.length === 0, `${n}: în public/data numai cele ${FISIERE.length} fișiere cerute de pagină${inPlus.length ? `; ÎN PLUS: ${inPlus.join(', ')}` : ''}`);
   }
-  proba(oct <= BUGET.octeti_fisiere, `fișierele împrejurimilor: ${(oct / 1048576).toFixed(2)} MB necomprimate, buget ${BUGET.octeti_fisiere / 1048576} MB`);
+  // MiB = 2^20 octeți; octeții, grupați câte trei, ca să se poată compara cu `ls -l`.
+  const grupat = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  proba(oct <= BUGET.octeti_fisiere, `fișierele împrejurimilor: ${(oct / 1048576).toFixed(2)} MiB necomprimate, buget ${BUGET.octeti_fisiere / 1048576} MiB (${grupat(oct)} ≤ ${grupat(BUGET.octeti_fisiere)} B)`);
 }
 
 // ------------------------------------------------------------ 3. crăpăturile

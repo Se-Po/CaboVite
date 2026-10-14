@@ -85,7 +85,8 @@ const asteptare = (() => {
  *
  * Nu aruncă. E chemată după ce scena a pornit; o excepție de aici ar ajunge în
  * `catch`-ul de mai jos, care scoate canvasul — și ar lăsa scena vie, cu bucla ei
- * și cei 73 MB de plasă, sub o pagină care pretinde că n-are scenă.
+ * și plasele ei — numai ale lui alpha au ~104 MB de atribute (`npm run verifica-teren`) —,
+ * sub o pagină care pretinde că n-are scenă.
  */
 function arataSurse(surse) {
   try {
@@ -322,11 +323,14 @@ try {
     // Anunțurile scrise cât panourile erau ascunse — busola, eșecul fotografiei — se scriu din nou.
     scena.arata?.();
     arataSurse(scena.surse);
-    // Linia de bază pentru verificările de memorie de mai târziu.
-    console.info('scenă pornită —', scena.nrTriunghiuri, 'triunghiuri',
+    // Linia de bază pentru verificările de mai târziu: triunghiurile pe părți
+    // (`scena.triunghiuri`; alpha e `nrTriunghiuri`, bază + petic). Memoria GPU de la capăt e
+    // cea dinaintea primului cadru: geometriile și programele urcă pe placă abia la el.
+    const t = scena.triunghiuri;
+    console.info('scenă pornită —', scena.nrTriunghiuri, 'triunghiuri în alpha',
       scena.petic ? `(bază ${scena.teren.nrTriunghiuri} + petic ${scena.petic.nrTriunghiuri})` : '',
-      scena.memorie(),
-      scena.sanctuar ? `sanctuar: ${scena.sanctuar.nrTriunghiuri.cladiri} + ${scena.sanctuar.nrTriunghiuri.drapaj} pe teren` : '');
+      t ? `· împrejurimi ${t.imprejurimi} · sanctuar ${t.sanctuar} + ${t.drapaj} pe teren · clădiri ${t.cladiri} · total ${t.total}` : '',
+      scena.memorie());
     globalThis.__scena = scena; // cârlig pentru verificare din consolă
   }
 } catch (e) {

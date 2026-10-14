@@ -85,7 +85,7 @@ export async function deschideCog(url, { dir, descarca = true }) {
       if (!(e instanceof RangeError) && !/out of range|outside/i.test(e.message)) throw e;
     }
   }
-  if (!niveluri) throw new Error(`${url}: antetul nu încape în 8 MB`);
+  if (!niveluri) throw new Error(`${url}: antetul nu încape în 8 MiB`);
 
   const n0 = niveluri[0];
   const ps = n0.d.valori(33550), tp = n0.d.valori(33922);

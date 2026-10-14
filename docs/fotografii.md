@@ -7,7 +7,7 @@ noi ale subsistemului se scriu aici, nu în CLAUDE.md.
 
 Originalele stau în `date-sursa/poze/` — date-sursă, deci în afara depozitului,
 lângă `lidar/`. `public/photos/` e altceva: fotografiile pe care le *afișează*
-pagina, redimensionate. Copiază-le prin USB; WhatsApp, Telegram și descărcarea
+pagina, redimensionate; azi directorul e gol (numai `.gitkeep`). Copiază-le prin USB; WhatsApp, Telegram și descărcarea
 din Google Photos pe web șterg sau degradează GPS-ul din EXIF.
 
 `npm run citeste-poze` citește EXIF-ul fără să decodeze niciun pixel și întreabă
@@ -56,7 +56,7 @@ La calcar, vegetație uscată și tufăriș e fals — vezi nota din `paleta-ter
 
 ### Ortofotoul, și de ce nu înlocuiește fotografiile
 
-`ORTOS-2025` de la DGT, dala `ORTOS-2025-cog-25cm-464-3` (283 MB, în
+`ORTOS-2025` de la DGT, dala `ORTOS-2025-cog-25cm-464-3` (296 MB, în
 `date-sursa/ortofoto/`, deci în afara depozitului). Lângă ea stă, din 2026-10-07, și
 464-1, dala de la nord (335 MB), pentru împrejurimi; scripturile lui alpha numesc dala
 lor (`ORTOFOTO_ALPHA` din `scripts/comun/ortofoto.mjs`), nu iau „primul .tif din
@@ -98,7 +98,7 @@ la `harta_v4` (aceeași cutie ca `harta_v2`) iese **106 × 703 pixeli, întregi*
 pixelul ortofotoului cade peste nodul LiDAR fără reeșantionare. La `harta_v5` pasul se potrivește, dar
 alinierea NU: pe convenția „noduri", amprenta primului nod începe la 1180,5 ×
 2298,5 pixeli, deci nodurile cad pe colțurile pixelilor. Peticul se citește de la
-nivelul de 0,5 m, mediat 2 × 2 — vezi stratul NDVI, mai sus. Scriptul verifică asta și se oprește dacă nu iese.
+nivelul de 0,5 m, mediat 2 × 2 — vezi `docs/harti-relief.md`, „Stratul NDVI”. Scriptul verifică asta și se oprește dacă nu iese.
 Control independent: numărul de celule de uscat din contur, 773 208 pe `harta_v4`
 (491 895 pe `harta_v2`, 492 056 pe `harta_v0`), e identic cu
 `acoperire.uscat_masurat_in_poligon` din sidecar, iar

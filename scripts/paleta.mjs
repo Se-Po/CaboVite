@@ -87,7 +87,7 @@ const main = () => {
   const { repere } = JSON.parse(readFileSync(join(DIR, 'etichete.json'), 'utf8'));
 
   // Ortofotoul e opțional: lanțul trebuie să meargă și numai din fotografii,
-  // fiindcă dala de 283 MB nu intră în depozit și cine clonează n-o are.
+  // fiindcă dala de 296 MB nu intră în depozit și cine clonează n-o are.
   let orto = {}, sursaOrto = null;
   try {
     // Raportul lui harta_v2, fixat: pe el s-au măsurat albedourile paletei, iar

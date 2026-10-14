@@ -43,7 +43,7 @@ const verificari = [
   {
     test: (s) => /setPixelRatio\s*\(\s*window\.devicePixelRatio\s*\)/.test(s),
     mesaj:
-      'setPixelRatio(window.devicePixelRatio) fără plafon → vezi tiparul resizeRendererToDisplaySize din .claude/rules/three-scene.md',
+      'setPixelRatio(window.devicePixelRatio) fără plafon → redimensioneaza() din src/scene/renderer.js (DPR ≤ 2, 2560 × 1440); tiparul e în .claude/rules/three-scene.md',
   },
   {
     test: (s) => /setSize\s*\([^)]*\)/.test(s) && !/setSize\s*\([^)]*,\s*false\s*\)/.test(s),

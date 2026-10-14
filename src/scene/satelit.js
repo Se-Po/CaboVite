@@ -22,17 +22,18 @@ import { ceataCer } from './mare.js';
 //
 // Coordonatele texturii nu stau în geometrie: se calculează în shader din poziția
 // vârfului, care e deja în metri de scenă (matricea plaselor e identitatea). Un
-// atribut `uv` ar fi costat 16–33 MB pe cele 4 milioane de vârfuri.
+// atribut `uv` ar fi costat 23–46 MB pe cele 5,8 milioane de vârfuri ale lui alpha (cu
+// 4 sau 8 octeți pe vârf: două componente pe 16 biți sau Float32).
 
 export const VERSIUNE_ORTO = 'orto_v1';
 const CHEIE_PREFERINTA = 'cabo-espichel:strat';
 const PRELUCRARE_IMPREJURIMI = 'fotografia împrejurimilor, drapată pe relief în vederea Satelit';
 
-// Texturile vin toate deodată, la detaliul întreg (MB = 2^20 octeți): baza (3,88 MB), peticul
-// de 0,25 m (6,03 MB) și cele patru niveluri ale împrejurimilor, cu harta_v9 de 2 m (3,09 MB) —
-// 14,44 MB în șase fișiere. Harta se arată abia cu ele pe placă, direct pe Satelit (scena.js):
-// autorul a văzut pornirea în trei secvențe — Relief, Satelit după 6,1 MB, peticul și harta_v9
-// ascuțite după încă 9,1 MB — și a cerut una singură (2026-10-08). A doua treaptă și varianta
+// Texturile vin toate deodată, la detaliul întreg: baza (3,88 MiB), peticul de 0,25 m
+// (6,03 MiB) și cele patru niveluri ale împrejurimilor, cu harta_v9 de 2 m (3,09 MiB) —
+// 14,44 MiB în șase fișiere. Harta se arată abia cu ele pe placă, direct pe Satelit (scena.js):
+// autorul a văzut pornirea în trei secvențe — Relief, Satelit după 6,1 MiB, peticul și harta_v9
+// ascuțite după încă 9,1 MiB — și a cerut una singură (2026-10-08). A doua treaptă și varianta
 // mică a lui harta_v9 au plecat odată cu ele.
 
 const citestePreferinta = () => { try { return localStorage.getItem(CHEIE_PREFERINTA); } catch { return null; } };
@@ -274,7 +275,8 @@ export function creeazaSatelit(o) {
     // Falezele rămân fotografia. Pe un perete abrupt ea e întinsă — ortofotoul
     // privește drept în jos —, dar pe calcar dungile acelea arată ca stratele, iar
     // stânca pictată din regula de albedo ieșea uniformă și ternă. Măsurătoarea
-    // (npm run masoara-faleza) și comparația sunt în CLAUDE.md; autorul a ales fotografia.
+    // (npm run masoara-faleza) și comparația, cu alegerea autorului, sunt în
+    // `docs/satelit.md`, „Falezele rămân fotografia”.
     //
     // Același program pentru bază și petic: diferă numai textura, iar r186 cheamă
     // onBeforeCompile pe fiecare material chiar când programul e refolosit.
@@ -358,8 +360,8 @@ export function creeazaSatelit(o) {
         ktx2 = await panaLa(incarcator, semnal);
         if (!ktx2 || semnal.aborted) return oprita();
         // `detectSupport` a rulat la sosirea încărcătorului, poate pe un context pierdut chiar
-        // atunci, la pornire: extensiile ieșeau toate lipsă, iar Satelit rămânea pe RGBA (~71 MB
-        // pe placă), fără petic, toată sesiunea. Cu contextul viu, configurația se reface înaintea
+        // atunci, la pornire: extensiile ieșeau toate lipsă, iar Satelit rămânea pe RGBA (~67 MB
+        // pe placă, fără petic) toată sesiunea. Cu contextul viu, configurația se reface înaintea
         // primei transcodări: workerii o primesc abia când se creează.
         await contextViu(semnal);
         if (semnal.aborted) return oprita();

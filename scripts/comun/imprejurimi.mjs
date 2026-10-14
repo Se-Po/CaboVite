@@ -29,8 +29,9 @@ export const NODURI_ALPHA = { x0: -95787, x1: -93461, y0: -139391, y1: -136407 }
  *   ~4 km spre vest și 3 km spre sud.
  * harta_v8 — Copernicus GLO-30, la 256 m, pe un disc de 50 km rază în jurul
  *   centrului lui alpha (`RAZA_V8`): dincolo de 24 km de cameră ceața scenei e
- *   completă, iar camera stă la cel mult ~9,6 km de centru, deci nimic din disc nu
- *   trece de planul îndepărtat (FAR, 60 km). Grila e pătratul care cuprinde discul.
+ *   completă, iar camera stă la cel mult ~9,9 km de centru, deci nimic din disc nu
+ *   trece de planul îndepărtat (FAR, 60 km). Grila e un pătrat cu semilatura de ~48,1 km:
+ *   discul îi taie numai colțurile.
  */
 export const RAZA_V8 = 50000;
 

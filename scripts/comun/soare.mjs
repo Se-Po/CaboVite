@@ -8,7 +8,7 @@
 //
 // Azimutul e ADEVĂRAT, măsurat de la nordul geografic, în sensul acelor de ceas.
 // Scena e pe grila TM06, unde nordul e altul: aici A_grilă = A_adevărat − γ, cu
-// γ = −0,673704° (vezi „Busola și nordul adevărat” în CLAUDE.md), adică
+// γ = −0,673704° (vezi `docs/busola.md`, „Busola și nordul adevărat”), adică
 // A_grilă = A_adevărat + 0,674°.
 
 const R = Math.PI / 180;

@@ -46,7 +46,8 @@
 //   - mesajul de încărcare (main.js): faza fotografiei cu procentul, butonul care oprește
 //     așteptarea, focusul mutat pe Satelit când harta apare, apoi `scena.arata()` o dată;
 //   - compilarea înaintea primului cadru (scena.js): `compileAsync` după ultimul `scena.add`
-//     și înaintea buclei, pe sursă; timpii, în pagină (CLAUDE.md);
+//     și înaintea buclei, pe sursă; timpii, în pagină
+//     (`docs/randarea.md`, „Compilarea, înaintea primului cadru”);
 //   - anunțurile după apariția hărții (scena.js, busola.js): `arata()` cheamă `reanunta()` pe
 //     busolă și pe Satelit după două cadre ale paginii; busola, construită cu un DOM fals,
 //     golește anunțul și îl scrie din nou;
@@ -350,7 +351,7 @@ globalThis.clearTimeout = CT;
 // ------------------------------------------------------------ verificarea dinaintea descărcării
 
 // Un CSP fără 'unsafe-eval' sau WebAssembly oprit: încărcătorul nu se mai face, iar
-// `pregateste()` din satelit.js prinde eroarea cu un avertisment, înaintea celor ~12 MB.
+// `pregateste()` din satelit.js prinde eroarea cu un avertisment, înaintea celor 14,44 MiB ale texturilor.
 console.log('\nVerificarea transcodorului, înaintea descărcării');
 const RENDERER = { extensions: { has: () => false, get: () => null } };
 const incearca = async (strica, repara) => {
@@ -403,8 +404,8 @@ console.log('\nKTX2Loader: ce folosește garda');
 
 // Ce Chromium-ul panoului nu poate încerca: browserele fără `:has()` — Firefox sub 121,
 // deci și 115 ESR — și fără `dvh` — Chrome 94–107, Firefox 93–100. Proba din pagină le
-// simulează (CLAUDE.md, „Flux de lucru”); aici se păzește foaia, ca o regulă nouă să nu le
-// aducă înapoi.
+// simulează (`docs/punctul.md`, „Punctul de sub clic”); aici se păzește foaia, ca o regulă
+// nouă să nu le aducă înapoi.
 console.log('\nFoaia de stil: fără `:has()`, `dvh` numai cu rezervă, selecția oprită numai pe hartă');
 {
   const CSS = textSursa('src/styles/main.css');
@@ -803,7 +804,8 @@ console.log('\nFișa și cutia „Coordonate”: cel puțin 1rem între ele, la 
 // (WebGLRenderLists.js:7-13), iar cerul și marea își fac materialele înaintea
 // terenului (scena.js). Fără renderOrder, amândouă se umbreau pe tot ecranul și se
 // acopereau apoi. Proba folosește chiar sortarea lui three. Că imaginea rămâne aceeași
-// la pixel — de aceea `Less` pe mare — se vede numai pe GPU: proba din pagină, în CLAUDE.md.
+// la pixel — de aceea `Less` pe mare — se vede numai pe GPU: proba din pagină, în
+// `docs/randarea.md`, „Cerul ultimul, marea după teren”.
 console.log('\nOrdinea de desenare: cerul ultimul, marea după teren');
 {
   const paleta = paletaCurenta();
@@ -1274,7 +1276,8 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
 
     // 9. scena.js trece garda fiecărui încărcător al pornirii și verifică după fiecare
     //    așteptare: altfel un sanctuar abandonat ar porni tăcut harta fără el. Scena cere
-    //    WebGL, deci aici se păzește sursa; abandonul în pagină e în CLAUDE.md.
+    //    WebGL, deci aici se păzește sursa; abandonul în pagină e în
+    //    `docs/pornirea.md`, „Garda pornirii”.
     {
       const verificaScena = (src) => {
         const apeluri = [...src.matchAll(/\b(incarcaRelief|incarcaSanctuar|incarcaCladiri|incarcaImprejurimi|incarcaPaleta)\(([^)]*)\)/g)];
@@ -1305,8 +1308,9 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
 // codul paginii — `descarcaSatelit` și `creeazaSatelit` —, cu un DOM, un renderer și un `fetch`
 // falși, cu fișierele adevărate din public/data, cu transcodarea lui KTX2Loader înlocuită și pe
 // ceasul virtual de mai sus. Construcția cere WebGL: ordinea din scena.js se păzește pe sursă,
-// iar timpii, în pagină (CLAUDE.md). Controalele rulează satelit.js și scena.js de la
-// REPER_VECHI, din git, și mutații plauzibile ale lui satelit.js de azi.
+// iar timpii, în pagină (`docs/satelit.md`, „O singură încărcare”). Controalele rulează
+// satelit.js și scena.js de la REPER_VECHI, din git, și mutații plauzibile ale lui satelit.js
+// de azi.
 console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotografiei, ieșirea');
 {
   // REPER_VECHI (0.1.5.02): Satelit cerut după construcție, în două trepte, cu harta_v9 mică în prima.
@@ -1543,7 +1547,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   const T6 = ['harta_v4', 'harta_v5', ...NUME_IMP].map((n) => `${n}-orto_v1`);
   const LAT = Object.fromEntries(T6.map((n) => [n, SIDECAR(n).latime]));
   const S6 = T6.reduce((a, n) => a + SIDECAR(n).octeti, 0);
-  const MB = (n) => (n / 2 ** 20).toFixed(2);   // MB = 2^20 octeți, ca în CLAUDE.md
+  const MiB = (n) => (n / 2 ** 20).toFixed(2);   // MiB = 2^20 octeți; cifra, în `docs/satelit.md`, „O singură încărcare”
   const butonul = (d) => { const rad = d.gazda.copii[0]; return { rad, b: rad?.copii[0], anunt: rad?.copii[1] }; };
   const clic = (b) => { for (const f of b.asc.click ?? []) f(); };
   const ANUNT = 'Se încarcă fotografia aeriană…', ESEC = 'Fotografia aeriană nu s-a putut încărca.';
@@ -1584,7 +1588,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       `cererile înaintea construcției: ${x.devreme} din ${T6.length} .ktx2 (baza, peticul, ${NUME_IMP.join(', ')}), ${x.mic} cereri -mic; Satelit ${la.v ? 'pornit' : 'NEPORNIT'}`);
     proba(la.activ && la.petic === 'harta_v5-orto_v1' && la.teren === 'harta_v4-orto_v1' && la.v9 === LAT['harta_v9-orto_v1'] && la.urcate === T6.length,
       `la gata: Satelit ${la.activ ? 'aplicat' : 'NEAPLICAT'}, peticul pe ${la.petic}, baza pe ${la.teren}, harta_v9 la ${la.v9} texeli lățime (întreaga are ${LAT['harta_v9-orto_v1']}), ${la.urcate} texturi urcate pe placă`);
-    proba(x.transcodate.length === T6.length && x.octeti === S6, `transcodate până la Satelit: ${x.transcodate.length} texturi, ${MB(x.octeti)} MB (${x.octeti} octeți)`);
+    proba(x.transcodate.length === T6.length && x.octeti === S6, `transcodate până la Satelit: ${x.transcodate.length} texturi, ${MiB(x.octeti)} MiB (${x.octeti} octeți)`);
     proba(r.avert.length === 0 && r.dispuse === 1, `avertismente ${r.avert.length}${r.avert[0] ? ` („${r.avert[0]}”)` : ''}, încărcătorul eliberat de ${r.dispuse} ori`);
     if (V) {
       const rv = await porneste({ M: V });
@@ -1923,9 +1927,10 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   //     progresul și ieșirea) → compileAsync → faza fotografiei → așteptarea lui Satelit, numai pe
   //     calea automată → bucla. Fără `primulCadru` și fără `data-panouri`. Construcția cere WebGL,
   //     deci ordinea se păzește pe sursă; că primul cadru e chiar Satelit se vede în pagină
-  //     (CLAUDE.md). Legăturile lui creeazaSatelit se cer ca text exact: progresul spre
-  //     `laIncarcare`, ieșirea `faraSatelit` ca valoare, iar `faraSatelit` trecut de `porneste` lui
-  //     `construieste`, pe aceeași poziție în apel și în semnătură. Controale: scena.js de la
+  //     (`docs/satelit.md`, „O singură încărcare”). Legăturile lui creeazaSatelit se cer ca
+  //     text exact: progresul spre `laIncarcare`, ieșirea `faraSatelit` ca valoare, iar
+  //     `faraSatelit` trecut de `porneste` lui `construieste`, pe aceeași poziție în apel și în
+  //     semnătură. Controale: scena.js de la
   //     REPER_VECHI, cel de azi fără peticul cerut devreme, fără garda oprită după date, cu
   //     așteptarea mutată după buclă, cu `faraSatelit: null`, cu `laProgres: undefined` și fără
   //     `faraSatelit` în apelul lui `construieste`.
@@ -2189,7 +2194,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   // (o) Contextul WebGL pierdut chiar când sosește încărcătorul: `detectSupport` vede atunci
   //     toate extensiile lipsă. Satelit așteaptă refacerea contextului și reface configurația
   //     înaintea primei transcodări, deci texturile ies comprimate, iar peticul vine. Pe codul
-  //     de dinainte (recenzia): RGBA, ~71 MB pe placă, fără petic, toată sesiunea.
+  //     de dinainte (recenzia): RGBA, ~67 MB pe placă, fără petic, toată sesiunea.
   {
     deLaZero();
     let pierdut = true;
@@ -2796,9 +2801,10 @@ console.log('\nPagina fără scenă: titlul, capitolul sanctuarului cu sursele, 
 // la prima vizită primul cadru ținea firul ~0,37 s, din care ~0,30 s numai legarea. scena.js
 // le compilează întâi cu `compileAsync`, după ce toate plasele sunt în scenă și înaintea
 // buclei. Între ele stă numai așteptarea fotografiei (`asteaptaSatelitul`; vezi „Satelit la
-// pornire”, (k)), nicio altă așteptare. Timpii cer WebGL: în pagină (CLAUDE.md). Aici se
-// păzește ordinea, pe sursă. Controale: scena.js de la REPER_VECHI, fără compilare, și sursa de
-// azi cu compilarea mutată după `setAnimationLoop`.
+// pornire”, (k)), nicio altă așteptare. Timpii cer WebGL: în pagină
+// (`docs/randarea.md`, „Compilarea, înaintea primului cadru”). Aici se păzește ordinea, pe
+// sursă. Controale: scena.js de la REPER_VECHI, fără compilare, și sursa de azi cu
+// compilarea mutată după `setAnimationLoop`.
 console.log('\nCompilarea înaintea primului cadru (scena.js)');
 {
   const COMPILA = 'try { await renderer.compileAsync(scena, camera); } catch', BUCLA = 'renderer.setAnimationLoop(() =>';

@@ -33,26 +33,27 @@ nu se măsoară pe ele.
 
 | nivel | sursă | pas | noduri de uscat | triunghiuri | textura Satelit |
 |---|---|---|---|---|---|
-| `harta_v6` | dalele DGT de 2 m, filtru cort 1-2-1 | 4 m | 109 248 | 216 105 | ortofoto, 2 m, 0,62 MB |
-| `harta_v9` | dalele DGT de 2 m, filtru cort 1-2-…-6-…-2-1 | 12 m | 69 151 | 138 203 | ortofoto, 2 m, 3,09 MB |
-| `harta_v7` | Copernicus GLO-30 | 32 m | 37 853 | 75 834 | ortofoto unde acoperă, altfel Sentinel-2; 16 m, 0,22 MB |
-| `harta_v8` | Copernicus GLO-30, media a 8 × 8 eșantioane, pe un disc de 50 km | 256 m | 30 931 | 64 457 | Sentinel-2, 64 m, 0,59 MB |
+| `harta_v6` | dalele DGT de 2 m, filtru cort 1-2-1 | 4 m | 109 248 | 216 105 | ortofoto, 2 m, 0,62 MiB |
+| `harta_v9` | dalele DGT de 2 m, filtru cort 1-2-…-6-…-2-1 | 12 m | 69 151 | 138 203 | ortofoto, 2 m, 3,09 MiB |
+| `harta_v7` | Copernicus GLO-30 | 32 m | 37 853 | 75 834 | ortofoto unde acoperă, altfel Sentinel-2; 16 m, 0,22 MiB |
+| `harta_v8` | Copernicus GLO-30, media a 8 × 8 eșantioane, pe un disc de 50 km | 256 m | 30 931 | 64 457 | Sentinel-2, 64 m, 0,59 MiB |
 
-În total +494 599 de triunghiuri (+25,7%), 27,9 MB de atribute (cu normalele nivelurilor
-netezite), 7,14 MB de fișiere — din care 3,09 MB textura de 2 m a lui `harta_v9`. ETC1S ar fi
-dat 0,62 MB, cu ΔE_OK×100 1,35 după decodare față de 0,22 (p99 6,0 față de 1,6); s-a păstrat
+În total +494 599 de triunghiuri (+25,7%), 27,9 MiB de atribute (cu normalele nivelurilor
+netezite), 7,14 MiB de fișiere — din care 3,09 MiB textura de 2 m a lui `harta_v9`. ETC1S ar fi
+dat 0,62 MiB, cu ΔE_OK×100 1,35 după decodare față de 0,22 (p99 6,0 față de 1,6); s-a păstrat
 UASTC, alegerea autorului pentru alpha.
 De ce până la 50 km: ceața three e PLANĂ (`vFogDepth = −mvPosition.z`), camera poate
 sta la ~10 km de centru, iar colțurile unui ecran 16:9 văd până la ~30 km; la 25 km
 uscatul ar fi fost în ceață numai pe jumătate, lângă o mare deja ~78% în ceață. Și de
-ce nu mai departe: camera stă la cel mult ~9,6 km de centru, iar planul îndepărtat e la
+ce nu mai departe: camera stă la cel mult ~9,9 km de centru (1,9 km până la colțul lui alpha,
+plus 8 km), iar planul îndepărtat e la
 60 km; colțurile pătratului lui `harta_v8`, la 68 km, ar fi fost retezate drept de el.
 Dincolo de disc (`RAZA_V8`) nodurile sunt apă — 24 156 —, și tot de aceea lipsesc
 dalele GLO-30 N37: uscatul de la sud de 38°, lângă Sines, e la peste 50 km.
 
 **Sursele noi**, deschise, aduse o singură dată (`npm run surse-imprejurimi`, aprobat
-de autor: 52,1 MB în 208 cereri, plus 0,45 MB de antete citite întâi, la probă —
-Copernicus ~23 MB, Sentinel ~29,5 MB). Manifestul `scripts/imprejurimi/surse.json` ține
+de autor: 52,1 MiB în 208 cereri, plus 0,45 MB de antete citite întâi, la probă —
+dalele Copernicus au 23 956 988 B, cele Sentinel 29 683 274 B, după manifest). Manifestul `scripts/imprejurimi/surse.json` ține
 prima descărcare și, pe fiecare fereastră, mărimea dalelor ei din antet (53,6 MB în
 total); o rulare de pe disc, care nu mai cere nimic — nici itemii STAC, ținuți și ei
 pe disc —, nu le rescrie. `scripts/comun/cog.mjs` citește COG-uri pe intervale de octeți și ține pe
@@ -150,7 +151,8 @@ Funcțiile comune ale texturilor (mipuri, KTX2, pierdere) stau în `scripts/comu
 fațetele de 32 m se vedeau pe Relief, de la ~2 km, ca pete — fiecare cu lumina și
 culoarea ei —, iar autorul a cerut relieful netezit (2026-10-07); cele de 12 m ale lui
 `harta_v9`, văzute de la 0,4–2,4 km, la fel. `harta_v6` rămâne cu fațete, ca alpha. Normala e pe nod, din diferențe centrale pe grilă, pe 8 biți cu semn
-(`normal` normalizat, 3 octeți pe vârf: +1,4 MB); culoarea, tot pe nod, din aceeași
+(`normal` normalizat, 3 octeți pe vârf: +2,5 MB pe cele 835 482 de vârfuri netezite, suma nodurilor și
+fâșiilor numărate de `verifica-imprejurimi`); culoarea, tot pe nod, din aceeași
 regulă, cu panta normalei și NDVI-ul nodului, iar GPU-ul le interpolează peste triunghi.
 Un nod de apă ia media culorilor uscatului de pe cel mai apropiat inel de noduri din
 jurul lui: o fațetă de 32 m care coboară de la 10 m la −8 m iese din mare abia la 57% din
@@ -193,18 +195,18 @@ vederi (țintă fixă 640 × 400). Timpul GPU, alternat vechi/nou, mediana a 15:
 16,54; în 1600 × 900 cu MSAA 4, −0,23…−0,33 ms. Același câștig în toate vederile: e în
 vârfuri. Satelit nu e atins — materialul lui e neiluminat.
 
-**Textura lui `harta_v9`** se cere întreagă, la 2 m pe texel (3,09 MB), odată cu celelalte.
+**Textura lui `harta_v9`** se cere întreagă, la 2 m pe texel (3,09 MiB), odată cu celelalte.
 De la 0.1.3.02 până pe 2026-10-08 venea în două trepte: întâi `harta_v9-orto_v1-mic`,
-nivelurile de mip 1–4 ale celei întregi (4 m, 0,79 MB), apoi cea de 2 m, după ce Satelit era
+nivelurile de mip 1–4 ale celei întregi (4 m, 0,79 MiB), apoi cea de 2 m, după ce Satelit era
 pe ecran. Pe 2026-10-08 autorul a văzut harta încărcându-se în etape și a cerut s-o vadă o
-singură dată, direct pe Satelit, cu tot la detaliul întreg (vezi „Vederea Satelit”).
+singură dată, direct pe Satelit, cu tot la detaliul întreg (vezi `docs/satelit.md`, „O singură încărcare”).
 Varianta mică a ieșit din depozit, cu `TEXTURA_MICA` din `textura-imprejurimi`; regula ei din
 `vercel.json`, `(?:-mic)?`, a rămas și nu mai prinde nimic, iar pentru `verifica-livrare` un
 `-mic` revenit e un fel necunoscut și pică (încercat cu fișierele încă în `dist/`). Compresia
 n-ar fi ajutat: setarea UASTC e deja cea implicită, iar cu RDO mai tare fișierul scade cu 5%
-(2,93 MB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MB, cu ΔE de șase ori mai
+(2,93 MiB) sau, cu pierderea p99 triplată, cu 17%; ETC1S ar avea 0,62 MiB, cu ΔE de șase ori mai
 mare.
-Cine revine nu le mai cere deloc: `vercel.json` le ține un an în cache (vezi „Livrarea”). În
+Cine revine nu le mai cere deloc: `vercel.json` le ține un an în cache (vezi `docs/livrarea.md`, „Cache-ul”). În
 `?previzualizare` nu se încarcă. Satelit le comută materialele cu ale lui alpha, pe
 același program. `inaltimeRandata` din scenă — alpha unde e alpha, împrejurimile în
 rest — e cea pe care merg raza panoului punctului și ocluzia etichetei; măsurătorile
@@ -249,7 +251,7 @@ busola (`acasa()`) și tasta Home. Rozeta poartă eticheta „Acasă — vederea
   `harta_v8`, orice normală aproape verticală ar trece): mediană 0,42° / 0,56° / 0,56°, p99
   4,32° / 3,30° / 3,42° (`harta_v9` / `harta_v7` / `harta_v8`), prag 1°; control: normala
   nodului de la est dă 2,10° / 2,52° / 2,10°;
-- bugetul: 600 000 de triunghiuri, 8 MB de fișiere (azi 7,14); fiecare nivel are în
+- bugetul: 600 000 de triunghiuri, 8 MiB de fișiere (azi 7,14); fiecare nivel are în
   `public/data` numai cele șase fișiere pe care le cere pagina — cu varianta mică încă acolo,
   `harta_v9` pica;
 - la bit: sha256 pe fiecare atribut al celor patru plase, cu fâșiile, cât în `AMPRENTA`

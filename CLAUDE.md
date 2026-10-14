@@ -12,6 +12,9 @@ se poartă în română.
 
 - three.js **0.186.0 (r186)**, versiune fixă în `package.json`, fără `^`
 - Vite 8.3.0 (dev server + build), tot fără `^`
+- three e fixat și pentru că `camera.js` folosește membri privați ai OrbitControls, iar
+  `loaders.js` `KTX2Loader.init()`: o versiune nouă trece întâi prin `verifica-controale` și
+  `verifica-pagina`, care îi verifică.
 - JavaScript modern, module ES, fără framework. Nu introduce React, TypeScript
   sau alt strat fără să întrebi întâi.
 
@@ -29,18 +32,18 @@ se poartă în română.
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 | `npm run build-zona` / `build-petic` | baza și peticul lui alpha → `public/data/harta_vN-dem.*`; un nume nou pe fiecare hartă |
 | `npm run verifica-teren` | plasa și culoarea terenului, cu codul paginii, în Node |
-| `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/` |
-| `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
-| `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele de sosire ale dalelor, straturile PNG, candidații din afara OSM |
-| `npm run masoara-sanctuar` | acoperișuri, turnuri, cupole, ziduri, apeduct și coșuri măsurate pe MDS → `date-sursa/derivate/` |
+| `npm run verifica-tiff` | decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT |
+| `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface |
+| `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele dalelor, straturile, candidații |
+| `npm run masoara-sanctuar` | formele sanctuarului, măsurate pe MDS → `date-sursa/derivate/` |
 | `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`; un nume se scrie o singură dată |
 | `npm run verifica-sanctuar` | sanctuarul, cu codul paginii, în Node, față de LiDAR, de numărătoarea din 1880 și de el însuși |
-| `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
+| `npm run masoara-zbor` | soarele, deplasarea și înclinarea ortofotoului → `date-sursa/derivate/zbor.json` |
 | `npm run textura-ortofoto` | texturile Satelit ale lui alpha (KTX2 UASTC) → `public/data/<hartă>-orto_v1.*`; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul; măsurătoare, nefolosită de pagină |
-| `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
+| `npm run osm-cladiri` | instantaneul OSM al celorlalte clădiri, cu versiuni fixate; `-- --din-manifest` îl reface |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
 | `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul |
 | `npm run surse-imprejurimi` | aduce o singură dată Copernicus DEM și Sentinel-2, cu manifestul `scripts/imprejurimi/surse.json` |
@@ -48,21 +51,25 @@ se poartă în română.
 | `npm run textura-imprejurimi` | texturile Satelit și NDVI-ul împrejurimilor; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | alpha și împrejurimile, cu codul paginii, în Node: cusăturile, bugetul, culoarea, netezirea |
 | `npm run verifica-controale` | mouse-ul, degetele, tastatura și drona, busola, Escape, panoul „Coordonate”, cu codul paginii, în Node |
-| `npm run verifica-livrare` | după `npm run build`: cache, antete și CSP, numele publicate, ES5 și marcajul; `-- --live` față de sebastians.life |
+| `npm run verifica-livrare` | după build: cache, antete și CSP, numele publicate, ES5, marcajul; `-- --live` pe sebastians.life |
 | `npm run verifica-pagina` | restul, cu codul paginii, în Node: Satelit, foaia de stil, ordinea de desenare, canvasul, pornirea, pagina fără scenă |
-| `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.svg`, `favicon.ico`, `apple-touch-icon.png` |
+| `npm run verifica-documentatie` | CLAUDE.md și `docs/`: mărimea, indexul, trimiterile, căile decodoarelor, comentariile vechi, sursele etichetelor |
+| `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.*`, `apple-touch-icon.png` |
 
-Ce verifică fiecare probă, pe larg, și tabelul vechi: `docs/comenzi.md`. Scripturile de construit
-hărți și texturi cer `date-sursa/`, care nu e în depozit; codul lor comun stă în `scripts/comun/`.
+Pe larg: `docs/comenzi.md`. Scripturile de construit hărți și texturi cer `date-sursa/`, care nu e
+în depozit; codul lor comun stă în `scripts/comun/`.
 
 ## Arhitectură
 
-- `src/main.js` — punctul de intrare; leagă scena de conținut, nimic altceva
+- `src/main.js` — punctul de intrare: pornește scena și ține mesajul de încărcare, atribuirea cu
+  modala surselor (`scrieSurse`) și calea fără scenă (`faraScena`), cu scena eliberată la eșec
 - `src/scene/` — tot codul three.js. Nimic din three.js nu trăiește în afara acestui director.
 - `src/chapters/` — câte un modul per capitol narativ, numai DOM, cu un `init()` și un `dispose()`.
   Azi `sanctuar.js`: fișa etichetei (`creeazaFisa`, din eticheta.js) și textul ei pe calea fără scenă
 - `src/content/` — textele în română, ca date, separate de cod
-- `public/` — modele, texturi, fotografii, decodoare. Servite ca atare.
+- `src/styles/` — `main.css`, foaia de stil a paginii, și `cursoare/`, cursoarele SVG ale hărții
+- `public/` — servit ca atare: `data/` (hărțile, straturile, texturile KTX2, sanctuarul,
+  clădirile, paleta), `plasa.js`, iconițele; `models/`, `photos/`, `textures/` goale, de rezervă.
 - `docs/` — notele pe subsisteme: de ce e fiecare lucru cum e, măsurătorile, probele, istoricul
   (indexul, mai jos)
 
@@ -93,7 +100,10 @@ când lucrezi în `src/scene/`.
 
 Înainte să spui că o modificare e gata:
 
-1. `npm run build` trebuie să treacă fără erori.
+1. `npm run build` trebuie să treacă fără erori, apoi probele Node: `npm run verifica-tiff`,
+   `-teren`, `-sanctuar`, `-cladiri`, `-imprejurimi`, `-controale`, `-pagina` și `-documentatie`
+   (`verifica-livrare`, la pasul 5). Fără `date-sursa/`, probele pe date reale se sar, cu mesaj:
+   asta nu e un eșec.
 2. Deschide panoul Browser (Ctrl+Shift+B / Cmd+Shift+B), încarcă pagina,
    fă un screenshot și **uită-te la el**. O scenă 3D poate compila perfect și
    afișa un ecran negru.
@@ -120,7 +130,7 @@ Nu declara nimic funcțional fără dovadă. Dacă nu poți verifica, spune asta
 ## Decizii în vigoare
 
 Regulile care țin de tot proiectul, nu de un singur fișier. Fiecare e pe larg, cu motivul și
-proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB = 10⁶ B, MiB = 2²⁰ B.
+proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB = 10⁶ B, MiB = 2²⁰ B; KB = 10³ B, KiB = 2¹⁰ B.
 
 **Date, nume, depozit**
 - Un nume publicat în `/data` (`harta_vN-dem.*`, `harta_vN-orto_vM.*`, `sanctuar_vN.json`,
@@ -134,13 +144,16 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   cele vechi rămân în istoricul git. `date-sursa/` nu intră în depozit, datele produse în
   `public/data` da. O hartă nouă — alt contur, alt pas, alt conținut — primește un nume nou.
   → harti-relief
-- Scripturile își numesc fișierele-sursă (`DALE`, `NIVELURI`, `ORTOFOTO_ALPHA`), nu iau „primul
-  din director”; o dală nenumită care atinge amprenta oprește construcția. → harti-relief,
-  imprejurimi
-- Sursele externe se aduc o singură dată, cu manifest; o construcție nu descarcă nimic. OSM:
+- `build-petic`, `build-imprejurimi` și scripturile ortofotoului își numesc sursele (`DALE`,
+  `NIVELURI`, `ORTOFOTO_ALPHA`), nu iau „primul din director”; `build-imprejurimi` se oprește la
+  o dală nenumită care îi atinge amprenta. `build-zona` încă citește toate `.tif` din
+  `date-sursa/lidar` care ating cutia. → harti-relief, imprejurimi, fotografii
+- Sursele pe care le aduce un script (Copernicus, Sentinel-2, OSM) se aduc o singură dată, cu
+  manifest; dalele DGT le aduce autorul de mână, din CDD. O construcție nu descarcă nimic. OSM:
   versiuni fixate, instantanee care nu se suprascriu, fără Overpass, sub o cerere pe secundă.
   → imprejurimi, sanctuar
-- Aceleași date dau aceiași octeți (la KTX2: `--threads 1` și `--uastc-rdo-m`). Octeții
+- Texturile KTX2 ies la octet din aceleași date (`--threads 1`, `--uastc-rdo-m`); fișierele JSON
+  scrise de build-*, `paleta` și `strat-ndvi` poartă `generat`, deci nu. Octeții
   comparați cu git se compară ca blob git (`hash-object --path`): cu `core.autocrlf`, capetele
   de rând diferă. Extragerile binare din git, în Git Bash, nu în PowerShell 5.1. → livrarea,
   satelit, harti-relief
@@ -154,10 +167,9 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - Rândul „© DGT · © Copernicus · © OpenStreetMap” se vede fără nicio interacțiune (regulile
   OSMF); „© DGT” deschide modala cu restul, inclusiv clauza de răspundere a Copernicus DEM.
   → fotografii
-- Fotografiile de pe Commons se folosesc numai ca să se vadă, nu se copiază. → sanctuar
 
 **Coordonate, nord, altitudine**
-- Scena stă pe grila TM06: +X e estul grilei, −Z nordul grilei, Y altitudinea. → busola
+- Scena stă pe grila TM06: +X e estul grilei, −Z nordul grilei, Y altitudinea. → busola, punctul
 - γ nu e o constantă: se deduce din `colturi_geo` al bazei, cu `cos φ · N/M` pe GRS80. Fără
   `colturi_geo`, busola nu se creează. → busola
 - Capcana semnului: theta = 0 înseamnă camera la SUD; „nordul în sus” e theta = γ. Cifra busolei
@@ -184,8 +196,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - „Coordonate” pornește minimizat și, minimizat, nu culege nimic; textul copiat are punct
   zecimal. → punctul
 - Harta se mânuiește ca o hartă (stânga mută, dreapta rotește, rotița spre cursor), iar
-  tastatura ca o dronă; harta n-are butoane pe ecran. Tastele se recunosc după poziție (`code`).
-  → controale
+  tastatura ca o dronă; harta n-are butoane pe ecran. Mutarea, rotirea, Shift și Ctrl se recunosc
+  după poziție (`code`, și pe AZERTY); plusul, minusul și Home, după semn (`key`). → controale
 - Camera stă între 80 m și 8 km de țintă, cu ținta în cutia nodurilor lui alpha; niciun pas de
   la tastatură n-o duce sub 20 m peste ce e sub ea. Zborul pune poziția absolut, după ce
   descarcă inerția și încheie gestul în curs. → controale, busola
@@ -197,8 +209,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 **Randarea**
 - Scena desenează la cerere: în repaus, 0 cadre (de aceea și cerul e senin). O animație se
   agață în buclă, fără al doilea `requestAnimationFrame`. → randarea
-- Raportul de pixeli e cel mult 2, iar canvasul cel mult 2560 × 1440 de pixeli de dispozitiv;
-  MSAA rămâne. → randarea
+- Raportul de pixeli e cel mult 2, iar canvasul cel mult 2560 · 1440 ≈ 3,69 milioane de pixeli
+  de dispozitiv (o arie, nu laturi); MSAA rămâne. → randarea
 - Cerul se desenează ultimul (`renderOrder` 2), marea după teren (1, `LessDepth`); programele
   se compilează cu `compileAsync` înaintea buclei. → randarea
 - Construcția plaselor rămâne pe firul principal, fără workeri: decizia autorului. → satelit
@@ -212,7 +224,7 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   `webglcontextrestored`; soarele nu se mută ca să încadreze umbra. → sanctuar
 - Ce stă în DOM peste hartă (eticheta, semnul punctului, pivotul) se proiectează pe cadrul
   desenat, după `camera.updateMatrixWorld()`; „vizibil” se citește cu
-  `getClientRects().length`. → sanctuar, punctul
+  `getClientRects().length`. → sanctuar, punctul, controale
 
 **Satelit**
 - Pagina pornește pe Satelit și arată harta o singură dată, cu cele șase texturi întregi; cu
@@ -222,8 +234,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   Relief rămâne la octet. → satelit
 - Texturile sunt KTX2 UASTC (alegerea autorului), cu versiune proprie (`orto_vN`). Transcodorul
   nu se copiază în `public/`: îl emite Vite. → satelit, livrarea
-- Falezele rămân fotografia, iar acoperișurile fantomă nu se retușează: alegerea autorului.
-  → satelit
+- Falezele rămân fotografia: alegerea autorului. Acoperișurile fantomă încă nu s-au retușat;
+  retușul (`orto_v2`) e opțional, iar primul loc de retușat e turnul de nord. → satelit
 - Gărzile: 20 s fără niciun octet opresc pornirea sau fotografia; transcodarea are 30 s,
   numărate numai cât pagina e vizibilă. → pornirea, satelit
 
@@ -235,25 +247,29 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   `@supports`, cu rezerva `vh` în `--vizibil`. → punctul, livrarea
 - Textul panoului „Coordonate” are cel puțin 14 px (0,875rem). → punctul
 - Animațiile CSS numai pe `transform` și `opacity`, oprite sub reduced-motion; selecția e
-  oprită numai pe hartă și pe butoanele de peste ea. → pornirea, controale
+  oprită numai pe hartă și pe butoanele de peste ea. → comenzi, controale
 - Focusul de peste hartă are haloul `0 0 0 7px var(--bg)`; în contrast forțat, busola trece
   pe `CanvasText`. → controale
 - Un singur `h1` și `<noscript>`, în afara lui `#continut`; panourile ascunse și canvasul fără
   pointer până la `data-scena`. → pornirea
 - `build.target` e `['es2022', 'safari15.4', 'ios15.4']`; `public/plasa.js` e ES5, script clasic
   cu `defer`. → pornirea
-- Fără `frame-ancestors` și fără `og:image`, la alegerea autorului; hărțile de cod se publică,
-  închise publicului. → livrarea
+- Fără `frame-ancestors`, ales: pagina se poate încadra. `og:image` lipsește până alege autorul
+  o imagine. Hărțile de cod se publică, închise publicului, la alegerea autorului. → livrarea
 
 **Probele**
 - Fiecare probă de fond are un control negativ: aceeași probă pe o greșeală cunoscută, care
-  trebuie să pice. Probele Node rulează codul paginii, nu copii ale lui. → sanctuar, controale
+  trebuie să pice. Codul încercat e al paginii, importat, nu copiat; valoarea de referință se
+  calculează independent în probă, nu se importă. → sanctuar, controale, teren, imprejurimi
+- O probă pe sursă aduce textul la LF, iar o mutație care nu se aplică pică singură: probele trec
+  pe o clonă LF și pe una CRLF. → satelit
 - `AMPRENTA` (sha256 pe atribute) ține refactorizările la bit; o schimbare voită o rescrie, cu
   motivul în commit. → teren, imprejurimi, sanctuar, cladiri
 - „Identic la pixel” se scrie numai când chiar e; o cifră pe care n-o reface niciun cod sau cu
   sursă necunoscută nu dovedește nimic. → teren, sanctuar
-- Încărcătoarele opționale nu aruncă: `null` și un singur avertisment. Un `null` din JSON se
-  verifică: în aritmetică ar intra drept 0. → satelit, sanctuar
+- Încărcătoarele opționale nu aruncă: la eșec, `null` și un singur avertisment; la abandonul
+  gărzii sau la `dispose()`, `null` fără avertisment. Un `null` din JSON se verifică: în
+  aritmetică ar intra drept 0. → satelit, sanctuar, pornirea
 - Câte arce și ferestre are fiecare aripă spune Pinho Leal (1880); `build-sanctuar` se oprește
   dacă numărul ar scădea tăcut. → sanctuar
 - Fotografiile se copiază prin USB și nu pictează harta. Platoul ia culoarea din ortofoto,
@@ -269,9 +285,9 @@ ce e fiecare lucru cum e și ce probă pică dacă îl strici.
 | Când atingi… | Citește |
 |---|---|
 | `vercel.json`, versiunea din `vite.config.js`, antetele și CSP-ul, iconițele, `verifica-livrare`, `scripts/comun/vercel.mjs`, `publicat.mjs` | `docs/livrarea.md` |
-| pornirea din `main.js` (mesajul de încărcare, `faraScena`, anunțul), `index.html`, `public/plasa.js`, `src/chapters/`, `build.target`, garda și încărcarea din `loaders.js` | `docs/pornirea.md` |
+| pornirea din `main.js` (încărcarea, `faraScena`), `index.html`, `public/plasa.js`, `src/chapters/`, `build.target`, garda din `loaders.js` | `docs/pornirea.md` |
 | `harta_v4` și `harta_v5`, `build-zona`, `build-petic`, `strat-ndvi`, `ortofoto`, `verifica-tiff`, `scripts/comun/relief.mjs`, `tiff.mjs`, `lzw.mjs`, `tm06.mjs` | `docs/harti-relief.md` |
-| `busola.js`, `zbor.js`, `VEDERE_START` și `acasa()` din `camera.js`, `scripts/comun/soare.mjs` | `docs/busola.md` |
+| `busola.js`, `zbor.js`, `VEDERE_START` și `acasa()` din `camera.js` | `docs/busola.md` |
 | `punct.js`, `geo.js`, `raza.js`, `cadru-liber.js`, `#punct` din `main.css` | `docs/punctul.md` |
 | `ControaleHarta` și drona din `camera.js`, `rotita.js`, `gest.js`, `tastatura.js`, cursoarele, focusul, `verifica-controale` | `docs/controale.md` |
 | `terrain.js`, `palette.js`, `previzualizare.js`, `verifica-teren` | `docs/teren.md` |
@@ -279,10 +295,9 @@ ce e fiecare lucru cum e și ce probă pică dacă îl strici.
 | `alpha.js`, `imprejurimi.js`, `cusatura.js`, `harta_v6`, `v9`, `v7`, `v8`, `*-imprejurimi.mjs`, `scripts/comun/imprejurimi.mjs`, `cog.mjs`, `textura.mjs` | `docs/imprejurimi.md` |
 | `satelit.js`, KTX2 din `loaders.js`, `*-orto_v1.*`, `textura-ortofoto`, `masoara-faleza` | `docs/satelit.md` |
 | `sanctuar.js`, `sanctuar-forme.js`, `drapaj.js`, `eticheta.js`, `fisa-cadru.js`, `umbre.js`, `src/content/sanctuar.js`, `*-sanctuar.mjs`, `scripts/sanctuar/`, `scripts/comun/osm.mjs`, `plane.mjs` | `docs/sanctuar.md` |
-| `cladiri_v1.json`, `*-cladiri.mjs`, `scripts/cladiri/`, `src/content/cladiri.js`, umbrele pe grupuri (`urmaresteGrupul`) | `docs/cladiri.md` |
-| `citeste-poze`, `culori-poze`, `paleta`, `masoara-zbor`, `paleta-teren.json`, `scripts/comun/exif.mjs`, `oklab.mjs`, atribuirea și modala „© DGT” | `docs/fotografii.md` |
-| comenzile din `package.json`, `verifica-pagina` | `docs/comenzi.md` |
-
+| `cladiri_v1.json`, `*-cladiri.mjs`, `scripts/cladiri/`, `src/content/cladiri.js`, `src/scene/nume.js`, umbrele pe grupuri (`urmaresteGrupul`) | `docs/cladiri.md` |
+| `citeste-poze`, `culori-poze`, `paleta`, `masoara-zbor`, `scripts/comun/soare.mjs`, `paleta-teren.json`, `scripts/comun/exif.mjs`, `oklab.mjs`, atribuirea și modala „© DGT” | `docs/fotografii.md` |
+| comenzile din `package.json`, `verifica-pagina`, `verifica-documentatie` | `docs/comenzi.md` |
 
 ## Principii de design (nenegociabile)
 
@@ -293,10 +308,11 @@ ce e fiecare lucru cum e și ce probă pică dacă îl strici.
   barele de defilare. Tema deschisă, aleasă după `prefers-color-scheme`, a plecat
   după v0.1.1, la cererea autorului.
 - **Responsivitate** reală, pe toate dimensiunile și nivelurile de zoom.
-- **Navigare clară:** nav sticky, breadcrumbs, scrollspy.
+- **Navigare clară:** nav sticky, breadcrumbs, scrollspy (neimplementat încă: singurul capitol, al
+  sanctuarului, e fișa și textul de pe calea fără scenă).
 - **Degradare grațioasă:** pagina trebuie să rămână lizibilă și fără WebGL.
   Textul este conținutul; scena 3D îl servește, nu invers. Fără WebGL2, `#continut` are textul
-  fișei sanctuarului, cu sursele; fără JavaScript, o propoziție (vezi „Pornirea”).
+  fișei sanctuarului, cu sursele; fără JavaScript, o propoziție (vezi `docs/pornirea.md`, „Titlul și pagina fără scenă”).
 - `prefers-reduced-motion` oprește animațiile automate ale camerei.
 
 ## Acuratețe factuală

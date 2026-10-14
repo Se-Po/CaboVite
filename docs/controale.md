@@ -321,7 +321,7 @@ paza solului, pe build: Ctrl până la 27,42 m peste mare, apoi Q ×6 (216° →
   mijloc → zoom, un deget → mutare, două → zoom și rotire, ridicat unul → mutare;
 - metodele și câmpurile private folosite există — dacă three se schimbă, aici pică;
 - panoul „Coordonate” culege același punct ca zoomul și apucarea, și pe mare (vezi
-  „Punctul de sub clic”): 0 m pe 5 200 de pixeli; control, compunerea veche: pe mare,
+  `docs/punctul.md`, „Punctul de sub clic”): 0 m pe 5 200 de pixeli; control, compunerea veche: pe mare,
   mediana 13,53 m;
 - pagina mărită, cu un `visualViewport` fals pus înainte de creare: pornită la scara 2,
   fără niciun `resize`, `touch-action: manipulation` și controalele oprite, iar o atingere

@@ -36,7 +36,7 @@ de sub el: ΔE 0,50 / 0 / 0,53 opus soarelui / spre el / lateral; o ceață de c
 constantă ar da 2,85 / 4,54 / 0,59. Alpha stă sub 5 km de cameră și primește ceața
 obișnuită, liniară, cu media orizontului ca culoare — aceeași lege ca înainte, deci
 terenul de aproape iese neschimbat. Împrejurimile, până la 50 km, păstrează legea
-liniară, dar iau culoarea cerului de pe azimut — vezi „Zona alpha și împrejurimile”. Cadre desenate în 2 s de repaus: 0.
+liniară, dar iau culoarea cerului de pe azimut — vezi `docs/imprejurimi.md`, „Ceața”. Cadre desenate în 2 s de repaus: 0.
 
 ## Randarea: ordinea de desenare, mărimea canvasului, compilarea
 
@@ -102,10 +102,10 @@ telefon de 390 × 844 la 3× avea 1170 × 2532 (2,96 MP), sub plafonul de pixeli
 35,5–47,4 MB cu rezolvarea MSAA implicită și 118,5–130,3 MB cu cea explicită; la 2× e de
 2,25 ori mai mic <!-- NEVERIFICAT: ce rezolvare MSAA alege Chrome pe telefon -->.
 Întoarce true și la o mărime CSS nouă cu același buffer — mărirea paginii, 1280 × 720 la 1× →
-640 × 360 la 2× —, ca bucla să refacă decalajul imaginii (vezi „Punctul de sub clic”).
+640 × 360 la 2× —, ca bucla să refacă decalajul imaginii (vezi `docs/punctul.md`, „Punctul de sub clic”).
 
-Ce a costat: un telefon în peisaj pornește cu umbrele pe cutia unită (vezi „Umbrele pe
-grupuri”), iar cu pagina mărită de două ori pe telefon (195 × 422 la 6×) canvasul rămâne
+Ce a costat: un telefon în peisaj pornește cu umbrele pe cutia unită
+(vezi `docs/cladiri.md`, „Umbrele pe grupuri”), iar cu pagina mărită de două ori pe telefon (195 × 422 la 6×) canvasul rămâne
 390 × 844 — un pixel randat pe 3 × 3 ai ecranului. Un buget de pixeli pe
 `(pointer: coarse)`, care n-ar depinde de mărire, nu s-a ales.
 
@@ -125,7 +125,7 @@ iar promisiunea se rezolvă după un temporizator de ~10 ms (WebGLRenderer.js:15
 pe primul cadru <!-- NEVERIFICAT: calea fără extensie, citită în cod -->. Programul umbrei
 rămâne pe primul cadru (`compile()` nu face trecerea de umbre). Satelit își compilează
 materialele pe plase-proxy, înaintea lui: între `compileAsync` și buclă stă numai așteptarea
-fotografiei (vezi „Vederea Satelit”). Pe un context pierdut Chromium dă `COMPLETION_STATUS_KHR`
+fotografiei (vezi `docs/satelit.md`, „O singură încărcare”). Pe un context pierdut Chromium dă `COMPLETION_STATUS_KHR`
 adevărat, deci așteptarea nu se agață.
 
 Măsurat pe build, în panou, cu fila în față (Intel UHD 770, ANGLE D3D11, canvas 916 × 914),

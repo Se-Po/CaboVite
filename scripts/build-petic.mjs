@@ -311,7 +311,7 @@ const main = () => {
 
   console.log(`\ndeplasare în scenă: x ${deplasare.x}, z ${deplasare.z}`);
   console.log(`gaura din bază: x ${gaura.x0}..${gaura.x1}, z ${gaura.z0}..${gaura.z1}`);
-  console.log(`scris: public/data/${NUME}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MB) + .json`);
+  console.log(`scris: public/data/${NUME}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MiB) + .json`);
 };
 
 main();

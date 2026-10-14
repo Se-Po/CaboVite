@@ -17,7 +17,7 @@ rămâne. Mișcarea camerei nu depinde de el. Fără mouse, butonul **„Măsoar
 (următorul după „–” cu Tab) culege, cu aceeași culegere ca un clic, punctul din centrul
 vederii — ținta camerei pe ecran (`centruVederii` din camera.js), deci centrul părții
 libere de fișă și de cutie (mai jos). Stă pe un rând cu „Copiază” pe desktop, pe telefon unul sub altul.
-Escape îl minimizează (vezi „Focusul, Escape și contrastul forțat”). Unde stă:
+Escape îl minimizează (vezi `docs/controale.md`, „Focusul, Escape și contrastul forțat”). Unde stă:
 - pe desktop, dreapta-jos, sub coloana busolei, deasupra versiunii paginii;
 - pe ecranele late dar scunde (≤ 32rem), la stânga coloanei busolei;
 - pe telefon, pe rândul de jos, la stânga coloanei busolei și a lui Satelit;
@@ -163,7 +163,7 @@ baza de 2 m în rest. Nu e cosmetic: diferența dintre plase e ~2 mm în mijlocu
 peticului și până la 0,153 m pe cusătură.
 
 `src/scene/geo.js` face conversiile scenă ↔ TM06 ↔ longitudine/latitudine,
-ancorate pe **centrul** lui `bbox_tm06` — vezi convenția de mai sus. Longitudinea
+ancorate pe **centrul** lui `bbox_tm06` — vezi `docs/harti-relief.md`, „Convenția `bbox_tm06`”. Longitudinea
 și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
 mai multe ar fi precizie inventată peste o sursă rotunjită.
 

@@ -123,7 +123,7 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
     pagină, la primul cadru, pe Satelit: 1440 × 900 la DPR 1 dă „toate”, 0,497 m pe texel; la
     DPR 2 (canvas 2428 × 1517) „sanctuar”, 0,216 m; telefonul în portret, 390 × 844 la 3×
     (780 × 1688), „sanctuar”; în PEISAJ, 844 × 390 la 3× (1688 × 780), „toate”, 0,497 m —
-    raportul de pixeli e plafonat la 2 (vezi „Mărimea canvasului”), iar fără plafon canvasul
+    raportul de pixeli e plafonat la 2 (vezi `docs/randarea.md`, „Mărimea canvasului”), iar fără plafon canvasul
     ar avea 1170 px înălțime, peste prag. Farul își primește umbra când te apropii de el.
     Cutia unită, forțată, ar fi
     făcut umbrele sanctuarului, din mijlocul imaginii, de 2,3 ori mai difuze sub
@@ -144,7 +144,7 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 
 - **încărcătorul:** șapte căi de eșec dau `null` și un avertisment, fără aruncare.
   Una dintre ele sunt datele sanctuarului;
-- **construcția:** 0 elemente sărite, 232 de triunghiuri (buget 6 000), 6,5 KB
+- **construcția:** 0 elemente sărite, 232 de triunghiuri (buget 6 000), 6,5 KiB
   (buget 20), două grupuri. O cheie inexistentă în `materiale_profil` sare farul,
   cu avertisment; înainte, culoarea nedefinită se scria tăcut ca negru;
 - **vârful:** cel mai înalt vârf e la 168,28 m, iar raza verticală pe ax lovește

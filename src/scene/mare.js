@@ -69,8 +69,13 @@ void main() {`)
  *   culoarea cerului pe direcția fiecărui pixel, în loc de una singură: cerul e mai
  *   luminos spre soare, iar o ceață de o singură culoare ar lăsa o linie vizibilă la
  *   orizont. Fără el, ceața obișnuită.
- * @param {number} [intindere] 120 km, de două ori planul îndepărtat al camerei:
- *   marginea planului stă mereu dincolo de ceața completă (24 km), deci nu se vede.
+ * @param {number} [intindere] 120 km, de două ori planul îndepărtat al camerei (FAR, 60 km).
+ *   Camera stă la cel mult ~9,9 km de centru (1,9 km până la colțul lui alpha, plus 8 km),
+ *   deci marginea cea mai apropiată e la cel puțin ~50,1 km în plan. Pe calea cu cer, ceața
+ *   mării e exponențială (`LUNGIME_CEATA_MARE`, 10 km), deci niciodată completă: pe axa
+ *   privirii, la 50,1 km, e 1 − e^(−5,01) ≈ 99,3%. Ceața citește însă adâncimea (`vFogDepth`,
+ *   planară), nu distanța, iar spre colțurile ecranului adâncimea scade: la 16:9, cu fov 45°,
+ *   ~38,3 km și ~97,8% (calculat, nemăsurat în pagină). Fără cer, ceața scenei e liniară și completă de la 24 km de adâncime.
  */
 export function creeazaMare(paleta, cer = null, intindere = 120000) {
   const geometrie = new THREE.PlaneGeometry(intindere, intindere, 1, 1);

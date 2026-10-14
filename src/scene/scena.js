@@ -25,6 +25,7 @@ import { reliefRandat } from './raza.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
 import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
 import { instantaneuMemorie } from './dispose.js';
+import { numeElement } from './nume.js';
 
 // Orchestrarea scenei și randarea la cerere.
 //
@@ -52,8 +53,8 @@ export async function porneste(canvas, { continut, laSurse, laEsec, laIncarcare,
   // Tot ce se alocă de aici încolo se înscrie aici, în ordinea creării.
   //
   // Pornirea poate eșua în mai multe locuri, nu doar la încărcarea reliefului:
-  // `creeazaTeren()` alocă tablouri proporționale cu grila — ~48 MB pentru baza
-  // de 1164 × 1493 — iar un RangeError acolo e plauzibil tocmai pe telefonul de
+  // `creeazaTeren()` alocă tablouri proporționale cu grila — ~77 MB de atribute pentru
+  // baza de 1164 × 1493 — iar un RangeError acolo e plauzibil tocmai pe telefonul de
   // 390 px. `main.js` prinde excepția și scoate canvasul, dar scoaterea din DOM
   // nu eliberează nimic: contextul WebGL rămâne viu până îl adună browserul, iar
   // browserele țin puține contexte deodată. Deci curățăm noi, oriunde s-ar rupe.
@@ -271,8 +272,8 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
 
   const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
   scena.add(teren.obiect);
-  // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza de
-  // ~48 MB trebuie să fie deja în listă ca s-o elibereze `curata()`.
+  // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza, cu
+  // ~77 MB de atribute, trebuie să fie deja în listă ca s-o elibereze `curata()`.
   deEliberat.push(() => teren.dispose());
 
   const petic = reliefPetic
@@ -515,11 +516,14 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   const cadruLiber = creeazaCadruLiber({ camera, canvas: renderer.domElement, cereRandare });
   deEliberat.push(() => cadruLiber.dispose());
 
-  // Panoul punctului. Primește `inaltimeLa` COMPUS — cel care alege peticul de
-  // 1 m acolo unde există — fiindcă e o unealtă de măsurat, iar diferența dintre
-  // plase pe cusătură s-a măsurat la 0,153 m. Întoarce null dacă harta nu poate
-  // exprima un punct în longitudine/latitudine. Cutia lui deschisă, pe telefon peste
-  // mijlocul ecranului, mută imaginea deasupra ei; punctul cules are un semn pe hartă.
+  // Panoul punctului. Primește relieful randat (`inaltimeRandata`, raza.js): în alpha,
+  // accesorul compus, care alege peticul de 1 m acolo unde există — e o unealtă de
+  // măsurat, iar diferența dintre plase pe cusătură s-a măsurat la 0,153 m —, în rest
+  // împrejurimile, pe care raza se oprește. Altitudinea se citește numai în alpha
+  // (`inAlpha`); dincolo, panoul spune că acolo nu se măsoară. Întoarce null dacă
+  // harta nu poate exprima un punct în longitudine/latitudine. Cutia lui deschisă, pe
+  // telefon peste mijlocul ecranului, mută imaginea deasupra ei; punctul cules are un
+  // semn pe hartă. Numele clădirii lovite vine din conținut, după prefixul cheii (nume.js).
   const punct = creeazaPunct({
     gazda: canvas.parentElement ?? document.body,
     canvas, camera, geo,
@@ -529,7 +533,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     inAlpha: alpha?.contine,
     zMin: relief.meta?.zMin_m,
     loveste: lovesteCladire,
-    numeElement: (cheie) => [...(continut?.sanctuar?.nume_elemente ?? []), ...(continut?.cladiri?.nume_elemente ?? [])].find(([p]) => cheie.startsWith(p))?.[1] ?? cheie,
+    numeElement: (cheie) => numeElement(cheie, continut),
     // „Măsoară centrul”: ținta pe ecran, deci centrul părții libere.
     centru: () => controale.centruVederii(),
     cadru: cadruLiber,
@@ -629,7 +633,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // înainte, i-ar trebui o așteptare. Așa nici prima comutare pe Relief nu sacadează;
   // materialele Satelit și le compilează Satelit, pe plase-proxy (satelit.js). Măsurat pe
   // build, la prima vizită: primul cadru 370–383 → 99–109 ms, iar imaginea gata cu ~0,2 s
-  // mai devreme; la reveniri, cam la fel (CLAUDE.md).
+  // mai devreme; la reveniri, cam la fel (`docs/randarea.md`, „Compilarea, înaintea primului cadru”).
   try { await renderer.compileAsync(scena, camera); } catch { /* se compilează la prima randare */ }
 
   // Harta se arată o singură dată, direct pe Satelit, cu toate texturile la detaliul întreg pe
@@ -701,6 +705,20 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // `geometrie.dispose()` singur.
   let viu = true;
 
+  // Triunghiurile pe părți, pentru linia din consolă (main.js) și verificările de memorie.
+  // `nrTriunghiuri` rămâne numai alpha, bază + petic. `total` e tot ce construiește scena, fără
+  // cer și mare; drapajul — suprafețele sanctuarului de pe teren — se vede numai pe Relief
+  // (Satelit îl ascunde: fotografia le are).
+  const triunghiuri = {
+    alpha: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
+    imprejurimi: imprejurimi?.nrTriunghiuri ?? 0,
+    sanctuar: sanctuar?.nrTriunghiuri.cladiri ?? 0,
+    drapaj: sanctuar?.nrTriunghiuri.drapaj ?? 0,
+    cladiri: cladiri?.nrTriunghiuri.cladiri ?? 0,
+  };
+  triunghiuri.total = triunghiuri.alpha + triunghiuri.imprejurimi + triunghiuri.sanctuar
+    + triunghiuri.drapaj + triunghiuri.cladiri;
+
   return {
     renderer, scena, camera, controale, teren, petic, sanctuar, cladiri, busola, punct, geo, alpha, acasa,
     // Getter: vederea Satelit își adaugă sursele când îi sosesc texturile — pe calea automată
@@ -725,7 +743,8 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     zbor, eticheta, cadruFisa, cadruLiber, umbre, umbreGrup, satelit, imprejurimi, inaltimeRandata, gest,
     get tastatura() { return tastatura; },
     get relief() { return viu ? relief : null; },
-    nrTriunghiuri: teren.nrTriunghiuri + (petic?.nrTriunghiuri ?? 0),
+    nrTriunghiuri: triunghiuri.alpha,
+    triunghiuri,
     // Peticul e mai fin, deci acolo unde există el dă altitudinea; baza n-are
     // nicio valoare sub gaură. Nimic nu-l cheamă acum, dar e accesorul firesc
     // pentru așezarea unui reper pe teren, la capitolele care urmează.

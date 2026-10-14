@@ -679,7 +679,7 @@ noscript p {
  * adaugă la sfârșitul lui, și copiii lor, care îl moștenesc. Nu `:root:has(#versiune)`:
  * Firefox are `:has()` abia de la 121, iar 115 ESR, ultimul pentru Windows 7–8.1 și
  * macOS 10.12–10.14, rula pagina fără el, cu „Coordonate” peste versiune pe 13 px din 16.
- * Depinde de ordinea din DOM; o păzește proba din pagină (CLAUDE.md, „Flux de lucru”).
+ * Depinde de ordinea din DOM; o păzește proba din pagină (`docs/livrarea.md`, „Versiunea din pagină”).
  */
 #versiune ~ * { --versiune: 1.15rem; }
 

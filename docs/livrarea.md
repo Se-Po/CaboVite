@@ -70,7 +70,7 @@ până când autorul alege o imagine.
   e scrisă în probă (`clasaData`), deci un fel nou pică până i se hotărăște politica;
 - un nume imutabil care a avut în istoric două conținuturi pică;
 - `dist/` local n-are voie să aibă fișiere din `public/` gitignorat. Vercel construiește
-  din commit, deci `public/draco`, rămas de la `copy-decoders`, făcea `npm run preview` să
+  din commit, deci `public/draco`, rămas de la `copy-decoders` (scriptul a fost scos pe 2026-10-09), făcea `npm run preview` să
   servească 763 341 de octeți pe care pagina publicată nu-i are;
 - un fișier din `public/` încă neadăugat în git se spune, fără să pice: Vercel nu-l publică
   până nu intră în commit;
@@ -79,7 +79,7 @@ până când autorul alege o imagine.
   o listă de noduri PERMISE, deci o formă pe care n-o știe pică; nu se vede numai ce nu lasă
   urmă în arbore, virgula de după ultimul parametru (ES2017) —, cu `defer` și fără `type`, semnul `__modulPornit` în intrare și în plasă, mesajul de
   încărcare: `role="status"` pe paragraf, procentul `aria-hidden`, butonul „Arată relieful
-  acum” ascuns (vezi „Pornirea”); marcajul de dinainte și butonul fără `hidden` pică.
+  acum” ascuns (vezi `docs/pornirea.md`, „Mesajul”); marcajul de dinainte și butonul fără `hidden` pică.
 
 Controalele:
 - `/data/(.*)` imutabil pică pe paletă și pe NDVI;
@@ -113,7 +113,7 @@ de impunere, `cabo-espichel-csp-impus` se încearcă de mână și în Firefox �
 ## Versiunea din pagină (mutat din „Flux de lucru”)
 
 - Pagina își arată versiunea, `v0.1.N`, în colțul din dreapta-jos (`#versiune`), odată cu harta
-  — cât se încarcă stă ascunsă, cu celelalte panouri (vezi „Pornirea”) — și, fără JavaScript, imediat.
+  — cât se încarcă stă ascunsă, cu celelalte panouri (vezi `docs/pornirea.md`, „Panourile”) — și, fără JavaScript, imediat.
   N-o scrie nimeni de mână: build-ul (`vite.config.js`) o ia din prefixul subiectului
   ultimului commit — pe Vercel din `VERCEL_GIT_COMMIT_MESSAGE`, altfel din `git log` —,
   deci prefixul `0.1.N.xx` e obligatoriu. Fără niciun subiect cu prefix, pagina nu scrie

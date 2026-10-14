@@ -37,7 +37,7 @@ import { cereFisier } from './comun/cere.mjs';
 
 const ORTO = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
 const IESIRE = 'date-sursa/derivate';
-const GAMMA_GRILA = 0.673704; // A_grilă − A_adevărat, grade (CLAUDE.md, „Busola”)
+const GAMMA_GRILA = 0.673704; // A_grilă − A_adevărat, grade (`docs/busola.md`, „Busola și nordul adevărat”)
 const FEREASTRA_ZBOR = ['2025-05-24', '2025-07-25']; // lotul 4 al ORTOS-2025, după SNIG
 
 // Zonele, în TM06, pe metri întregi (pixelii LiDAR de 0,5 m cad pe ele).
@@ -48,7 +48,7 @@ const ZONE = {
 // Pentru înregistrarea pe sol trebuie relief, nu platou: versanții de lângă far.
 const ZONA_SOL = { x0: -94900, x1: -94500, y0: -138800, y1: -138420 };
 
-cereFisier(ORTO, 'dala de ortofoto ORTOS-2025 464-3', 'Vezi „Ortofotoul” în CLAUDE.md.');
+cereFisier(ORTO, 'dala de ortofoto ORTOS-2025 464-3', 'Vezi „Ortofotoul” în docs/fotografii.md.');
 mkdirSync(IESIRE, { recursive: true });
 const o = deschideOrtofoto(ORTO, 0.25);
 const R = Math.PI / 180;

@@ -23,7 +23,7 @@ fiecare cadru și nu se puteau vedea niciodată. Triunghiuri, pe `harta_v2`:
 Se taie numai celulele cu TOATE patru nodurile la cotă; malul rămâne întreg. Iar
 `inaltimeLa` citește din `grila`, nu din plasă, deci tăierea nu atinge panoul
 punctului: un clic pe mare întoarce punctul de pe suprafața mării, la `COTA_MARE`, și
-eticheta „apă" (vezi „Punctul de sub clic”).
+eticheta „apă" (vezi `docs/punctul.md`, „Punctul de sub clic”).
 
 **Nu există atribut `normal`.** Cu `flatShading: true`, shaderul r186 nu-l
 citește: sub `FLAT_SHADED` varianta `vNormal` nici nu se declară, iar
@@ -32,7 +32,7 @@ fațetei, adică exact ce am fi scris. Pe geometrie neindexată cu normale de
 fațetă cele două sunt același plan. Scapă 92 248 344 de octeți din RAM și de pe
 placă, plus 127 ms de `computeVertexNormals()` la fiecare pornire. Excepția sunt
 nivelurile de la 12 m încolo ale împrejurimilor, netezite (`neted`, `campNeted`): vezi
-„Zona alpha și împrejurimile”.
+`docs/imprejurimi.md`, „Netezirea”.
 
 **Culoarea stă pe `Uint16` normalizat**, 6 octeți pe vârf în loc de 12. `Uint8`
 NU merge: valorile din atribut sunt liniare, iar un pas de 1/255 în liniar
@@ -67,8 +67,8 @@ peticul 63 → 45. Atributele sunt identice la bit, și în pagină: `verifica-t
 sha256 pe position, color, cutie și sferă cât în `AMPRENTA` (citită pe codul vechi) și
 cel mult 774 562 de apeluri, iar codul vechi pică. Controale: diagonala cu `<` schimbă
 sha-ul (2 747 de nepotriviri la proba 2); scurtătura cu muchiile incluse greșește 140 de
-puncte din 1 736 496. Cu câmpul netezit și cu drapajul (în „Zona alpha și împrejurimile”
-și „Sanctuarul”), cadrul lung de la
+puncte din 1 736 496. Cu câmpul netezit și cu drapajul (în `docs/imprejurimi.md`, „Netezirea”,
+și `docs/sanctuar.md`, „Suprafețele de pe teren”), cadrul lung de la
 pornire scade în pagină de la 524 la 406 ms (build de producție, Long Animation Frames,
 mediana a 5 încărcări).
 
@@ -84,7 +84,7 @@ vegetația. Tufărișul și vegetația uscată au aceeași pantă mediană (14,1
 12,6°) și aceeași altitudine mediană (103,4 m amândouă); cea mai bună regulă
 posibilă pe cele două le desparte la întâmplare pe date nevăzute, iar antrenată pe
 sudul hărții și aplicată pe nord cade sub clasa majoritară. Informația stă în
-infraroșul ortofotoului — vezi stratul NDVI, la hărți.
+infraroșul ortofotoului — vezi `docs/harti-relief.md`, „Stratul NDVI”.
 
 **Ce face:**
 - roca: potecă → calcar după pantă, lin între 20° și 40°;

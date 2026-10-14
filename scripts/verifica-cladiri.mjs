@@ -21,7 +21,7 @@ import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { fereastraLidar, fisierDala, daleFereastra } from './comun/lidar.mjs';
 
-const BUGET = { triunghiuri: 6000, json_kb: 20 };
+const BUGET = { triunghiuri: 6000, json_kib: 20 };
 const FISIER = 'public/data/cladiri_v1.json';
 const MDS_FAR = 168.28;
 // Amprenta plasei, sha256 pe atributele ei, pe `cladiri_v1` așezat pe `harta_v5` +
@@ -101,8 +101,8 @@ proba(cladiri !== null, 'clădirile se construiesc');
 if (!cladiri) { console.log(`\n${picate} probe picate`); process.exit(1); }
 proba(avertConstructie.length === 0, `niciun element sărit (${avertConstructie.length} avertismente${avertConstructie.length ? `: ${avertConstructie.slice(0, 3).join(' | ')}` : ''})`);
 proba(cladiri.nrTriunghiuri.cladiri <= BUGET.triunghiuri, `${cladiri.nrTriunghiuri.cladiri} triunghiuri, buget ${BUGET.triunghiuri}`);
-const kb = readFileSync(FISIER).length / 1024;
-proba(kb <= BUGET.json_kb, `${FISIER}: ${kb.toFixed(1)} KB, buget ${BUGET.json_kb} KB`);
+const kib = readFileSync(FISIER).length / 1024;
+proba(kib <= BUGET.json_kib, `${FISIER}: ${kib.toFixed(1)} KiB, buget ${BUGET.json_kib} KiB`);
 proba(cladiri.poi === null && cladiri.obiecte.length === 1, 'fără etichetă și fără suprafețe pe teren: un singur obiect');
 const grupuri = [...cladiri.cutiiGrupuri.keys()].sort();
 proba(grupuri.join() === 'casa_da_ronca,far', `grupurile pentru umbre: ${grupuri.join(', ')}`);

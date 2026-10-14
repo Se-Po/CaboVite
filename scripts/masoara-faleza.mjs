@@ -23,8 +23,9 @@
 //
 // Rezultatul NU se folosește în pagină. Stânca pictată după prag ieșea uniformă și
 // ternă, iar fotografia întinsă arată, pe calcar, ca stratele adevărate; autorul a
-// ales fotografia (2026-09-30, comparația în CLAUDE.md). Scriptul rămâne ca
-// măsurătoare: pragul la care fotografia își pierde detaliul și lumina ei pe stâncă.
+// ales fotografia (2026-09-30; comparația: `docs/satelit.md`, „Falezele rămân fotografia”).
+// Scriptul rămâne ca măsurătoare: pragul la care fotografia își pierde detaliul și lumina
+// ei pe stâncă.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
@@ -38,7 +39,7 @@ import { culoareTeren, incarcaPaleta, paletaCurenta, SPRE_LINIAR } from '../src/
 const ORTO = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
 const ZBOR = 'date-sursa/derivate/zbor.json';
 const IESIRE = 'date-sursa/derivate/faleza.json';
-cereFisier(ORTO, 'dala de ortofoto', 'Vezi „Ortofotoul” în CLAUDE.md.');
+cereFisier(ORTO, 'dala de ortofoto', 'Vezi „Ortofotoul” în docs/fotografii.md.');
 cereFisier(ZBOR, 'măsurătorile zborului', 'Rulează întâi: npm run masoara-zbor');
 const zbor = JSON.parse(readFileSync(ZBOR, 'utf8'));
 

@@ -74,7 +74,7 @@ async function adu(et, url, dir, k, cutie, b = 0) {
   const v = await c.fereastra(k, f.c0, f.r0, f.L, f.H, NaN, b);
   let fara = 0; for (const x of v) if (Number.isNaN(x)) fara++;
   const veniti = descarcat.octeti - inainte;
-  console.log(`  ${et}: nivelul ${k} (${f.pas[0].toPrecision(3)}), ${f.L} × ${f.H} pixeli, ${(veniti / 1048576).toFixed(2)} MB acum`);
+  console.log(`  ${et}: nivelul ${k} (${f.pas[0].toPrecision(3)}), ${f.L} × ${f.H} pixeli, ${(veniti / 1048576).toFixed(2)} MiB acum`);
   // `octeti_dale`: mărimea dalelor care ating fereastra, din antet — aceeași la orice
   // rulare; `octeti_adusi` e numai ce a venit din rețea acum.
   return { url, nivel: k, pas: f.pas, fereastra: { c0: f.c0, r0: f.r0, latime: f.L, inaltime: f.H }, octeti_dale: c.octetiFereastra(k, f.c0, f.r0, f.L, f.H), octeti_adusi: veniti, pixeli_in_afara: fara };
@@ -155,7 +155,7 @@ const main = async () => {
       : { data: manifest.generat, octeti: descarcat.octeti, cereri: descarcat.cereri });
   mkdirSync('scripts/imprejurimi', { recursive: true });
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
-  console.log(`\nadus din rețea la rularea asta: ${(descarcat.octeti / 1048576).toFixed(2)} MB în ${descarcat.cereri} cereri`);
+  console.log(`\nadus din rețea la rularea asta: ${(descarcat.octeti / 1048576).toFixed(2)} MiB în ${descarcat.cereri} cereri`);
   console.log(`scris ${MANIFEST}`);
 };
 

@@ -302,9 +302,10 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
   const tag = /<script\b[^>]*\bsrc="\/plasa\.js"[^>]*>/.exec(html)?.[0] ?? '';
   const intrare = /\/assets\/index-[\w-]+\.js/.exec(html)?.[0];
   const semnal = intrare && readFileSync(`dist${intrare}`, 'utf8').includes('__modulPornit') && plasa.includes('window.__modulPornit');
-  // Mesajul de încărcare (vezi „Pornirea”): un <div id="incarcare"> cu paragraful anunțat
-  // (`role="status"`), în care procentul stă într-un <span aria-hidden="true"> gol — cititorul de
-  // ecran aude numai faza —, și butonul „Arată relieful acum”, ascuns până la faza fotografiei.
+  // Mesajul de încărcare (`docs/pornirea.md`, „Pornirea: mesajul de încărcare și plasa”): un
+  // <div id="incarcare"> cu paragraful anunțat (`role="status"`), în care procentul stă într-un
+  // <span aria-hidden="true"> gol — cititorul de ecran aude numai faza —, și butonul
+  // „Arată relieful acum”, ascuns până la faza fotografiei.
   // Fără atribute de stil sau handlere: le prinde și proba de mai sus, pe tot documentul.
   const mesajNou = (h) => {
     const div = /<div id="incarcare">([\s\S]*?)<\/div>/.exec(h)?.[1] ?? null;
@@ -326,9 +327,9 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
 
 // Pagina are un titlu (`<h1>`, ascuns vizual) și, fără JavaScript, o propoziție (`<noscript>`), amândouă în
 // afara lui `<main id="continut">`, care rămâne gol: main.js scrie calea fără scenă numai într-un
-// `#continut` gol, iar cu JavaScript pornit conținutul lui <noscript> e text (CLAUDE.md, „Pornirea”). În
-// sursă și în ce publică build-ul. Controale: index.html de la 6ad3a47, fără ele, și titlul pus în
-// `#continut`.
+// `#continut` gol, iar cu JavaScript pornit conținutul lui <noscript> e text
+// (`docs/pornirea.md`, „Titlul și pagina fără scenă”). În sursă și în ce publică build-ul.
+// Controale: index.html de la 6ad3a47, fără ele, și titlul pus în `#continut`.
 {
   const titlu = (h) => {
     const main = /<main id="continut">([\s\S]*?)<\/main>/.exec(h);

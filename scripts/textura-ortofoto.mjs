@@ -43,9 +43,9 @@ const ORTO = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
 const ZBOR = 'date-sursa/derivate/zbor.json';
 const IESIRE = 'public/data';
 const MARGINE_M = 4;          // în jurul cutiei hărții, ca filtrarea să nu citească dincolo de ea
-const PRAG_MB = 8;            // peste atât, pe fișier, scriptul se oprește și spune (autorul a acceptat +4–7 MB)
+const PRAG_MIB = 8;           // peste atât, pe fișier, scriptul se oprește și spune (autorul a acceptat +4–7 MB)
 
-cereFisier(ORTO, 'dala de ortofoto ORTOS-2025 464-3', 'Vezi „Ortofotoul” în CLAUDE.md.');
+cereFisier(ORTO, 'dala de ortofoto ORTOS-2025 464-3', 'Vezi „Ortofotoul” în docs/fotografii.md.');
 cereFisier(ZBOR, 'măsurătorile zborului', 'Rulează întâi: npm run masoara-zbor');
 const zbor = JSON.parse(readFileSync(ZBOR, 'utf8'));
 const o = deschideOrtofoto(ORTO, 0.25);
@@ -247,14 +247,14 @@ for (const [numeH, R] of Object.entries(rezultat)) {
     const b = codeazaKtx(R.pnguri, f, codare);
     const p = pierdere(f, R.niveluri[0].b, R.c.W, R.c.H);
     variante[codare] = { octeti: b.length, fisier: f, pierdere_dE: p };
-    console.log(`  ${numeH}, ${codare}: ${(b.length / 1048576).toFixed(2)} MB; după decodare ΔE medie ${p.medie}, p99 ${p.p99}, max ${p.max}`);
+    console.log(`  ${numeH}, ${codare}: ${(b.length / 1048576).toFixed(2)} MiB; după decodare ΔE medie ${p.medie}, p99 ${p.p99}, max ${p.max}`);
   }
   // Se alege UASTC: fotografia aeriană are detaliu fin; ETC1S e mai mic, dar
   // pierde mai mult — cifrele de deasupra, pe același nivel decodat.
   const ales = readFileSync(variante.uastc.fisier);
   proba(variante.uastc.pierdere_dE.medie < variante.etc1s.pierdere_dE.medie, `${numeH}: UASTC pierde mai puțin decât ETC1S (${variante.uastc.pierdere_dE.medie} față de ${variante.etc1s.pierdere_dE.medie})`);
-  if (ales.length > PRAG_MB * 1048576)
-    throw new Error(`${numeH}: ${(ales.length / 1048576).toFixed(2)} MB peste pragul de ${PRAG_MB} MB — oprește-te și spune autorului`);
+  if (ales.length > PRAG_MIB * 1048576)
+    throw new Error(`${numeH}: ${(ales.length / 1048576).toFixed(2)} MiB peste pragul de ${PRAG_MIB} MiB — oprește-te și spune autorului`);
   const scris = scrieNepublicat(iesire, ales);
   const c = R.c;
   const refs = referinte.map((q) => {
@@ -290,7 +290,7 @@ for (const [numeH, R] of Object.entries(rezultat)) {
     },
   };
   const scrisJson = scrieNepublicat(join(IESIRE, `${numeH}-${VERSIUNE}.json`), JSON.stringify(meta, null, 1));
-  if (scris || scrisJson) console.log(`  scris ${iesire} (${(ales.length / 1048576).toFixed(2)} MB) + .json`);
+  if (scris || scrisJson) console.log(`  scris ${iesire} (${(ales.length / 1048576).toFixed(2)} MiB) + .json`);
 }
 console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
 process.exit(picate ? 1 : 0);

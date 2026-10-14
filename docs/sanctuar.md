@@ -127,8 +127,8 @@ cuantila 0,8, nuanța din pixelii de peste mediană.
 - **Acoperișurile** din ortofoto, „reluminate la plat": o potrivire Lambert pe
   normalele RANSAC dă Y = 0,627·cos i + 0,345, iar culoarea se împarte la factorul
   fiecărei ape. Potrivirea dădea și un soare, azimut 96°, elevație 22,5°, care e
-  **greșit**: măsurat din umbre, soarele zborului stă la 94,0° / 39,5° (vezi
-  „Zborul ortofotoului”), iar 96° / 22,5° nu e o poziție a soarelui în fereastra de
+  **greșit**: măsurat din umbre, soarele zborului stă la 94,0° / 39,5°
+  (vezi `docs/fotografii.md`, „Zborul ortofotoului”), iar 96° / 22,5° nu e o poziție a soarelui în fereastra de
   zbor. Albedoul acoperișurilor din `sanctuar_v2` e deci reluminat cu un soare
   greșit; refacerea lui e un `sanctuar_v3`, încă nefăcut.
 - **Ortofotoul e ars** pe tot ce e alb: cupola Casei da Água are 98,8% din pixeli la
@@ -141,7 +141,7 @@ cuantila 0,8, nuanța din pixelii de peste mediană.
   tuturor acoperișurilor: (−0,25; +0,25) m, corelația 0,369 față de 0,341 la
   (0, 0). Se aplică la fel peste tot. E o deplasare a ACOPERIȘURILOR, nu a
   imaginii: pe sol fotografia stă cu ~0,35 m spre est, iar acoperișurile se înclină
-  spre VNV cu ~0,09 m pe metru de înălțime (vezi „Zborul ortofotoului”).
+  spre VNV cu ~0,09 m pe metru de înălțime (vezi `docs/fotografii.md`, „Zborul ortofotoului”).
 
 ### Suprafețele de pe teren
 
@@ -254,8 +254,8 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
   deschisă, un decalaj de obiectiv (`setViewOffset`) mută imaginea în partea liberă —
   foaia de jos pe telefon, panoul din dreapta pe desktop — iar distanța crește cât
   să încapă complexul (~110 m în jurul terreiro-ului). Camera și pivotul nu se mută.
-  Decalajul îl aplică `cadru-liber.js`, comun cu cutia „Coordonate” deschisă (vezi „Punctul
-  de sub clic”); distanța se socotește pe partea liberă de amândouă.
+  Decalajul îl aplică `cadru-liber.js`, comun cu cutia „Coordonate” deschisă
+  (vezi `docs/punctul.md`, „Punctul de sub clic”); distanța se socotește pe partea liberă de amândouă.
   Pe telefon, fără el, biserica ieșea din ecran la x = −18. Fișa laterală contează
   de la un sfert din lățime: între 545 și 666 px trece de 60%, iar un prag la 40%
   lăsa complexul sub ea. Regulile stau în `src/scene/fisa-cadru.js`, ca proba Node
@@ -283,7 +283,7 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
 
 `src/scene/umbre.js`: o singură hartă de 2048², strânsă pe clădiri plus lungimea
 umbrei (60 m; la 18° o clădire de 15 m aruncă 46 m): 0,211 m pe texel pe sanctuar;
-de departe, cutia unită a grupurilor, 0,50–0,60 m — vezi „Umbrele pe grupuri”. Cutia
+de departe, cutia unită a grupurilor, 0,50–0,60 m — vezi `docs/cladiri.md`, „Umbrele pe grupuri”. Cutia
 lasă apeductul afară: merge ~550 m spre est și dubla fereastra luminii (0,336 m pe
 texel) pentru umbre de 2–8 m. Harta ține ~32 MiB pe placă — adâncime plus culoare,
 pe care r186 o alocă oricum.
@@ -310,8 +310,8 @@ atingere. Probe, în pagină, cu `WEBGL_lose_context`, 1 s fără nicio atingere
 
 Aruncă umbră sanctuarul și, din v0.1.0, clădirile din afara lui; primesc
 clădirile, suprafețele și terenul. Împrejurimile nu primesc și n-au nici codul umbrelor în
-shader (vezi „Zona alpha și împrejurimile”). Cutia trece între grupuri — vezi „Umbrele pe
-grupuri”, la far.
+shader (vezi `docs/imprejurimi.md`, „Fără codul umbrelor”). Cutia trece între grupuri — vezi
+`docs/cladiri.md`, „Umbrele pe grupuri”.
 
 Soarele nu se mută ca să încadreze umbra — numai între vederi, Relief ↔ Satelit,
 unde `potriveste()` reîncadrează cutia și redesenează harta o dată. Camera de umbră
@@ -330,7 +330,7 @@ n-are nevoie de unul.
   necunoscută, material fără rgb, listă lipsă — `null` și un avertisment, fără
   aruncare; ancoră greșită; o coordonată `null` sare numai elementul ei;
 - **bugetul:** clădiri ≤ 70 000 de triunghiuri (azi 17 745), suprafețe ≤ 80 000
-  (60 866 pe `harta_v4`/`harta_v5`; 60 855 pe v2/v3), JSON ≤ 150 KB (94,7);
+  (60 866 pe `harta_v4`/`harta_v5`; 60 855 pe v2/v3), JSON ≤ 150 KiB (94,7);
 - **geometria:** vârfuri finite, ocluzie pe fiecare, stâlpi în ordine cu goluri
   ≥ 0,2 m, corpuri convexe — proba care a prins linia rotită a aripii N;
 - **amprenta plasei:** sha256 pe position, color și ocluzie, egal cu `AMPRENTA` din
