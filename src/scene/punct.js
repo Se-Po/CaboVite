@@ -225,20 +225,20 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
   // de telefon, iar o cititoare de ecran ar rosti-o.
   radacina.innerHTML =
     '<button class="activeaza" type="button" aria-expanded="false" aria-controls="punct-cutie"'
-    + ' title="Arată coordonatele punctului pe care dai clic">'
+    + ' title="Arată coordonatele punctului ales pe hartă">'
     + '<svg class="semn" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
     + '<circle cx="12" cy="12" r="6.5"/><path d="M12 1.5v6M12 16.5v6M1.5 12h6M16.5 12h6"/></svg>'
     + '<span class="text">Coordonate</span></button>'
     + '<div class="cutie" id="punct-cutie" data-stare="gol" hidden>'
     + '<div class="antet"><h2 class="titlu">Coordonate</h2>'
     + '<button class="minimizeaza" type="button" aria-label="Minimizează coordonatele"'
-    + ' title="Minimizează: clicul pe hartă nu mai măsoară"><span aria-hidden="true">–</span></button></div>'
+    + ' title="Minimizează: harta nu mai măsoară"><span aria-hidden="true">–</span></button></div>'
     // Îndemnul și cifrele stau în aceeași celulă (`.date`), iar cutia ține starea în
     // `data-stare`: ce nu se arată e ascuns cu `visibility`, deci cutia are de la deschidere
     // înălțimea pe care o are cu un punct (main.css). Cifrele pornesc cu „—”, nevăzute: goale,
     // rândurile ar fi mai scunde, iar cutia tot ar crește la primul punct (cu 49,8 px la 390 × 844).
     + '<div class="date">'
-    + '<p class="indemn">Dă clic pe teren ca să afli unde e punctul, sau măsoară centrul hărții.</p>'
+    + '<p class="indemn"></p>'
     + '<div class="valori">'
     + '<dl class="mari">'
     + '<dt class="cl" hidden>clădire</dt><dd class="cl" hidden></dd>'
@@ -282,6 +282,24 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     sol: radacina.querySelector('dd.sol'),
   };
   const randuriCladire = [...radacina.querySelectorAll('.cl, .sol')];
+
+  // Îndemnul numește gestul pointerului principal: degetul atinge, mouse-ul dă clic. Pe
+  // telefon scria „Dă clic” (Pixel 8 Pro, 2026-10-14). Se citește la fiecare scriere și se
+  // rescrie la schimbare: o tabletă cu tastatură își schimbă pointerul principal.
+  const tactil = globalThis.matchMedia?.('(pointer: coarse)') ?? null;
+  const INDEMN = {
+    start: (t) => (t ? 'Atinge terenul ca să afli unde e punctul, sau măsoară centrul hărții.'
+      : 'Dă clic pe teren ca să afli unde e punctul, sau măsoară centrul hărții.'),
+    afara: (t) => `În afara zonei alpha: aici nu se măsoară. ${t ? 'Atinge harta.' : 'Dă clic pe hartă.'}`,
+  };
+  let felIndemn = 'start';
+  const scrieIndemn = (fel = felIndemn) => {
+    felIndemn = fel;
+    indemn.textContent = INDEMN[fel](Boolean(tactil?.matches));
+  };
+  scrieIndemn();
+  const laPointer = () => scrieIndemn();
+  tactil?.addEventListener?.('change', laPointer);
 
   if (Number.isFinite(zMin)) {
     camp.alt.title = `Apa e codată la ${nr(zMin, 0)} m în hartă — artificiu de `
@@ -353,7 +371,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
     // În afara zonei alpha nu se scrie nicio cifră și nu rămâne nimic de copiat.
     if (!p.cladire && !inZona(p.x, p.z)) {
       for (const r of randuriCladire) r.hidden = true;
-      indemn.textContent = 'În afara zonei alpha: aici nu se măsoară. Dă clic pe hartă.';
+      scrieIndemn('afara');
       cutie.setAttribute('data-stare', 'gol');
       ales = null;
       cereRandare?.();
@@ -554,6 +572,7 @@ export function creeazaPunct({ gazda, canvas, camera, inaltimeLa, geo, limitaDat
       activeazaBtn.removeEventListener('click', laActivare);
       minimizeazaBtn.removeEventListener('click', laMinimizare);
       document.removeEventListener('keydown', laTasta);
+      tactil?.removeEventListener?.('change', laPointer);
       clearTimeout(cronoCopiere);
       canvas.removeAttribute('data-culege');
       document.documentElement.removeAttribute('data-punct-deschis');

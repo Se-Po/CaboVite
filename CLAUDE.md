@@ -50,7 +50,7 @@ se poartă în română.
 | `npm run build-imprejurimi -- harta_vN` | un nivel al împrejurimilor, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit și NDVI-ul împrejurimilor; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
 | `npm run verifica-imprejurimi` | alpha și împrejurimile, cu codul paginii, în Node: cusăturile, bugetul, culoarea, netezirea |
-| `npm run verifica-controale` | mouse-ul, degetele, tastatura și drona, busola, Escape, panoul „Coordonate”, cu codul paginii, în Node |
+| `npm run verifica-controale` | mouse-ul, degetele, tastatura și drona, busola, Escape, panoul „Coordonate”, eticheta, cu codul paginii, în Node |
 | `npm run verifica-livrare` | după build: cache, antete și CSP, numele publicate, ES5, marcajul; `-- --live` pe sebastians.life |
 | `npm run verifica-pagina` | restul, cu codul paginii, în Node: Satelit, foaia de stil, ordinea de desenare, canvasul, pornirea, pagina fără scenă |
 | `npm run verifica-documentatie` | CLAUDE.md și `docs/`: mărimea, indexul, trimiterile, căile decodoarelor, comentariile vechi, sursele etichetelor |
@@ -165,8 +165,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - Tot ce derivă din contururile OSM e bază de date derivată, deci ODbL 1.0, cu atribuirea
   „© contribuitorii OpenStreetMap”. → sanctuar
 - Rândul „© DGT · © Copernicus · © OpenStreetMap” se vede fără nicio interacțiune (regulile
-  OSMF); „© DGT” deschide modala cu restul, inclusiv clauza de răspundere a Copernicus DEM.
-  → fotografii
+  OSMF), iar eticheta sanctuarului îl ocolește ca obstacol tare; „© DGT” deschide modala cu
+  restul, inclusiv clauza de răspundere a Copernicus DEM. → fotografii, sanctuar
 
 **Coordonate, nord, altitudine**
 - Scena stă pe grila TM06: +X e estul grilei, −Z nordul grilei, Y altitudinea. → busola, punctul

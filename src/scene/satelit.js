@@ -506,7 +506,7 @@ export function creeazaSatelit(o) {
   const ocupat = (da) => {
     if (da) buton.setAttribute('aria-busy', 'true');
     else buton.removeAttribute('aria-busy');
-    buton.title = da ? 'Se încarcă fotografia aeriană; un clic rămâne pe Relief' : TITLU;
+    buton.title = da ? 'Se încarcă fotografia aeriană; o nouă apăsare rămâne pe Relief' : TITLU;
     anunt.textContent = da ? 'Se încarcă fotografia aeriană…' : '';
   };
 

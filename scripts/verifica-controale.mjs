@@ -2,7 +2,8 @@
 // plus punctul pe care îl culege panoul „Coordonate” — același „ce e sub cursor” —,
 // „Măsoară centrul”, tastatura și drona (tastatura.js, `comanda` din camera.js), anunțul busolei,
 // Escape pe fișa sanctuarului și pe cutia „Coordonate” (eticheta.js, punct.js), imaginea mutată
-// din calea cutiei și semnul punctului cules (cadru-liber.js), planul apropiat cu imaginea mutată.
+// din calea cutiei și semnul punctului cules (cadru-liber.js), îndemnul panoului după pointer,
+// planul apropiat cu imaginea mutată, eticheta sanctuarului lângă rândul surselor (`alegePozitie`).
 // Controalele pe codul de dinainte citesc modulele de la REPER_VECHI din git.
 //
 //   npm run verifica-controale
@@ -47,13 +48,14 @@ const LN = Math.log(FACTOR_TREAPTA);
 // Controalele pe codul de dinainte: modulele de la REPER_VECHI, din git, sau mutații ale celor
 // de azi. Textul se citește cu capetele de rând aduse la LF, deci proba nu depinde de
 // core.autocrlf; o mutație care nu se mai aplică întoarce null, iar controlul ei pică
-// („MUTAȚIA NU S-A APLICAT”). Fără git, controalele pe REPER_VECHI pică fiecare cu mesajul lui.
+// („MUTAȚIA NU S-A APLICAT”). Fără git, controalele pe un reper din istoric și comparațiile cu
+// el pică fiecare cu mesajul lui, iar probele pe codul de azi rulează mai departe.
 const REPER_VECHI = '6ad3a47';
 const LF = (t) => t.replace(/\r\n/g, '\n');
 const textSursa = (cale) => LF(readFileSync(cale, 'utf8'));
-const textVechi = (cale) => {
+const textVechi = (cale, reper = REPER_VECHI) => {
   try {
-    return LF(execFileSync('git', ['show', `${REPER_VECHI}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
+    return LF(execFileSync('git', ['show', `${reper}:${cale}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 }));
   } catch { return null; }
 };
 const NEAPLICATA = 'MUTAȚIA NU S-A APLICAT';
@@ -2362,6 +2364,65 @@ console.log('\nCutia „Coordonate” peste mijloc: imaginea se mută în partea
   const ov = PO ? ocluzie({ P: PO }) : null;
   proba(ov !== null && !bunOcl(ov), `control, clădirile cu toleranța reliefului: ${ov === null ? NEAPLICATA : textOcl(ov)} — pică`);
 
+  // Îndemnul după pointerul principal: cu `(pointer: coarse)` „Atinge terenul”, cu mouse-ul
+  // „Dă clic pe teren”, rescris la schimbare; în afara zonei alpha, la fel. Pe telefon scria
+  // „Dă clic” (Pixel 8 Pro, 2026-10-14). Un `matchMedia` fals, cu ascultătorii lui; locul din
+  // afara alpha se caută pe coloana din mijloc a ecranului de 390 × 844, cu camera spre est; cât
+  // se vede „În afara”, pointerul trece pe mouse, iar îndemnul rămâne al locului. Controale:
+  // tactilul ignorat, schimbarea neascultată, ascultătorul rămas după dispose(), schimbarea
+  // care rescrie îndemnul de început.
+  const M0 = globalThis.matchMedia;
+  const indemn = (o = {}) => {
+    const asc = new Set();
+    const mq = { matches: true, addEventListener: (t, f) => { if (t === 'change') asc.add(f); }, removeEventListener: (t, f) => asc.delete(f) };
+    globalThis.matchMedia = (q) => (q === '(pointer: coarse)' ? mq : { matches: false, addEventListener() {}, removeEventListener() {} });
+    const r = {};
+    const s = sesiune(E390, o);
+    try {
+      const t = () => s.unul('.indemn').textContent;
+      r.deget = t();
+      mq.matches = false;
+      for (const f of [...asc]) f({ matches: false });
+      r.mouse = t();
+      mq.matches = true;
+      for (const f of [...asc]) f({ matches: true });
+      s.panou.activeaza();
+      // Camera spre est, peste marginea lui alpha (x ≈ 1160 m): razele de sus cad dincolo de ea.
+      s.b.controale.target.set(1100, inaltimeRandata(1100, 0), 0);
+      s.b.camera.position.set(0, 300, 0);
+      s.b.controale.update();
+      s.b.camera.updateMatrixWorld();
+      for (let y = 4; y < E390.h && !r.afara; y += 4) { s.panou.culegeLa(E390.w / 2, y); if (t().startsWith('În afara')) r.afara = t(); }
+      // Pointerul se schimbă cât se vede „În afara”: îndemnul rămâne al locului, cu gestul nou.
+      mq.matches = false;
+      for (const f of [...asc]) f({ matches: false });
+      r.afaraMouse = t();
+    } catch (err) { r.eroare = err.message; }
+    s.dispose();
+    r.dupa = asc.size;
+    if (M0 === undefined) delete globalThis.matchMedia; else globalThis.matchMedia = M0;
+    return r;
+  };
+  const bunIndemn = (r) => !r.eroare && r.deget?.startsWith('Atinge terenul') && r.mouse?.startsWith('Dă clic pe teren')
+    && r.afara === 'În afara zonei alpha: aici nu se măsoară. Atinge harta.'
+    && r.afaraMouse === 'În afara zonei alpha: aici nu se măsoară. Dă clic pe hartă.' && r.dupa === 0;
+  const textIndemn = (r) => (r.eroare ? `aruncă: ${r.eroare}` : `cu degetul „${r.deget}”; cu mouse-ul „${r.mouse}”; în afara alpha „${r.afara ?? 'NEGĂSIT'}”, `
+    + `apoi cu mouse-ul „${r.afaraMouse ?? '—'}”; ${r.dupa} ascultători după dispose()`);
+  const ind = indemn();
+  proba(bunIndemn(ind), `îndemnul după pointer: ${textIndemn(ind)}`);
+  const IA = await modulDin(muta(PUNCT_JS, ['    indemn.textContent = INDEMN[fel](Boolean(tactil?.matches));', '    indemn.textContent = INDEMN[fel](false);']));
+  const ia = IA ? indemn({ P: IA }) : null;
+  proba(ia !== null && !bunIndemn(ia), `control, pointerul ignorat: ${ia === null ? NEAPLICATA : textIndemn(ia)} — pică`);
+  const IB = await modulDin(muta(PUNCT_JS, ["  tactil?.addEventListener?.('change', laPointer);\n", '']));
+  const ib = IB ? indemn({ P: IB }) : null;
+  proba(ib !== null && !bunIndemn(ib), `control, schimbarea pointerului neascultată: ${ib === null ? NEAPLICATA : textIndemn(ib)} — pică`);
+  const IC = await modulDin(muta(PUNCT_JS, ["      tactil?.removeEventListener?.('change', laPointer);\n", '']));
+  const ic = IC ? indemn({ P: IC }) : null;
+  proba(ic !== null && !bunIndemn(ic), `control, ascultătorul rămas după dispose(): ${ic === null ? NEAPLICATA : textIndemn(ic)} — pică`);
+  const ID = await modulDin(muta(PUNCT_JS, ['  const laPointer = () => scrieIndemn();', "  const laPointer = () => scrieIndemn('start');"]));
+  const id = ID ? indemn({ P: ID }) : null;
+  proba(id !== null && !bunIndemn(id), `control, schimbarea rescrie îndemnul de început: ${id === null ? NEAPLICATA : textIndemn(id)} — pică`);
+
   if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
   if (A0 === undefined) { delete globalThis.addEventListener; delete globalThis.removeEventListener; } else { globalThis.addEventListener = A0; globalThis.removeEventListener = R0; }
 }
@@ -2419,6 +2480,213 @@ console.log('\nPlanul apropiat cu imaginea mutată: paza solului îi vede colțu
     '    const cam = this.object, tv = Math.tan((cam.fov * Math.PI) / 360);\n    const raza = 1.1 * cam.near * Math.sqrt(1 + tv * tv * (1 + cam.aspect * cam.aspect));']));
   const iv = MV ? inel(MV) : null;
   proba(iv !== null && iv.sol !== 100, `control, \`_solSub\` cu formula fără decalaj: ${iv === null ? NEAPLICATA : `solul ${iv.sol.toFixed(2)} m, discul se oprește înaintea colțului`} — pică`);
+}
+
+// ------------------------------------------------------------ 15. eticheta și rândul surselor
+
+console.log('\nEticheta sanctuarului ocolește rândul surselor: atribuirea nu se acoperă');
+{
+  // `alegePozitie` (eticheta.js) pe dreptunghiurile măsurate pe un Pixel 8 Pro (448 × 867, DPR
+  // 2,25), build v0.1.6, 2026-10-14, cu getBoundingClientRect: rândul surselor, rozeta busolei,
+  // Satelit, versiunea, „Coordonate” minimizat, cutia goală (pe telefon la fel de înaltă cu un
+  // punct simplu) și cutia cu o clădire (Casa da Ronca: numele pe trei rânduri și rândul „sol”);
+  // eticheta are 256 × 60. Citirea busolei e luată din captură. Cu cutia deschisă, ancora a ajuns
+  // la (290,2; 0,9), iar eticheta stătea peste „© OpenStreetMap”.
+  //
+  // Se cer: pe telefon, „jos” mutat chiar sub rând, la (162,2; 60); pe o grilă de 4 px, pe tot
+  // ecranul, în fiecare stare a panoului, cu pinul și fără, eticheta nu atinge niciodată rândul,
+  // iar cu pinul vizibil nicio mutare și nicio rezervă nu-l acoperă — îl acoperă numai cele patru
+  // poziții împinse de marginea ecranului, cum spune eticheta.js; la ancora (276; 764), minimizat,
+  // mutarea liberă cea mai scurtă, (8; 722). Trei cazuri construite, fără loc liber sau cu pinul:
+  // atribuirea descoperită chiar dacă eticheta acoperă astfel mai mult din rest; între pozițiile
+  // care lasă sursele libere, cea care acoperă cel mai puțin; o mutare care ar acoperi pinul
+  // pierde în fața uneia mai lungi care nu-l acoperă. Referințele se calculează aici, din
+  // dreptunghiuri, cu marginea de 8 px și pinul din main.css (12 px cu chenarul, border-box, deci
+  // ±6), nu se importă. Separat, unde una din cele patru poziții era liberă, alegerea e aceeași ca
+  // la REPER_SURSE; fără git, numai comparația asta pică.
+  //
+  // Apoi drumul din DOM: `creeazaEticheta` întreagă, pe un DOM fals în care obstacolele au
+  // dreptunghiuri, cu ancora în centrul ecranului (`mod` „ancora”): fără niciun loc liber,
+  // eticheta nu stă pe `#surse`; în banda cu pinul, nu stă pe pin. Prinde `TARI`, `tare` din
+  // dreptunghiuri și `pin: mod === 'ancora'`.
+  //
+  // Controale, care pică: eticheta.js de la REPER_SURSE; fără prioritatea atribuirii; rezerva numai
+  // pe obstacolele tari; fără pin; raza pinului de 2 px; prima mutare liberă; cea mai lungă;
+  // mutările fără margine; fără întâietatea celor patru poziții; în DOM: `TARI` gol, `{ pin: false }`
+  // și dreptunghiurile fără `tare`.
+  const REPER_SURSE = '2c5c680';
+  const EV = await modulDin(textVechi('src/scene/eticheta.js', REPER_SURSE));
+  const ETICHETA_JS = textSursa('src/scene/eticheta.js');
+  const REZERVA = '  return [...candidati, ...mutati].reduce((a, b) => (b.tare < a.tare || (b.tare === a.tare && b.acoperit < a.acoperit) ? b : a));';
+  const LIBER_MUTAT = '  const liberMutat = mutati.filter((m) => m.acoperit === 0).reduce((a, b) => (a === null || b.drum < a.drum ? b : a), null);';
+  const MUTARI = "[['sub', c.left, o.bottom + MARGINE], ['deasupra', c.left, o.top - h - MARGINE],\n        ['dupa', o.right + MARGINE, c.top], ['inainte', o.left - w - MARGINE, c.top]]";
+  const CONTROALE = [
+    ['fără prioritatea atribuirii', [REZERVA, '  return [...candidati, ...mutati].reduce((a, b) => (b.acoperit < a.acoperit ? b : a));']],
+    ['rezerva numai pe obstacolele tari', [REZERVA, '  return [...candidati, ...mutati].reduce((a, b) => (b.tare < a.tare ? b : a));']],
+    ['fără pin', ['        if (cutiePin) m.acoperit += intersectie(m, cutiePin);\n', '']],
+    ['raza pinului de 2 px', ['const RAZA_PIN = 8;', 'const RAZA_PIN = 2;']],
+    ['prima mutare liberă', [LIBER_MUTAT, '  const liberMutat = mutati.find((m) => m.acoperit === 0) ?? null;']],
+    ['cea mai lungă mutare liberă', [LIBER_MUTAT, LIBER_MUTAT.replace('b.drum < a.drum', 'b.drum > a.drum')]],
+    ['mutările fără margine', [MUTARI, MUTARI.replaceAll(' + MARGINE', '').replaceAll(' - MARGINE', '')]],
+  ];
+  const dr = (l, r, t, b) => ({ left: l, right: r, top: t, bottom: b });
+  const inter = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+  const SURSE = { ...dr(12, 294, 8, 52), tare: true };
+  const COMUNE = [SURSE, dr(364, 436, 735, 807), dr(366, 431, 811, 833), dr(341, 436, 681, 727), dr(397, 436, 842, 858)];
+  const STARI = { 'cutia goală': [...COMUNE, dr(100, 332, 494, 837)], 'cutia cu o clădire': [...COMUNE, dr(100, 332, 402, 836)],
+    'minimizat': [...COMUNE, dr(190, 332, 790, 836)] };
+  const ECRAN = { w: 448, h: 867 }, MARIME = { w: 256, h: 60 };
+  const MARGINE = 8, DIST = 12;
+  const pinLa = (x, y) => dr(x - 6, x + 6, y - 6, y + 6);
+  const la = (p, l, t) => Math.abs(p.left - l) < 1e-9 && Math.abs(p.top - t) < 1e-9;
+  const xy = (p) => `(${p.left.toFixed(1)}; ${p.top.toFixed(1)}) „${p.nume}”`;
+  // Cele patru poziții, neîmpinse în ecran, ca să se știe care acoperire de pin e a marginii.
+  const neimpinsa = (x, y, nume) => ({ sus: [x - MARIME.w / 2, y - MARIME.h - DIST], dreapta: [x + DIST, y - MARIME.h / 2],
+    stanga: [x - MARIME.w - DIST, y - MARIME.h / 2], jos: [x - MARIME.w / 2, y + DIST] })[nume];
+  // Fără niciun loc liber: deasupra de y = 52 eticheta atinge sursele; dedesubt, panoul de la
+  // y = 70. Peste surse ar acoperi mai puțin (4 840 px²) decât peste panou (cel puțin 10 752).
+  const FARA = [SURSE, dr(0, 448, 70, 300)];
+  // Tot fără loc liber, cu panoul în trepte: la dreapta de x = 150 începe la y = 70, la stânga la
+  // y = 100. Sub surse la dreapta, (184; 60), acoperă 256 · 50 = 12 800 px²; sub ele la stânga,
+  // (62; 60), 168 · 50 + 88 · 20 = 10 160.
+  const TREPTE = [SURSE, dr(150, 448, 70, 300), dr(0, 150, 100, 300)];
+  const acoperaTrepte = (p) => inter(p, TREPTE[1]) + inter(p, TREPTE[2]);
+  // Pinul la (150; 100), într-o bandă de 80 px între o bară sus și un panou jos, cu panouri la
+  // stânga și la dreapta: orice loc liber din bandă acoperă pinul; sub panoul de jos e loc.
+  const BANDA = [dr(0, 448, 0, 60), dr(0, 30, 60, 140), dr(300, 448, 60, 140), dr(0, 448, 140, 300)];
+
+  /** Telefonul, grila, mutarea cea mai scurtă și cazurile construite, pe un modul; null fără modul. */
+  const ruleaza = (M) => {
+    if (!M) return null;
+    const telefon = M.alegePozitie({ x: 290.2, y: 0.9 }, MARIME, STARI['cutia goală'], ECRAN, { pin: true });
+    let peste = 0, tot = 0, schimbate = 0, reparate = 0, cuPin = 0, pinMargine = 0, pinNeimpins = 0, pinMutat = 0;
+    for (const obst of Object.values(STARI)) for (const pin of [true, false]) {
+      for (let x = 0; x <= ECRAN.w; x += 4) for (let y = 0; y <= ECRAN.h; y += 4) {
+        tot++;
+        const n = M.alegePozitie({ x, y }, MARIME, obst, ECRAN, { pin });
+        if (inter(n, SURSE) > 0) peste++;
+        if (pin) {
+          cuPin++;
+          if (inter(n, pinLa(x, y)) > 0) {
+            const b = neimpinsa(x, y, n.nume);
+            if (!b) pinMutat++; else if (la(n, b[0], b[1])) pinNeimpins++; else pinMargine++;
+          }
+        }
+        if (EV) {
+          const v = EV.alegePozitie({ x, y }, MARIME, obst, ECRAN);
+          if (v.acoperit === 0) { if (!la(n, v.left, v.top)) schimbate++; } else reparate++;
+        }
+      }
+    }
+    // Libere sunt „sus-deasupra” (79 px, prima în ordinea buclei și cea mai lungă), „sus-inainte”
+    // (71 px) și „stanga-deasupra” (12 px), lipită de marginea din stânga.
+    const scurta = M.alegePozitie({ x: 276, y: 764 }, MARIME, STARI.minimizat, ECRAN, { pin: true });
+    const fara = M.alegePozitie({ x: 330, y: 20 }, MARIME, FARA, { w: 448, h: 300 }, { pin: true });
+    const trepte = M.alegePozitie({ x: 330, y: 20 }, MARIME, TREPTE, { w: 448, h: 300 }, { pin: true });
+    const pin = M.alegePozitie({ x: 150, y: 100 }, MARIME, BANDA, ECRAN, { pin: true });
+    return { telefon, peste, tot, cuPin, pinMargine, pinNeimpins, pinMutat, scurta, fara, trepte, pin,
+      schimbate: EV ? schimbate : null, reparate: EV ? reparate : null };
+  };
+  const bunE = (r) => r !== null && la(r.telefon, 290.2 - MARIME.w / 2, SURSE.bottom + MARGINE) && r.peste === 0
+    && r.pinMutat === 0 && r.pinNeimpins === 0 && la(r.scurta, MARGINE, 790 - MARIME.h - MARGINE)
+    && inter(r.fara, SURSE) === 0 && inter(r.trepte, SURSE) === 0 && acoperaTrepte(r.trepte) === 10160
+    && inter(r.pin, pinLa(150, 100)) === 0 && inter(r.pin, BANDA[3]) === 0;
+  const textE = (r) => (r === null ? NEAPLICATA : `pe telefon ${xy(r.telefon)}; grila: ${r.peste} din ${r.tot} peste surse; pinul vizibil acoperit în `
+    + `${r.pinMargine + r.pinNeimpins + r.pinMutat} din ${r.cuPin}: ${r.pinMargine} de cele patru poziții împinse de margine, ${r.pinNeimpins} neîmpinse, `
+    + `${r.pinMutat} de mutări și rezerve; mutarea cea mai scurtă ${xy(r.scurta)}; fără loc liber ${xy(r.fara)}${inter(r.fara, SURSE) ? ' PESTE SURSE' : ''}; `
+    + `în trepte ${xy(r.trepte)}${inter(r.trepte, SURSE) ? ' PESTE SURSE' : ''}, ${acoperaTrepte(r.trepte)} px²; `
+    + `în banda pinului ${xy(r.pin)}${inter(r.pin, pinLa(150, 100)) ? ' PESTE PIN' : ''}`);
+  const textC = (r) => (r === null ? NEAPLICATA : r.schimbate === null ? `NECITIT (fără eticheta.js de la ${REPER_SURSE}, comparația nu s-a făcut)`
+    : `${r.schimbate} schimbate din ${r.tot - r.reparate}; ${r.reparate} fără loc liber printre cele patru`);
+  const ze = ruleaza(ETICHETA);
+  proba(bunE(ze), textE(ze));
+  proba(ze.schimbate === 0, `unde una din cele patru poziții era liberă, alegerea e aceeași ca la ${REPER_SURSE}: ${textC(ze)}`);
+  const ve = ruleaza(EV);
+  proba(ve !== null && !bunE(ve), `control, eticheta.js de la ${REPER_SURSE}: ${ve === null ? 'NECITIT' : textE(ve)} — pică`);
+  for (const [nume, pereche] of CONTROALE) {
+    const r = ruleaza(await modulDin(muta(ETICHETA_JS, pereche)));
+    proba(r !== null && !bunE(r), `control, ${nume}: ${textE(r)} — pică`);
+  }
+  const fl = ruleaza(await modulDin(muta(ETICHETA_JS, ['  if (liber) return liber;\n', ''])));
+  proba(fl !== null && fl.schimbate !== null && fl.schimbate > 0, `control, fără întâietatea celor patru poziții: ${textC(fl)} — pică`);
+
+  // Drumul din DOM. Noduri cu dreptunghi; `document.querySelector` le dă după selector; canvasul de
+  // 448 × 867 din (0; 0); camera la 500 m privește ancora, care cade în centru, la (224; 433,5).
+  const D0 = globalThis.document, A0 = globalThis.addEventListener, R0 = globalThis.removeEventListener;
+  class NodE {
+    constructor(tag) {
+      Object.assign(this, { tagName: tag.toUpperCase(), copii: [], atribute: {}, hidden: false, textContent: '', style: {}, dataset: {},
+        cutie: dr(0, MARIME.w, 0, MARIME.h) });
+      this.classList = { toggle() {}, contains: () => false, add() {}, remove() {} };
+    }
+    setAttribute(k, v) { this.atribute[k] = String(v); }
+    getAttribute(k) { return this.atribute[k] ?? null; }
+    removeAttribute(k) { delete this.atribute[k]; }
+    toggleAttribute(k, f) { if (f) this.atribute[k] = ''; else delete this.atribute[k]; }
+    append(...n) { for (const c of n) if (typeof c !== 'string') this.copii.push(c); }
+    appendChild(c) { this.append(c); return c; }
+    remove() {}
+    contains() { return false; }
+    focus() {}
+    addEventListener() {}
+    removeEventListener() {}
+    getBoundingClientRect() { return { ...this.cutie, width: this.cutie.right - this.cutie.left, height: this.cutie.bottom - this.cutie.top }; }
+    getClientRects() { return [this.getBoundingClientRect()]; }
+  }
+  const CX = ECRAN.w / 2, CY = ECRAN.h / 2;
+  /** Eticheta adevărată, pe obstacolele date ca {selector: dreptunghi}; locul ales și starea. */
+  const inDom = (E, obstacole) => {
+    if (!E) return null;
+    const noduri = Object.fromEntries(Object.entries(obstacole).map(([s, r]) => { const n = new NodE('div'); n.cutie = r; return [s, n]; }));
+    globalThis.document = { documentElement: new NodE('html'), body: new NodE('body'), createElement: (t) => new NodE(t),
+      querySelector: (s) => noduri[s] ?? null, addEventListener() {}, removeEventListener() {} };
+    globalThis.addEventListener = globalThis.removeEventListener = () => {};
+    const canvas = new NodE('canvas');
+    canvas.cutie = dr(0, ECRAN.w, 0, ECRAN.h);
+    canvas.clientWidth = ECRAN.w;
+    canvas.clientHeight = ECRAN.h;
+    const camera = new THREE.PerspectiveCamera(50, ECRAN.w / ECRAN.h, 1, 10000);
+    camera.position.set(0, 0, 500);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const gazda = new NodE('div');
+    let r = null;
+    try {
+      const e = E.creeazaEticheta({ gazda, canvas, camera, inaltimeLa: () => -1e9, ancora: [0, 0, 0],
+        continut: { eticheta: 'Sanctuarul', nume: 'n', despre_model: 'm', fapte: [] }, laDeschidere() {}, cereRandare() {} });
+      e.pas();
+      const buton = gazda.copii.find((n) => n.id === 'sanctuar-eticheta').copii.find((n) => n.className === 'poi');
+      const [, l, t] = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(buton.style.transform).map(Number);
+      r = { ...dr(l, l + MARIME.w, t, t + MARIME.h), nume: e.stare.pozitie, mod: e.stare.mod };
+      e.dispose();
+    } catch (err) { r = { eroare: err.message }; }
+    return r;
+  };
+  const SURSE_DOM = dr(0, ECRAN.w, CY - 34, CY + 36);
+  const domuri = (E) => (E ? {
+    // Fără niciun loc liber: ecranul acoperit tot, rândul surselor o bandă în jurul ancorei. Orice
+    // poziție acoperă la fel de mult; numai prioritatea atribuirii o scoate de pe surse.
+    fara: inDom(E, { '#surse': SURSE_DOM, '#legenda': dr(0, ECRAN.w, 0, CY - 34), '#versiune': dr(0, ECRAN.w, CY + 36, ECRAN.h) }),
+    // Pinul: banda de 80 px din jurul ancorei, între o bară sus, un panou jos și două laterale.
+    pin: inDom(E, { '#legenda': dr(0, ECRAN.w, 0, CY - 40), '#busola .roza': dr(0, CX - 120, CY - 40, CY + 40),
+      '#busola .citire': dr(CX + 150, ECRAN.w, CY - 40, CY + 40), '#versiune': dr(0, ECRAN.w, CY + 40, CY + 200) }),
+  } : null);
+  const bunD = (d) => d !== null && !d.fara.eroare && !d.pin.eroare && d.fara.mod === 'ancora' && inter(d.fara, SURSE_DOM) === 0
+    && inter(d.pin, pinLa(CX, CY)) === 0;
+  const textD = (d) => (d === null ? NEAPLICATA : [['fără loc liber', d.fara, SURSE_DOM, 'PESTE SURSE'], ['banda pinului', d.pin, pinLa(CX, CY), 'PESTE PIN']]
+    .map(([n, p, o, peste]) => (p.eroare ? `${n}: aruncă: ${p.eroare}` : `${n} ${xy(p)}${inter(p, o) ? ` ${peste}` : ''}`)).join('; ') + `, modul ${d.fara.mod ?? '—'}`);
+  const zd = domuri(ETICHETA);
+  proba(bunD(zd), `creeazaEticheta pe un DOM cu dreptunghiuri, ancora în centru: ${textD(zd)}`);
+  for (const [nume, pereche] of [
+    ['`TARI` gol', ["const TARI = new Set(['#surse']);", 'const TARI = new Set([]);']],
+    ['`{ pin: false }`', ["{ pin: mod === 'ancora' }", '{ pin: false }']],
+    ['dreptunghiurile fără `tare`', ['top: r.top - cutieCanvas.top, bottom: r.bottom - cutieCanvas.top, tare }', 'top: r.top - cutieCanvas.top, bottom: r.bottom - cutieCanvas.top }']],
+  ]) {
+    const d = domuri(await modulDin(muta(ETICHETA_JS, pereche)));
+    proba(d !== null && !bunD(d), `control în DOM, ${nume}: ${textD(d)} — pică`);
+  }
+  if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
+  if (A0 === undefined) { delete globalThis.addEventListener; delete globalThis.removeEventListener; } else { globalThis.addEventListener = A0; globalThis.removeEventListener = R0; }
 }
 
 console.log(picate ? `\n${picate} probe au picat` : '\ntoate probele au trecut');

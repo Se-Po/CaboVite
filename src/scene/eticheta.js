@@ -11,8 +11,11 @@ import { creeazaFisa } from '../chapters/sanctuar.js';
 // Trei lucruri pe care nu le face o etichetă simplă:
 //   - OCOLEȘTE panourile: busola, butonul Satelit, panoul punctului, rândul cu
 //     sursele, versiunea, legenda și fișa deschisă. Încearcă sus, dreapta, stânga, jos, și ia
-//     prima poziție liberă. Obstacolele se citesc din DOM, nu se presupun: panoul
-//     punctului se deschide, se minimizează și crește după un clic.
+//     prima poziție liberă; dacă toate patru ating ceva, le mută pe lângă ce ating. Rândul
+//     cu sursele e obstacol tare: atribuirea se vede fără nicio interacțiune (regulile
+//     OSMF), deci eticheta nu stă peste el cât există un loc care nu-l atinge. Obstacolele
+//     se citesc din DOM, nu se presupun: panoul punctului se deschide, se minimizează și
+//     crește după un clic.
 //   - Când ancora iese din cadru sau e în spatele camerei, eticheta stă lipită de
 //     marginea ecranului, cu o săgeată spre sanctuar: rămâne un drum într-acolo.
 //   - Când relieful acoperă sanctuarul, eticheta rămâne, dar punctată: altfel ai
@@ -28,31 +31,63 @@ import { creeazaFisa } from '../chapters/sanctuar.js';
 // Panoul punctului, pe cele două stări: butonul minimizat și cutia deschisă. Amândouă
 // există de la creare, deci observatorul de mai jos le vede; cea ascunsă se sare.
 const OBSTACOLE = ['#busola .roza', '#busola .citire', '#punct .activeaza', '#punct .cutie', '#surse', '#legenda', '#straturi button', '#versiune'];
+// Obstacolele tari: atribuirea. Eticheta poate acoperi orice altceva înaintea lor.
+const TARI = new Set(['#surse']);
 const DIST_ETICHETA = 12; // px între ancoră și etichetă
-const MARGINE = 8;        // px de la marginea ecranului
+const MARGINE = 8;        // px de la marginea ecranului și de la un obstacol ocolit
+const RAZA_PIN = 8;       // px, o alegere: pinul are 12 px cu chenar (border-box, main.css), deci ±6, plus 2 px de aer
 
 const intersectie = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
   * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
 
 /**
  * Alege unde se așază eticheta, dintre patru poziții în jurul ancorei: prima care nu
- * atinge niciun obstacol; dacă toate ating, cea care acoperă cel mai puțin.
- * Fiecare poziție se aduce întâi în ecran.
+ * atinge niciun obstacol. Dacă toate ating, fiecare se mută lângă fiecare obstacol pe care
+ * îl atinge — sub el, deasupra, la dreapta, la stânga — și se ia mutarea liberă cea mai
+ * scurtă. Pentru o mutare, pinul (`pin`, cât se vede) e și el obstacol: cele patru poziții nu
+ * stau niciodată pe el, decât împinse de marginea ecranului, iar una mutată nu-l acoperă cât
+ * există alta liberă. Fără nicio mutare liberă: cea care acoperă cel mai puțin din
+ * obstacolele tari (`tare: true`), apoi din toate. Fiecare poziție se aduce întâi în ecran.
+ *
+ * Găsit pe un Pixel 8 Pro (448 × 867), pe 2026-10-14: cu „Coordonate” deschis, imaginea
+ * urcă și ancora ajunge sus, unde toate patru pozițiile ating rândul cu sursele; cea care
+ * acoperea cel mai puțin stătea peste „© OpenStreetMap”.
  */
-export function alegePozitie(ancora, marime, obstacole, ecran) {
+export function alegePozitie(ancora, marime, obstacole, ecran, { pin = false } = {}) {
   const { x, y } = ancora, { w, h } = marime;
-  const candidati = [
-    { nume: 'sus', left: x - w / 2, top: y - h - DIST_ETICHETA },
-    { nume: 'dreapta', left: x + DIST_ETICHETA, top: y - h / 2 },
-    { nume: 'stanga', left: x - w - DIST_ETICHETA, top: y - h / 2 },
-    { nume: 'jos', left: x - w / 2, top: y + DIST_ETICHETA },
-  ].map((c) => {
-    const left = Math.min(ecran.w - w - MARGINE, Math.max(MARGINE, c.left));
-    const top = Math.min(ecran.h - h - MARGINE, Math.max(MARGINE, c.top));
+  const aseaza = (nume, l, t) => {
+    const left = Math.min(ecran.w - w - MARGINE, Math.max(MARGINE, l));
+    const top = Math.min(ecran.h - h - MARGINE, Math.max(MARGINE, t));
     const r = { left, top, right: left + w, bottom: top + h };
-    return { ...c, ...r, acoperit: obstacole.reduce((s, o) => s + intersectie(r, o), 0) };
-  });
-  return candidati.find((c) => c.acoperit === 0) ?? candidati.reduce((a, b) => (b.acoperit < a.acoperit ? b : a));
+    let acoperit = 0, tare = 0;
+    for (const o of obstacole) { const a = intersectie(r, o); acoperit += a; if (o.tare) tare += a; }
+    return { nume, ...r, acoperit, tare };
+  };
+  const candidati = [
+    aseaza('sus', x - w / 2, y - h - DIST_ETICHETA),
+    aseaza('dreapta', x + DIST_ETICHETA, y - h / 2),
+    aseaza('stanga', x - w - DIST_ETICHETA, y - h / 2),
+    aseaza('jos', x - w / 2, y + DIST_ETICHETA),
+  ];
+  const liber = candidati.find((c) => c.acoperit === 0);
+  if (liber) return liber;
+  const cutiePin = pin ? { left: x - RAZA_PIN, right: x + RAZA_PIN, top: y - RAZA_PIN, bottom: y + RAZA_PIN } : null;
+  const mutati = [];
+  for (const c of candidati) {
+    for (const o of obstacole) {
+      if (intersectie(c, o) === 0) continue;
+      for (const [cum, l, t] of [['sub', c.left, o.bottom + MARGINE], ['deasupra', c.left, o.top - h - MARGINE],
+        ['dupa', o.right + MARGINE, c.top], ['inainte', o.left - w - MARGINE, c.top]]) {
+        const m = aseaza(`${c.nume}-${cum}`, l, t);
+        if (cutiePin) m.acoperit += intersectie(m, cutiePin);
+        m.drum = Math.hypot(m.left - c.left, m.top - c.top);
+        mutati.push(m);
+      }
+    }
+  }
+  const liberMutat = mutati.filter((m) => m.acoperit === 0).reduce((a, b) => (a === null || b.drum < a.drum ? b : a), null);
+  if (liberMutat) return liberMutat;
+  return [...candidati, ...mutati].reduce((a, b) => (b.tare < a.tare || (b.tare === a.tare && b.acoperit < a.acoperit) ? b : a));
 }
 
 /**
@@ -163,10 +198,10 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
     // un element `position: fixed` — chiar fișa, care pe telefon e foaie fixă jos —,
     // iar eticheta ajungea sub ea fără să știe.
     const obst = [...OBSTACOLE, ...(fisa.hidden ? [] : ['#sanctuar-fisa'])]
-      .map((s) => document.querySelector(s)).filter((o) => o && !o.hidden && o.getClientRects().length > 0)
-      .map((o) => o.getBoundingClientRect());
+      .map((s) => ({ o: document.querySelector(s), tare: TARI.has(s) })).filter(({ o }) => o && !o.hidden && o.getClientRects().length > 0)
+      .map(({ o, tare }) => ({ r: o.getBoundingClientRect(), tare }));
     const cutieCanvas = canvas.getBoundingClientRect();
-    const rel = obst.map((r) => ({ left: r.left - cutieCanvas.left, right: r.right - cutieCanvas.left, top: r.top - cutieCanvas.top, bottom: r.bottom - cutieCanvas.top }));
+    const rel = obst.map(({ r, tare }) => ({ left: r.left - cutieCanvas.left, right: r.right - cutieCanvas.left, top: r.top - cutieCanvas.top, bottom: r.bottom - cutieCanvas.top, tare }));
     let mod = 'ancora';
     if (!inCadru) {
       // Spre marginea ecranului, pe direcția de la centru la ancoră. În spatele
@@ -184,7 +219,8 @@ export function creeazaEticheta({ gazda, canvas, camera, inaltimeLa, ancora, con
     murdar = false;
     ultim = { x, y, mod, ocl };
     const r = buton.getBoundingClientRect();
-    const loc = alegePozitie({ x, y }, { w: r.width, h: r.height }, rel, { w: cw, h: ch });
+    // Pinul se vede numai pe ancoră; la margine stă ascuns (main.css), deci nu se ocolește.
+    const loc = alegePozitie({ x, y }, { w: r.width, h: r.height }, rel, { w: cw, h: ch }, { pin: mod === 'ancora' });
     buton.style.transform = `translate(${loc.left.toFixed(1)}px, ${loc.top.toFixed(1)}px)`;
     pin.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     radacina.dataset.mod = mod;

@@ -250,6 +250,29 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
   punctată când relieful o acoperă. **Vizibil = `getClientRects().length`**, nu
   `offsetParent`: acela e null și pentru `position: fixed`, adică pentru fișa de pe
   telefon, sub care eticheta ajungea fără să știe.
+- **Eticheta și rândul surselor** (2026-10-14). Pe un Pixel 8 Pro (448 × 867), cu
+  „Coordonate” deschis, imaginea urcă, ancora ajunge la y ≈ 1 și toate patru pozițiile
+  ating rândul surselor; cea care acoperea cel mai puțin stătea peste „© OpenStreetMap”,
+  deși atribuirea se vede fără nicio interacțiune. Acum, când toate patru ating ceva,
+  fiecare se mută lângă fiecare obstacol pe care îl atinge — sub, deasupra, după,
+  înainte — și se ia mutarea liberă cea mai scurtă; pentru mutări, pinul vizibil e și el
+  obstacol. Fără niciun loc liber câștigă cea care acoperă cel mai puțin din obstacolele
+  tari (rândul surselor), apoi din toate. Unde una din cele patru poziții era liberă,
+  alegerea e aceeași. `verifica-controale`, pe dreptunghiurile măsurate pe telefon (cutia
+  goală, cutia cu o clădire, „Coordonate” minimizat): eticheta la (162,2; 60), chiar sub
+  rând; pe o grilă de 4 px, cu pinul și fără, 0 din 147 126 poziții peste surse (6 780
+  înainte); cu pinul vizibil (±6 px, din main.css), 2 248 din 73 563 îl ating, toate
+  dintre cele patru poziții împinse de marginea ecranului, niciuna mutată (înainte, 11 681);
+  la ancora (276; 764), minimizat, mutarea liberă cea mai scurtă, (8; 722). Trei cazuri
+  construite: fără loc liber, sursele rămân libere chiar dacă eticheta acoperă mai mult din
+  rest; dintre pozițiile care le lasă libere, cea care acoperă cel mai puțin (10 160 px², nu
+  12 800); o mutare care ar acoperi pinul pierde. Unde una din cele patru poziții era
+  liberă, 0 schimbate din 88 880 față de `2c5c680`; fără git pică numai comparația asta.
+  Apoi `creeazaEticheta` întreagă, pe un DOM fals cu dreptunghiuri: rândul surselor și pinul
+  ajung din DOM la `alegePozitie`. Controale, care pică: eticheta.js de la `2c5c680`; fără
+  prioritatea atribuirii; rezerva numai pe obstacolele tari; fără pin; raza pinului de 2 px;
+  prima mutare liberă; cea mai lungă; mutările fără margine; fără întâietatea celor patru
+  poziții; în DOM, `TARI` gol, `{ pin: false }` și dreptunghiurile fără `tare`.
 - Clicul deschide fișa, APOI zboară: zborul primește cutia fișei. Cât fișa e
   deschisă, un decalaj de obiectiv (`setViewOffset`) mută imaginea în partea liberă —
   foaia de jos pe telefon, panoul din dreapta pe desktop — iar distanța crește cât

@@ -25,6 +25,20 @@ Escape îl minimizează (vezi `docs/controale.md`, „Focusul, Escape și contra
   butonul rămâne numai cu semnul. Așa ajunge și un telefon de 390 px cu pagina
   mărită de două ori. Îngust și sub 30rem înălțime, cutia coboară peste Satelit.
 
+**Îndemnul după pointer** (2026-10-14). Pe telefon scria „Dă clic pe teren” (Pixel 8 Pro). Acum
+numește gestul pointerului principal, `(pointer: coarse)`: „Atinge terenul ca să afli unde e
+punctul…” și, în afara zonei alpha, „… Atinge harta.”; cu mouse-ul, „Dă clic…”, ca înainte. Se
+citește la fiecare scriere și se rescrie la `change`, fiindcă o tabletă cu tastatură își schimbă
+pointerul principal; ascultătorul pleacă la `dispose()`. Titlurile nu mai numesc gestul
+(„Arată coordonatele punctului ales pe hartă”, „Minimizează: harta nu mai măsoară”, iar la Satelit
+„… o nouă apăsare rămâne pe Relief”): `title` nu e numai al mouse-ului, intră în arborele de
+accesibilitate ca descriere (HTML-AAM), deci o cititoare de ecran îl poate rosti și pe telefon
+<!-- NEVERIFICAT: TalkBack, VoiceOver -->. `verifica-controale`, cu un `matchMedia` fals: cu
+degetul, cu mouse-ul, înapoi la deget, apoi un punct din afara alpha și, cât se vede „În
+afara…”, mouse-ul, cu mesajul locului păstrat; controale, care pică: pointerul ignorat,
+schimbarea neascultată, ascultătorul rămas după `dispose()`, schimbarea care rescrie îndemnul de
+început.
+
 **Imaginea din calea cutiei și semnul punctului** (2026-10-09, alegerea autorului). Pe ecranele
 mici cutia deschisă stă peste mijlocul hărții, iar „Măsoară centrul” culegea un loc acoperit
 chiar de ea, fără niciun semn pe hartă (recenzia: 640 × 360, adică 1280 × 720 la 200%, 320 × 568,
@@ -70,8 +84,10 @@ clădirile cu toleranța reliefului (zidul nu acoperă); formula fără decalaj 
 de la 12,35 m la 320 × 568). În pagină (build, 2026-10-09, fila ascunsă, deci cadrele desenate de
 mână): aceleași cutii și poziții la toate șapte ecranele, deschis = cu un punct, `elementFromPoint`
 pe canvas sub semn; capturile la 390 × 844, 320 × 568 și 640 × 360; fișa pe telefon peste panou și
-închisă la loc; 0 erori în consolă. Mărirea adevărată cu Ctrl + și un telefon adevărat nu s-au
-încercat <!-- NEVERIFICAT: Ctrl + în browser, telefon -->.
+închisă la loc; 0 erori în consolă. Pe un telefon adevărat (Pixel 8 Pro, 448 × 867, 2026-10-14),
+cu atingeri prin CDP: cutia deschisă mută imaginea, punctul atins are semn, o clădire își scrie
+numele, iar „Copiază” răspunde „Copiat”. Mărirea adevărată cu Ctrl + nu s-a încercat
+<!-- NEVERIFICAT: Ctrl + în browser -->.
 
 Cutia deschisă primește clicurile: are înălțime maximă și defilează, cu antetul
 lipit sus, deci „–” se vede mereu. Prin ea nu se culege și nu se rotește camera;
