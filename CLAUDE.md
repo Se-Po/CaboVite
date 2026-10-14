@@ -214,6 +214,9 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   600 000 de triunghiuri și 8 MiB de fișiere. → imprejurimi
 - Umbrele: o singură hartă de 2048², cu `autoUpdate = false`, refăcută la
   `webglcontextrestored`; soarele nu se mută ca să încadreze umbra. → sanctuar
+- După un context refăcut, `dispose()` scrie avertismente „object does not belong to this
+  context”: ale lui three, inofensive, nereparate. Un renderer nou pe același context lasă 4
+  texturi și 3 framebuffere goale, netratate. → randarea
 - Ce stă în DOM peste hartă (eticheta, semnul punctului, pivotul) se proiectează pe cadrul
   desenat, după `camera.updateMatrixWorld()`; „vizibil” se citește cu
   `getClientRects().length`. → sanctuar, punctul, controale

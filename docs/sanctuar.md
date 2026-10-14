@@ -337,6 +337,12 @@ atingere. Probe, în pagină, cu `WEBGL_lose_context`, 1 s fără nicio atingere
   iar înscris la începutul ei ar fi aruncat ReferenceError la o restaurare venită în
   timpul unui `await` (dedus din cod, nemăsurat).
 
+`umbre.dispose()` eliberează și materialul de adâncime cu care three desenează harta, prins din
+`onBeforeShadow` al obiectelor care aruncă umbră: fără el, programul lui rămânea pe placă după
+`dispose()`. Cadrul nu se schimbă: 0 pixeli diferiți din 256 000, în țintă fixă de 640 × 400, pe
+Satelit și pe Relief. Vezi
+`docs/randarea.md`, „Eliberarea: programul de adâncime al umbrelor”.
+
 Aruncă umbră sanctuarul și, din v0.1.0, clădirile din afara lui; primesc
 clădirile, suprafețele și terenul. Împrejurimile nu primesc și n-au nici codul umbrelor în
 shader (vezi `docs/imprejurimi.md`, „Fără codul umbrelor”). Cutia trece între grupuri — vezi

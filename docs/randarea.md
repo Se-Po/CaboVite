@@ -222,9 +222,10 @@ Ordinea contează și față de renderer: după `renderer.dispose()` proprietă�
 golite, iar `Texture.dispose()` nu mai ajunge la placă. Eliberarea unui singleton e sigură:
 `dispose()` doar anunță ascultătorii texturii, datele rămân, iar un renderer nou îl urcă din nou.
 Printre ascultători sunt, după un context pierdut și refăcut, și ai modulelor de dinaintea
-pierderii: aceia mai șterg o dată mânerul vechi (vezi mai jos, „Ce rămâne”). Ne sprijinim pe un
-interior al lui three (`renderer.properties`, uniforma `dfgLUT`), deci o versiune nouă de three
-trece întâi prin `verifica-pagina`.
+pierderii: aceia mai șterg o dată mânerul vechi (vezi mai jos,
+„Contextul pierdut și refăcut: ștergerile pe contextul vechi”). Ne sprijinim pe un interior al
+lui three (`renderer.properties`, uniforma `dfgLUT`), deci o versiune nouă de three trece întâi
+prin `verifica-pagina`.
 
 **Probele.** `npm run verifica-pagina`, secțiunea LUT-ului DFG:
 - contractul r186, citit în build-ul pe care îl încarcă pagina: singletonul, uniforma pusă de
@@ -267,16 +268,189 @@ build-ul de dinaintea căutării din `dispose(scena)` și a mutării, cu aceeaș
 
 Harta, privită pe desktop și la 390 px: neschimbată. Consola: 0 erori, 0 încălcări CSP.
 
-**Ce rămâne, în afara contorului.** `WebGLState` face patru texturi goale de 1 × 1 — 2D, cub,
-2D array, 3D (WebGLState.js:439-442) —, pe care three nu le șterge și nu le numără în
-`info.memory`. Trăiesc cât contextul, pe care `dispose()` îl lasă viu intenționat (scena.js).
-S-au văzut după un context refăcut, când se fac din nou. O repornire pe același canvas ar mai
-adăuga patru; nu s-a reparat. Tot după un context refăcut, `dispose()` dă avertismente
-`INVALID_OPERATION: delete: object does not belong to this context`, și pe v0.1.6. Cauza, citită
-în cod: `onContextRestore` (WebGLRenderer.js) cheamă `initGLContext()`, care face module noi fără
-să desprindă ascultătorii `dispose` ai celor vechi (de pildă `WebGLGeometries.js:55`). La
-eliberare, aceștia șterg obiecte ale contextului pierdut. Reparația adaugă cel mult încă unul:
-ascultătorul LUT-ului din `WebGLTextures`-ul vechi, pe care v0.1.6, care nu elibera LUT-ul, nu-l
-declanșa (recenzia, într-o simulare în Node cu codul three; contoarele rămân corecte, scăderea
-cade pe `WebGLInfo`-ul vechi). <!-- NEVERIFICAT: numărul avertismentelor, pe fiecare versiune -->
-Nereparate.
+**Ce rămâne, în afara contorului.** `info.memory` nu numără programele: după `dispose()` mai
+rămânea programul de adâncime al umbrelor, reparat de umbre.js (vezi mai jos,
+„Eliberarea: programul de adâncime al umbrelor”). Nu numără nici obiectele pe care rendererul și
+le face la construcție și pe care three nu le șterge niciodată: patru texturi goale ale lui
+`WebGLState` — 2D, cub, 2D array, 3D, de 1 × 1 (WebGLState.js:439-442) — și trei framebuffere
+goale ale lui `initGLContext` (WebGLRenderer.js:459-461). Trăiesc cât contextul, pe care
+`dispose()` îl lasă viu intenționat (scena.js), iar după un context refăcut se fac din nou.
+Avertismentele de după un context refăcut, măsurate pe Satelit la pornire: 50 pe v0.1.6, 51 pe
+0.1.7.03; pe altă cale, cu alte obiecte urcate, altă cifră. Cel în plus e
+ascultătorul LUT-ului din `WebGLTextures`-ul vechi, cum prevedea recenzia. Cauza, proba și de ce
+rămân nereparate: mai jos, „Contextul pierdut și refăcut: ștergerile pe contextul vechi”.
+
+## Eliberarea: programul de adâncime al umbrelor
+
+Măsurat pe 2026-10-14, cu `renderer.info.programs` și cu sonda descrisă mai jos, care numără și
+programele din context („Sonda”, în
+„Contextul pierdut și refăcut: ștergerile pe contextul vechi”). După `__scena.dispose()`,
+`renderer.info.programs` mai avea un program, pe v0.1.6 publicat și pe 0.1.7.03, cu sau fără
+context pierdut: `type` `MeshDepthMaterial`. Câmpul `name` e gol, fiindcă e `material.name`.
+`info.memory` nu numără programele, deci tabelul LUT-ului nu-l vedea.
+
+**De ce.** WebGLShadowMap își face materialul de adâncime (`_depthMaterial`, WebGLShadowMap.js:44)
+și desenează cu el orice obiect care aruncă umbră, dacă materialul obiectului nu cere o variantă
+(alphaTest cu hartă, decupare, deplasare). Programul ține de material și pleacă numai prin
+`onMaterialDispose` al rendererului, la `material.dispose()`: `WebGLPrograms.dispose()` nu șterge
+programe, iar `renderer.dispose()` nu eliberează materialele lui WebGLShadowMap. Materialul e
+privat, deci nu-l elibera nimeni. O variantă e o clonă, pe care three o eliberează singur odată cu
+materialul obiectului (WebGLShadowMap.js:582-604). `compileAsync` nu compilează materialele
+umbrei, deci programul se face abia la primul cadru cu umbre.
+
+**Reparația.** umbre.js pune pe fiecare obiect care aruncă umbră un `onBeforeShadow`, o metodă
+publică a lui Object3D, goală pe prototip (Object3D.js:403). WebGLShadowMap o cheamă cu materialul
+desenat chiar înaintea desenului (WebGLShadowMap.js:546, 560), deci înaintea programului. Ce s-a
+prins se eliberează în `umbre.dispose()`, înscris în `deEliberat` imediat după `creeazaUmbre`, în
+același `try` și înaintea lui `urmaresteGrupul`, care poate arunca după el. Pleacă deci prin
+`curata()`, înaintea lui `renderer.dispose()`. După acesta, proprietățile rendererului sunt
+golite, iar `material.dispose()` nu-și mai găsește programul. Cârligul se scoate, numai dacă e al
+nostru, și rămâne metoda goală de pe prototip.
+
+După un context refăcut, three face un WebGLShadowMap nou, cu alt material. După primul cadru cu
+umbre se prind amândouă. Cel vechi pleacă fără nicio ștergere pe contextul pierdut, fiindcă
+`onMaterialDispose` citește proprietățile de acum. Reparația folosește numai API public. Un three
+care și-ar elibera singur materialul ar lăsa al doilea `dispose()` fără ascultători, deci
+inofensiv.
+
+**Probele.** `npm run verifica-pagina`, secțiunea „Programul de adâncime al umbrelor și contextul
+refăcut”. Hamul e `WebGLRenderer`-ul din build, cel pe care îl încarcă pagina, peste un context
+WebGL2 fals:
+- **Contextul fals.** E un Proxy cu constante numerice distincte și metode care nu fac nimic.
+  Întoarce cât îi trebuie rendererului ca să pornească: versiunea, precizia, programele legate
+  fără jurnal și `EXT_color_buffer_float`. Ține fiecare obiect creat cu generația contextului.
+  `perde()` crește generația, iar cât contextul e pierdut, orice apel e ignorat, ca în browser.
+- **Scena.** Soarele, un cub care aruncă umbră, un plan care o primește, `creeazaUmbre` al
+  paginii, `urmaresteLutDFG` și eliberarea în ordinea lui `curata()`. Contextul n-are locații de
+  uniforme, deci LUT-ul îl urcă `initTexture` după fiecare cadru.
+- **Ce se numără.** Materialele de adâncime eliberate se numără din `Material.prototype.dispose`,
+  nu din umbre.js. Consola lui three se prinde numai cât rulează hamul, cu 0 erori și 0
+  avertismente cerute.
+
+Rezultatele:
+- calea paginii: umbra desenată (`MeshDepthMaterial` printre programe), un material de adâncime
+  eliberat, 0 programe vii, cârligul înapoi pe prototip. Controale, prin mutații ale lui umbre.js:
+  fără `onBeforeShadow = prinde`, 1 program viu; fără `delete`, cârligul rămâne pe obiect. În ham,
+  cu `umbre.dispose()` după `renderer.dispose()`: 1 program viu. Consola: o textură marcată pentru
+  urcare fără imagine dă un avertisment, iar rândul consolei pică;
+- context pierdut și refăcut, cu `umbre.refa()` ca în `laRestaurare`: umbra redesenată pe
+  contextul nou, 2 materiale de adâncime eliberate, 0 programe vii. Controale: fără prindere, 1
+  program viu; hamul fără `umbre.refa()` lasă umbra nedesenată, iar garda redesenării pică;
+- pe sursa lui scena.js: înscrierea lui `u.dispose()` după `creeazaUmbre`, în același `try`,
+  înaintea lui `urmaresteGrupul`, și `laRestaurare`, care cheamă `umbre?.refa()` și ascultă
+  `webglcontextrestored`. Controale: fără înscriere, înscrisă după `urmaresteGrupul` și
+  `laRestaurare` fără `umbre?.refa()`, toate pică. Ordinea listă → renderer o păzește proba
+  LUT-ului.
+
+Că materialul vechi pleacă fără nicio ștergere de program pe contextul pierdut e o citire a lui
+three (`onMaterialDispose`, cu proprietățile de acum), nu o probă: în ham nu poate pica.
+
+În pagină, pe build (`cabo-espichel-productie`), cu panoul ascuns și `requestAnimationFrame`
+înlocuit, ca la LUT. Geometrii / texturi / programe, citite din `renderer.info`:
+
+| calea | înainte de `dispose()` | după | pe 0.1.7.03, după |
+|---|---|---|---|
+| Satelit la pornire | 10 / 9 / 11 | 0 / 0 / 0 | 0 / 0 / 1 |
+| comutat pe Relief | 14 / 9 / 21 | 0 / 0 / 0 | nemăsurat |
+| preferința Relief | 14 / 3 / 7 | 0 / 0 / 0 | nemăsurat |
+| context pierdut și refăcut | 10 / 9 / 11 la pierdere, 10 / 9 / 7 după refacere | 0 / 0 / 0 | 0 / 0 / 1 |
+| `laEsec`, trei excepții la rând în `zbor.pas` | 10 / 9 / 11 | 0 / 0 / 0 | nemăsurat |
+| 390 × 844 | 9 / 9 / 11 | 0 / 0 / 0 | nemăsurat |
+
+Pe calea contextului refăcut, sonda a numărat și programele din context: pe contextul nou nu
+rămâne niciunul viu. Rămân numai cele 4 texturi și 3 framebuffere ale constructorului.
+
+Pixelii: în țintă fixă de 640 × 400, din vederea de pornire, pe Satelit și pe Relief, build-ul de
+pe 0.1.7.03 și cel nou dau **0 pixeli diferiți din 256 000**, cu abaterea maximă 0. Control, pe
+Satelit, pe build-ul de pe 0.1.7.03: cu primirea umbrelor scoasă de pe cele 8 obiecte care o
+primesc, amprenta cadrului se schimbă, deci cadrul conține umbre; pe Relief, nemăsurat. Harta, privită pe desktop și la 390 px: pe ecran. Consola: nicio eroare și
+niciun avertisment în afara celor provocate de probe.
+
+## Contextul pierdut și refăcut: ștergerile pe contextul vechi
+
+Măsurat pe 2026-10-14. Contextul se pierde cu `WEBGL_lose_context` (`loseContext()`, 0,5 s, apoi
+`restoreContext()`, 2 s), apoi un `__scena.dispose()` scrie în consolă avertismente
+`WebGL: INVALID_OPERATION: delete: object does not belong to this context` și
+`deleteVertexArray: object does not belong to this context`. Pe Satelit la pornire, pe desktop:
+**50 pe v0.1.6** publicat, **51 pe 0.1.7.03** și după reparația umbrelor. Fără pierdere: 0. Pe
+altă cale, de pildă cu preferința Relief, se urcă alte obiecte, deci cifra ar fi alta
+(nemăsurat).
+
+**Sonda.** În panoul Browser, imediat după navigare, se înfășoară `create*` și `delete*` pe
+`WebGL2RenderingContext.prototype`, pentru buffere, VAO, texturi, framebuffere, renderbuffere,
+programe și shadere. Fiecare obiect creat poartă generația contextului. Un ascultător
+`webglcontextrestored` în captură pe `document` crește generația înaintea lui three, fiindcă
+captura pe document trece înaintea ascultătorilor de pe canvas. O ștergere pe un obiect din altă
+generație decât cea de acum e una pe contextul pierdut. Mărimea fiecărui obiect (`bufferData`,
+`texStorage2D`…) îl identifică. Ascultătorii „dispose” se numără printr-un `dispatchEvent`
+înfășurat.
+
+Ștergerile pe contextul pierdut, la `dispose()`:
+
+| ce | v0.1.6 | 0.1.7.03 |
+|---|---|---|
+| buffere: atributele și indicii celor 10 geometrii desenate, de la 12 B la 51 MB | 29 | 29 |
+| VAO | 12 | 12 |
+| texturi: 6 BC7 Satelit, culoarea și adâncimea umbrei (2048²) | 8 | 8 |
+| textura LUT-ului DFG (0x822F, 16²), eliberată abia din 0.1.7.03 | — | 1 |
+| framebuffer: ținta umbrei | 1 | 1 |
+| **total = avertismentele din consolă** | **50** | **51** |
+
+Toate sunt obiecte create înaintea pierderii: sonda le găsește pe toate în generația veche. Că
+sunt exact ce era viu la pierdere, minus cele 4 texturi și 3 framebuffere ale constructorului,
+pe care nu le șterge nimeni, și minus programele, s-a verificat pe scena de probă din Node (mai
+jos). În pagină, generația veche nu s-a inventariat. Pe v0.1.6 se scade și LUT-ul, viu, dar
+neeliberat atunci.
+
+**Cauza e în three.** `onContextRestore` (WebGLRenderer.js:1123) cheamă `initGLContext()` (442),
+care face module noi: WebGLTextures, WebGLAttributes, WebGLBindingStates, WebGLGeometries,
+WebGLShadowMap și celelalte. Pe cele vechi nu le desprinde nimeni de obiecte. Fiecare geometrie
+desenată are, măsurat, 1 ascultător „dispose” înainte de pierdere și 2 după refacere și un cadru.
+Ascultătorul vechi, `onGeometryDispose` (WebGLGeometries.js:8), șterge bufferele vechi
+(WebGLAttributes.js:173) și VAO-urile vechi (`releaseStatesOfGeometry`, WebGLBindingStates.js). La
+fel la texturi și la ținta umbrei (`onTextureDispose`, `onRenderTargetDispose`,
+WebGLTextures.js:324-488). Programele nu se dublează: `onMaterialDispose` e o singură funcție a
+rendererului, care citește proprietățile de acum.
+
+Pagina nu e cauza. Lista eliberează fiecare resursă o singură dată, iar `laRestaurare` doar
+redesenează umbrele și cere un cadru. Nimic nu se eliberează în timpul vieții după o refacere:
+comutarea Satelit/Relief și umbrele pe grupuri nu cheamă `dispose()`.
+
+**De ce rămân nereparate (hotărârea autorului).** Pe placă nu stricăm nimic: obiectele șterse
+fuseseră deja eliberate de browser la pierdere. Rămân două urme mici:
+- **`getError`.** Rămâne un singur `INVALID_OPERATION`, oricâte avertismente. Măsurat pe un
+  canvas separat: patru ștergeri după refacere, 4 avertismente, iar `getError` dă 1282 o dată,
+  apoi 0. three îl citește numai în mesajul unei legări de program eșuate (WebGLProgram.js:895).
+  Azi contextul nu se refolosește după `dispose()`. O repornire pe același canvas ar vedea codul
+  acesta în primul mesaj de eroare al unui shader.
+- **Modulele vechi pe CPU.** Rămân ținute în memorie până la `dispose()`. E puțin, dar nemăsurat.
+
+Avertismentele apar numai la un `dispose()` venit după o refacere: în pagină, pe `laEsec` sau pe
+eșecul pornirii, după o refacere, sau de mână din consolă.
+
+Există o cale numai cu API public. La `webglcontextlost`, three încă n-a schimbat modulele: doar
+își notează pierderea. Un `dispose()` chemat atunci pe tot ce e urcat declanșează ascultătorii
+vechi, care se scot singuri. Ștergerile lor cad pe contextul pierdut, unde browserul tace. Măsurat
+în Chromium, pe același canvas separat: patru ștergeri în ascultătorul `webglcontextlost`, 0
+avertismente, iar `getError` dă o dată `CONTEXT_LOST_WEBGL` (37442), apoi 0. La
+refacere, modulele noi urcă totul din nou, cu un singur ascultător. Costul ei: tot ce e urcat ar
+trebui pus și într-o listă de la pierdere. Pe lângă geometriile scenei, intră acolo texturile
+Satelit (pe Relief nu sunt în scenă), ținta umbrei și LUT-ul. O resursă nouă, uitată acolo, ar
+aduce avertismentul înapoi.
+
+**Probele.** Aceeași secțiune din `verifica-pagina`, cu hamul de mai sus, peste contextul pierdut
+și refăcut. Ștergerile pe contextul pierdut sunt egale, pe feluri, cu valoarea calculată în probă
+la pierdere: ce era viu, minus ce a făcut constructorul. Pe scena de probă, 8 buffere, 3 VAO, 3
+texturi (culoarea și adâncimea umbrei, LUT-ul) și 1 framebuffer. Ascultătorii geometriei trec de
+la 1 la 2. Control: aceiași pași, cu geometriile, ținta umbrei și LUT-ul eliberate la
+`webglcontextlost` — calea publică de mai sus —, dau 0 ștergeri pe contextul pierdut. Deci ele
+vin din ascultătorii modulelor vechi. Tăcerea browserului cât contextul e pierdut e modelată în
+contextul fals, nu probată acolo; în Chromium s-a măsurat pe canvasul separat de mai sus.
+
+**Un renderer nou pe același context** își face, la construcție, 4 texturi goale și 3
+framebuffere, iar `dispose()` nu le șterge. Măsurat în pagină, de trei ori, pe v0.1.6; în
+`verifica-pagina`, 4/3, 8/6, 12/9 după trei reporniri, iar controlul care le șterge înainte de
+numărare pică. Fac 36 B de texeli pe repornire și nu se tratează. Azi nicio cale a paginii nu le
+lasă în urmă: `elibereazaScena` din main.js pierde contextul după orice `dispose()`. Le lasă numai
+un `__scena.dispose()` de mână. O repornire pe capitole va avea de ales: ori păstrează rendererul,
+și atunci `dispose()` nu-l mai eliberează, ori ia un canvas nou și pierde contextul vechi.

@@ -76,7 +76,22 @@ export function creeazaUmbre({ renderer, soare, cutie, arunca, primesc, lungimeU
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   soare.castShadow = true;
-  for (const m of arunca) m.castShadow = true;
+
+  // Materialul de adâncime cu care se desenează harta e al lui three: WebGLShadowMap își face
+  // unul (`_depthMaterial`) și nu-l eliberează nimeni, nici `renderer.dispose()`, deci după
+  // `dispose()` îi rămânea programul pe placă. three i-l dă fiecărui obiect care aruncă umbră,
+  // în `onBeforeShadow`, chiar înaintea desenului: îl ținem minte de acolo și îl eliberăm în
+  // `dispose()`, care trece prin listă înaintea lui `renderer.dispose()`. După un context
+  // refăcut, three face un WebGLShadowMap nou, cu alt material: după primul cadru cu umbre se
+  // prind amândouă, iar cel vechi pleacă fără nicio ștergere pe contextul pierdut. O variantă
+  // clonată (alphaTest, decupare) o eliberează three oricum, odată cu materialul obiectului.
+  // Vezi `docs/randarea.md`, „Eliberarea: programul de adâncime al umbrelor”.
+  const adancime = new Set();
+  const prinde = (_r, _o, _c, _cu, _g, material) => { adancime.add(material); };
+  for (const m of arunca) {
+    m.castShadow = true;
+    m.onBeforeShadow = prinde;
+  }
   for (const m of primesc) m.receiveShadow = true;
 
   let viu = true;
@@ -96,8 +111,14 @@ export function creeazaUmbre({ renderer, soare, cutie, arunca, primesc, lungimeU
       if (!viu) return;
       viu = false;
       soare.castShadow = false;
-      for (const m of arunca) m.castShadow = false;
+      for (const m of arunca) {
+        m.castShadow = false;
+        // Numai cârligul nostru: rămâne metoda goală de pe prototip.
+        if (m.onBeforeShadow === prinde) delete m.onBeforeShadow;
+      }
       for (const m of primesc) m.receiveShadow = false;
+      for (const material of adancime) material.dispose();
+      adancime.clear();
       soare.shadow.dispose();          // harta de umbre e un WebGLRenderTarget
       renderer.shadowMap.enabled = false;
     },

@@ -387,6 +387,14 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // Probă, în pagină: fără sanctuar și fără clădiri (cererile lor cu 404), contextul
   // pierdut și refăcut cu WEBGL_lose_context: în 1 s fără nicio atingere, 0 cadre
   // înainte, 1 acum.
+  //
+  // La refacere, three face module noi (`initGLContext`), dar ascultătorii „dispose” ai celor
+  // dinainte rămân pe geometrii, texturi și ținta umbrei. Un `dispose()` venit după o refacere
+  // mai șterge deci o dată, pe contextul pierdut, bufferele, VAO-urile, texturile și ținta urcate
+  // înaintea pierderii: avertismente „object does not belong to this context”, inofensive — 51
+  // pe Satelit la pornire; numărul urmează ce era urcat. Pagina nu eliberează nimic de două ori.
+  // Nereparate, cu motivul și măsurătoarea în
+  // `docs/randarea.md`, „Contextul pierdut și refăcut: ștergerile pe contextul vechi”.
   const laRestaurare = () => { umbre?.refa(); cereRandare(); };
   canvas.addEventListener('webglcontextrestored', laRestaurare);
   deEliberat.push(() => canvas.removeEventListener('webglcontextrestored', laRestaurare));
@@ -760,8 +768,13 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
       // din `porneste()`. După `loseContext()` același element canvas nu mai poate
       // sluji un renderer nou, iar de aici scena trebuie să se poată reporni pe
       // canvasul existent — la schimbarea de capitol, de pildă. Contextul rămâne
-      // deci viu intenționat, nu din scăpare. Numai `laEsec` din main.js, care abandonează
-      // canvasul, îl pierde după `dispose()`.
+      // deci viu intenționat, nu din scăpare. Numai `elibereazaScena` din main.js — pe `laEsec`
+      // și pe eșecul pornirii —, care abandonează canvasul, îl pierde după `dispose()`.
+      //
+      // Un renderer nou pe același canvas își face însă, la fiecare repornire, 4 texturi goale
+      // și 3 framebuffere (în three, `WebGLState` și `initGLContext`), pe care `dispose()` nu
+      // le șterge: 36 B de texeli, netratate. Vezi
+      // `docs/randarea.md`, „Contextul pierdut și refăcut: ștergerile pe contextul vechi”.
     },
   };
 }

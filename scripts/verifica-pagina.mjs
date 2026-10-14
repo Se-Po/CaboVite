@@ -54,6 +54,13 @@
 //     și după un `render()` care a aruncat (căutat în scenă); ordinea, pe sursă: prins după
 //     `render()`, înscris în listă cu scena înaintea buclei, lista golită înaintea lui
 //     `renderer.dispose()`;
+//   - programul de adâncime al umbrelor (umbre.js, scena.js), cu `WebGLRenderer`-ul din build
+//     peste un context WebGL2 fals, care numără obiectele pe generații de context: prins din
+//     `onBeforeShadow` și eliberat, 0 programe vii, și după un context refăcut; zgomotul lui
+//     three la refacere — ștergerile pe contextul pierdut — egal cu ce era viu la pierdere minus
+//     ce face constructorul, 0 cu eliberarea la pierdere; un renderer nou pe același context
+//     lasă 4 texturi și 3 framebuffere; pe sursă, înscrierea umbrelor în listă și redesenarea
+//     lor la refacere;
 //   - anunțurile după apariția hărții (scena.js, busola.js): `arata()` cheamă `reanunta()` pe
 //     busolă și pe Satelit după două cadre ale paginii; busola, construită cu un DOM fals,
 //     golește anunțul și îl scrie din nou;
@@ -84,7 +91,8 @@ import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { redimensioneaza } from '../src/scene/renderer.js';
 import { materialMareSatelit } from '../src/scene/satelit.js';
 import { incarcaImprejurimi, NIVELURI_IMPREJURIMI } from '../src/scene/imprejurimi.js';
-import { proba, rezumat } from './comun/proba.mjs';
+import * as UMBRE from '../src/scene/umbre.js';
+import { cuAvertismente, proba, rezumat } from './comun/proba.mjs';
 import { LF, modulDin, muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 
 // ------------------------------------------------------------ uneltele
@@ -3079,6 +3087,285 @@ console.log('\nLUT-ul DFG al lui three: eliberat de scenă, înaintea rendererul
     const om = mutat === null ? null : ordineLut(mutat);
     proba(om !== null && !om.ok, `control, ${nume}: ${om === null ? NEAPLICATA : `prins după render ${om.lipit}, înscris la ${om.i}${om.inainte.length ? ` (înaintea a ${om.inainte.length} care țin materiale)` : ''}, lista la ${om.c}, rendererul la ${om.rd}`} — pică`);
   }
+}
+
+// ------------------------------------------------------------ programul de adâncime al umbrelor
+
+// three r186 desenează harta de umbre cu materialul lui WebGLShadowMap (`_depthMaterial`, un
+// MeshDepthMaterial), pe care nu-l eliberează nimeni, nici `renderer.dispose()`: după
+// `__scena.dispose()` îi rămânea programul pe placă. umbre.js îl prinde din `onBeforeShadow` și
+// îl eliberează în `dispose()`. Aici, cu `WebGLRenderer`-ul din build — cel pe care îl încarcă
+// pagina — peste un context WebGL2 fals, care ține fiecare obiect creat cu generația contextului:
+// (a) calea paginii; (b) contextul pierdut și refăcut, cu zgomotul lui three la eliberare
+// (ștergerile pe contextul pierdut), calculat aici; (c) un renderer nou pe același context;
+// (d) înscrierea umbrelor în listă, pe sursa lui scena.js. Pe GPU, proba e în pagină:
+// `docs/randarea.md`, „Eliberarea: programul de adâncime al umbrelor”.
+console.log('\nProgramul de adâncime al umbrelor și contextul refăcut (umbre.js, scena.js)');
+{
+  const FELURI = ['Buffer', 'VertexArray', 'Texture', 'Framebuffer', 'Renderbuffer', 'Program', 'Shader'];
+  // Ce poate rămâne urcat de la un context la altul; programele și shaderele n-au ascultători
+  // „dispose” pe obiecte (programele pleacă prin `onMaterialDispose` al rendererului).
+  const URCATE = ['Buffer', 'VertexArray', 'Texture', 'Framebuffer', 'Renderbuffer'];
+  // Contextul fals: constante numerice distincte, metode care nu fac nimic, plus cât îi trebuie
+  // lui WebGLRenderer ca să pornească — versiunea, precizia, programele legate fără jurnal.
+  // `perde()` crește generația, ca browserul, care invalidează la pierdere tot ce era creat; cât
+  // contextul e pierdut, browserul ignoră în tăcere orice apel. După refacere, o ștergere pe un
+  // obiect din generația veche e una pe contextul pierdut: în browser, avertismentul
+  // „object does not belong to this context”.
+  const contextFals = () => {
+    const K = new Map(), obiecte = new Map(), vechi = [], asc = {};
+    let gen = 0, pierdut = false;
+    const k = (n) => K.get(n);
+    const t = {
+      getParameter: (p) => (p === k('VERSION') ? 'WebGL 2.0'
+        : p === k('SCISSOR_BOX') || p === k('VIEWPORT') ? new Int32Array([0, 0, 64, 64]) : 16),
+      // Numai extensia pe care three o activează la urcarea unei texturi în virgulă mobilă — LUT-ul
+      // DFG e RG16F —, prezentă în orice browser desktop: fără ea, three avertizează o dată.
+      getExtension: (n) => (n === 'EXT_color_buffer_float' ? {} : null),
+      getSupportedExtensions: () => [],
+      getContextAttributes: () => ({ alpha: false, antialias: true, depth: true, stencil: false, premultipliedAlpha: true }),
+      getShaderPrecisionFormat: () => ({ precision: 23, rangeMin: 127, rangeMax: 127 }),
+      getProgramParameter: (_p, n) => (n === k('LINK_STATUS') ? true : 0),
+      getShaderParameter: (_s, n) => (n === k('COMPILE_STATUS') ? true : 0),
+      getProgramInfoLog: () => '',
+      getShaderInfoLog: () => '',
+    };
+    for (const f of FELURI) {
+      t['create' + f] = () => {
+        if (pierdut) return null;
+        const h = { f };
+        obiecte.set(h, { f, gen, viu: true });
+        return h;
+      };
+      t['delete' + f] = (h) => {
+        const o = h ? obiecte.get(h) : undefined;
+        if (!o || pierdut) return;
+        if (o.gen !== gen) vechi.push(f);
+        else o.viu = false;
+      };
+    }
+    const gl = new Proxy(t, {
+      get(o, n) {
+        if (n in o) return o[n];
+        if (typeof n === 'string' && /^[A-Z][A-Z0-9_]*$/.test(n)) {
+          if (!K.has(n)) K.set(n, 0x10000 + K.size);
+          return K.get(n);
+        }
+        return () => {};
+      },
+    });
+    const canvas = {
+      width: 64, height: 64, style: {}, setAttribute() {}, getContext: () => gl,
+      addEventListener: (n, f) => { (asc[n] ??= []).push(f); },
+      removeEventListener: (n, f) => { asc[n] = (asc[n] ?? []).filter((g) => g !== f); },
+    };
+    const emite = (n) => { for (const f of [...(asc[n] ?? [])]) f({ preventDefault() {} }); };
+    /** Obiectele vii ale generației de acum, ca mânere. */
+    const vii = () => [...obiecte].filter(([, o]) => o.viu && o.gen === gen).map(([h]) => h);
+    return {
+      gl, canvas, vechi, vii,
+      cate: (f) => vii().filter((h) => h.f === f).length,
+      perde: () => { pierdut = true; gen++; emite('webglcontextlost'); },
+      reface: () => { pierdut = false; emite('webglcontextrestored'); },
+    };
+  };
+  const peFeluri = (l) => Object.fromEntries(URCATE.map((f) => [f, l.filter((x) => x === f).length]).filter(([, n]) => n));
+  const text = (o) => Object.entries(o).map(([f, n]) => `${n} ${f}`).join(', ') || 'nimic';
+
+  // Scena de probă: soarele, un cub care aruncă umbră, un plan care o primește, `creeazaUmbre`
+  // al paginii, un cadru, apoi eliberarea în ordinea lui `curata()` — LUT-ul DFG (`lutDFG`,
+  // înscris ultimul), umbrele, materialele și geometriile —, abia apoi `renderer.dispose()`.
+  // Contextul fals n-are locații de uniforme, deci nimic nu eșantionează LUT-ul: după fiecare
+  // cadru îl urcă `initTexture`, cum l-ar urca în pagină primul program fizic. Ce s-a eliberat
+  // din materialele de adâncime se numără din `Material.prototype.dispose`, nu din umbre.js.
+  const umbreInNode = async ({ U = UMBRE, refacere = false, faraRefa = false, laPierdere = false, umbreDupaRenderer = false, faraDate = false } = {}) => {
+    const jurnal = { log: [], error: [] }, adancime = [];
+    const log0 = console.log, err0 = console.error, disp0 = THREE.Material.prototype.dispose;
+    const { r: rez, e, avert } = await cuAvertismente(() => {
+      console.log = (...a) => { jurnal.log.push(a.join(' ')); };
+      console.error = (...a) => { jurnal.error.push(a.join(' ')); };
+      THREE.Material.prototype.dispose = function () {
+        if (this.isMeshDepthMaterial) adancime.push(this);
+        return disp0.call(this);
+      };
+      try {
+        const c = contextFals();
+        const r = new THREE.WebGLRenderer({ canvas: c.canvas, context: c.gl });
+        const constructor = new Set(c.vii());
+        const s = new THREE.Scene();
+        const soare = new THREE.DirectionalLight(0xffffff, 1);
+        soare.position.set(100, 100, 100);
+        s.add(soare, soare.target);
+        const arunca = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshStandardMaterial());
+        const primeste = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial());
+        s.add(arunca, primeste);
+        const cam = new THREE.PerspectiveCamera(50, 1, 1, 1000);
+        cam.position.set(0, 50, 100);
+        cam.lookAt(0, 0, 0);
+        const umbre = U.creeazaUmbre({ renderer: r, soare, cutie: new THREE.Box3().setFromObject(arunca), arunca: [arunca], primesc: [primeste] });
+        // Controlul consolei: o textură marcată pentru urcare, fără imagine — three avertizează.
+        if (faraDate) {
+          const goala = new THREE.Texture();
+          goala.needsUpdate = true;
+          r.initTexture(goala);
+          goala.dispose();
+        }
+        const lutDFG = urmaresteLutDFG(r);
+        // Ascultătorii „dispose” ai geometriei care aruncă, numărați prin API-ul ei public.
+        const g = arunca.geometry, add0 = g.addEventListener, rem0 = g.removeEventListener;
+        let ascultatori = 0;
+        g.addEventListener = (tip, f) => { if (tip === 'dispose' && !g.hasEventListener(tip, f)) ascultatori++; add0.call(g, tip, f); };
+        g.removeEventListener = (tip, f) => { if (tip === 'dispose' && g.hasEventListener(tip, f)) ascultatori--; rem0.call(g, tip, f); };
+        const cadru = () => {
+          r.render(s, cam);
+          lutDFG.prinde(primeste.material);
+          const lut = r.properties.get(primeste.material).uniforms?.dfgLUT?.value;
+          if (lut?.isTexture) r.initTexture(lut);
+          return lut;
+        };
+        const lut = cadru();
+        const programe = r.info.programs.map((p) => p.type), ascInainte = ascultatori;
+        let asteptate = null, programeNoi = null, ascDupa = null;
+        if (refacere) {
+          // Calea publică, nefolosită de pagină: tot ce e urcat, eliberat cât contextul e pierdut.
+          if (laPierdere) c.canvas.addEventListener('webglcontextlost', () => {
+            for (const o of [arunca, primeste]) o.geometry.dispose();
+            soare.shadow.map?.dispose();
+            lut?.dispose();
+          });
+          // Valoarea de referință: ce era viu la pierdere, minus ce a făcut constructorul.
+          asteptate = peFeluri(c.vii().filter((h) => !constructor.has(h)).map((h) => h.f));
+          c.perde();
+          c.reface();
+          if (!faraRefa) umbre.refa();
+          cadru();
+          programeNoi = r.info.programs.map((p) => p.type);
+          ascDupa = ascultatori;
+        }
+        lutDFG.dispose(s);
+        if (!umbreDupaRenderer) umbre.dispose();
+        for (const o of [arunca, primeste]) { o.geometry.dispose(); o.material.dispose(); }
+        r.dispose();
+        if (umbreDupaRenderer) umbre.dispose();
+        return {
+          programe, programeNoi, asteptate, ascInainte, ascDupa,
+          vechi: peFeluri(c.vechi),
+          programeVii: c.cate('Program'), ramase: r.info.programs.map((p) => p.type),
+          propriu: Object.hasOwn(arunca, 'onBeforeShadow'),
+        };
+      } finally {
+        console.log = log0;
+        console.error = err0;
+        THREE.Material.prototype.dispose = disp0;
+      }
+    });
+    return rez === undefined ? { e, avert, jurnal } : { ...rez, adancime: adancime.length, e, avert, jurnal };
+  };
+  const curat = (x) => x.e === null && x.avert.length === 0 && x.jurnal.error.length === 0;
+  const consola = (x) => `${x.e ? `excepție: ${x.e.message}; ` : ''}${x.avert.length} avertismente${x.avert.length ? ` (${x.avert[0].slice(0, 120)})` : ''}, ${x.jurnal.error.length} erori`;
+  const textUmbre = textSursa('src/scene/umbre.js');
+  const faraPrindere = muta(textUmbre, ['    m.onBeforeShadow = prinde;\n', '']);
+  const faraDelete = muta(textUmbre, ['        if (m.onBeforeShadow === prinde) delete m.onBeforeShadow;\n', '']);
+  const UfaraPrindere = await modulDin(faraPrindere), UfaraDelete = await modulDin(faraDelete);
+
+  // (a) Calea paginii.
+  const a = await umbreInNode();
+  proba(curat(a), `hamul: WebGLRenderer-ul din build peste contextul fals, fără erori și fără avertismente (${consola(a)})`);
+  proba(a.programe?.includes('MeshDepthMaterial') && a.adancime === 1 && a.programeVii === 0,
+    `calea paginii: programele cadrului ${a.programe?.join(', ')}; ${a.adancime} material de adâncime eliberat; după dispose(), ${a.programeVii} programe vii (${a.ramase?.join(', ') || 'niciunul'} în info.programs)`);
+  proba(a.propriu === false, `după dispose(), onBeforeShadow e iar metoda de pe prototip (proprie: ${a.propriu})`);
+  const af = UfaraPrindere === null ? null : await umbreInNode({ U: UfaraPrindere });
+  proba(af !== null && af.programeVii === 1 && af.ramase.includes('MeshDepthMaterial'),
+    `control, umbre.js fără onBeforeShadow = prinde: ${af === null ? NEAPLICATA : `${af.programeVii} program viu (${af.ramase.join(', ')})`} — pică`);
+  const ad = UfaraDelete === null ? null : await umbreInNode({ U: UfaraDelete });
+  proba(ad !== null && ad.propriu === true, `control, umbre.js fără delete m.onBeforeShadow: ${ad === null ? NEAPLICATA : `cârligul rămâne pe obiect (proprie: ${ad.propriu})`} — pică`);
+  // Proprietățile rendererului sunt golite la `renderer.dispose()`: eliberat după el, materialul
+  // nu-și mai găsește programul.
+  const ar = await umbreInNode({ umbreDupaRenderer: true });
+  proba(ar.programeVii === 1 && ar.ramase.join() === 'MeshDepthMaterial',
+    `control, umbre.dispose() după renderer.dispose(): ${ar.programeVii} program viu (${ar.ramase.join(', ')}) — pică`);
+  // Controlul cere chiar avertismentul acela, nu orice abatere: o excepție n-ar trece drept el.
+  const as = await umbreInNode({ faraDate: true });
+  proba(as.e === null && as.jurnal.error.length === 0 && as.avert.length === 1 && /no image data/.test(as.avert[0]) && !curat(as),
+    `control, o textură marcată pentru urcare fără imagine: ${consola(as)} — pică`);
+
+  // (b) Contextul pierdut și refăcut, cu `umbre.refa()` ca în `laRestaurare`. three face module
+  // noi, dar ascultătorii „dispose” ai celor vechi rămân: la eliberare, aceia șterg încă o dată,
+  // pe contextul pierdut, tot ce urcaseră. Zgomotul lui three, nu al paginii, care eliberează o
+  // singură dată. Valoarea de referință se ia din contextul fals, la pierdere. Avertismentele din
+  // pagină: `docs/randarea.md`, „Contextul pierdut și refăcut: ștergerile pe contextul vechi”.
+  const b = await umbreInNode({ refacere: true });
+  const egale = (x, y) => x !== null && y !== null && JSON.stringify(x) === JSON.stringify(y);
+  proba(curat(b) && b.programeNoi?.includes('MeshDepthMaterial') && b.adancime === 2 && b.programeVii === 0,
+    `refăcut: umbra redesenată pe contextul nou (${b.programeNoi?.join(', ')}); ${b.adancime} materiale de adâncime eliberate, al modulului vechi și al celui nou; ${b.programeVii} programe vii (${consola(b)})`);
+  proba(egale(b.vechi, b.asteptate) && Object.keys(b.vechi ?? {}).length > 0 && b.ascInainte === 1 && b.ascDupa === 2,
+    `zgomotul lui three: șterse pe contextul pierdut ${text(b.vechi ?? {})}; vii la pierdere, minus constructorul: ${text(b.asteptate ?? {})}; ascultătorii geometriei ${b.ascInainte} → ${b.ascDupa}`);
+  const bf = UfaraPrindere === null ? null : await umbreInNode({ U: UfaraPrindere, refacere: true });
+  proba(bf !== null && bf.programeVii === 1, `control, refăcut, umbre.js fără prindere: ${bf === null ? NEAPLICATA : `${bf.programeVii} program viu (${bf.ramase.join(', ')})`} — pică`);
+  // În ham. În pagină, `umbre?.refa()` din `laRestaurare` îl păzește (d), pe sursă.
+  const bn = await umbreInNode({ refacere: true, faraRefa: true });
+  proba(bn.e === null && curat(bn) && bn.programeNoi?.length > 0 && !bn.programeNoi.includes('MeshDepthMaterial'),
+    `control, hamul refăcut fără umbre.refa(): umbra nedesenată pe contextul nou (${bn.programeNoi?.join(', ')}; ${consola(bn)}), deci garda redesenării pică`);
+  // Calea publică pe care pagina n-o folosește: eliberat la pierdere, fiecare ascultător vechi se
+  // scoate singur, iar ștergerile lui cad pe contextul pierdut, unde browserul tace.
+  const bp = await umbreInNode({ refacere: true, laPierdere: true });
+  proba(Object.keys(bp.vechi ?? {}).length === 0 && bp.programeVii === 0 && curat(bp),
+    `control, aceiași pași cu geometriile, ținta umbrei și LUT-ul eliberate la webglcontextlost: șterse pe contextul pierdut ${text(bp.vechi ?? {})}, deci ștergerile vin din ascultătorii modulelor vechi`);
+
+  // (c) Un renderer nou pe același context, de trei ori: își face de fiecare dată 4 texturi goale
+  // (WebGLState) și 3 framebuffere (initGLContext), pe care `dispose()` nu le șterge. Cifra din docs.
+  const reporniri = async (sterge) => {
+    const { r: cifre, e, avert } = await cuAvertismente(() => {
+      const c = contextFals(), v = [];
+      for (let i = 0; i < 3; i++) {
+        const r = new THREE.WebGLRenderer({ canvas: c.canvas, context: c.gl });
+        r.dispose();
+        if (sterge) for (const h of c.vii()) c.gl['delete' + h.f](h);
+        v.push(`${c.cate('Texture')}/${c.cate('Framebuffer')}`);
+      }
+      return v;
+    });
+    return { cifre: cifre?.join(' '), e, avert };
+  };
+  const rc = await reporniri(false), rcs = await reporniri(true);
+  proba(rc.e === null && rc.avert.length === 0 && rc.cifre === '4/3 8/6 12/9',
+    `renderer nou pe același context, de trei ori: texturi/framebuffere vii ${rc.cifre} (${rc.e ? `excepție: ${rc.e.message}; ` : ''}${rc.avert.length} avertismente)`);
+  proba(rcs.e === null && rcs.cifre === '0/0 0/0 0/0', `control, aceleași obiecte șterse înainte de numărare: ${rcs.cifre} — pică`);
+
+  // (d) Pe sursa lui scena.js: umbrele se eliberează prin listă numai dacă `u.dispose()` e înscris,
+  // în același `try` cu `creeazaUmbre` și înaintea lui `urmaresteGrupul`, care poate arunca după
+  // el. Ordinea listă → `renderer.dispose()` o păzește proba LUT-ului.
+  const CREEAZA = 'umbre = creeazaUmbre({', INSCRIE_U = 'deEliberat.push(() => u.dispose());', GRUP = 'umbreGrup = urmaresteGrupul(';
+  const inscriere = (src) => {
+    const a0 = src.indexOf(CREEAZA), i = src.indexOf(INSCRIE_U), g = src.indexOf(GRUP);
+    const acelasiTry = a0 >= 0 && i > a0 && !/\}\s*catch\b/.test(src.slice(a0, i));
+    return { ok: acelasiTry && g > i, a0, i, g, acelasiTry };
+  };
+  const sursa = textSursa('src/scene/scena.js');
+  const oi = inscriere(sursa);
+  proba(oi.ok, `scena.js: u.dispose() înscris în listă (${oi.i}) după creeazaUmbre (${oi.a0}), în același try (${oi.acelasiTry}), înaintea lui urmaresteGrupul (${oi.g})`);
+  const RAND_U = `      ${INSCRIE_U}\n`;
+  for (const [nume, mutat] of [
+    ['fără înscrierea umbrelor în listă', muta(sursa, [RAND_U, ''])],
+    ['înscrise după urmaresteGrupul', muta(sursa, [RAND_U, ''], [/( {8}umbreGrup = urmaresteGrupul\([^\n]*\n)/, `$1${RAND_U}`])],
+  ]) {
+    const om = mutat === null ? null : inscriere(mutat);
+    proba(om !== null && !om.ok, `control, ${nume}: ${om === null ? NEAPLICATA : `înscris la ${om.i}, urmaresteGrupul la ${om.g}`} — pică`);
+  }
+  // Și redesenarea umbrelor după o refacere: harta are `autoUpdate = false`, deci fără
+  // `umbre?.refa()` în `laRestaurare` ar rămâne nedesenată, iar programul de adâncime nou nu s-ar
+  // mai face (controlul din ham, la (b)).
+  const RESTAURARE = 'const laRestaurare = () => {', INREG = "canvas.addEventListener('webglcontextrestored', laRestaurare);";
+  const refacerePeSursa = (src) => {
+    const k = src.indexOf(RESTAURARE), corp = k < 0 ? '' : src.slice(k, src.indexOf('};', k));
+    const refa = corp.includes('umbre?.refa()'), inreg = src.includes(INREG);
+    return { ok: refa && inreg, refa, inreg };
+  };
+  const or = refacerePeSursa(sursa);
+  proba(or.ok, `scena.js: laRestaurare cheamă umbre?.refa() (${or.refa}) și ascultă webglcontextrestored (${or.inreg})`);
+  const faraRefaPeSursa = muta(sursa, ['umbre?.refa(); ', '']);
+  const orm = faraRefaPeSursa === null ? null : refacerePeSursa(faraRefaPeSursa);
+  proba(orm !== null && !orm.ok, `control, laRestaurare fără umbre?.refa(): ${orm === null ? NEAPLICATA : `refa ${orm.refa}`} — pică`);
 }
 
 // ------------------------------------------------------------ anunțurile după apariția hărții

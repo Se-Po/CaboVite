@@ -31,8 +31,9 @@ ochii prind. Parcurge lista și raportează fiecare punct cu dovadă.
    panourile nu se ating între ele? Textul rămâne lizibil? Nu apare scroll
    orizontal?
 7. **Memorie** — dacă modificarea schimbă capitolul sau încarcă/descarcă obiecte,
-   loghează `renderer.info.memory` înainte și după. Numerele trebuie să revină
-   la loc. Dacă urcă monoton, e scurgere.
+   loghează `renderer.info.memory` și `renderer.info.programs.length` înainte și
+   după: programele nu intră în `info.memory`. Numerele trebuie să revină la loc.
+   Dacă urcă monoton, e scurgere.
 8. **Fără motion** — cu `prefers-reduced-motion: reduce` activ, animațiile
    automate ale camerei trebuie să fie oprite.
 

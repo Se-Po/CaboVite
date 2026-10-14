@@ -104,7 +104,8 @@ function disposeObject(root) {
 }
 ```
 
-Verifică scurgerile cu `renderer.info.memory.geometries` / `.textures` și numărul
+Verifică scurgerile cu `renderer.info.memory.geometries` / `.textures` și cu
+`renderer.info.programs.length` (programele nu intră în `info.memory`), iar numărul
 de draw call-uri cu `renderer.info.render.calls`.
 
 `dispose()` trebuie să treacă prin **aceeași listă** ca eșecul pornirii, nu
