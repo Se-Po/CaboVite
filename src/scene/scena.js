@@ -22,7 +22,7 @@ import { creeazaGest } from './gest.js';
 import { creeazaTastatura } from './tastatura.js';
 import { reliefRandat } from './raza.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
-import { instantaneuMemorie } from './dispose.js';
+import { instantaneuMemorie, urmaresteLutDFG } from './dispose.js';
 import { numeElement } from './nume.js';
 
 // Orchestrarea scenei și randarea la cerere.
@@ -555,6 +555,17 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // Tastatura hărții (tastatura.js): creată abia înaintea buclei, mai jos.
   let tastatura = null;
 
+  // LUT-ul DFG al lui three (dispose.js): un singleton al modulului, urcat pe placă de primul
+  // material fizic desenat, pe care `renderer.dispose()` nu-l eliberează. Se prinde după
+  // `render()`, din materialul terenului — desenat în fiecare cadru, pe ambele vederi, cu
+  // uniforma lui și pe Relief (Standard), și pe Satelit (Basic) —, și pleacă prin listă,
+  // deci înaintea lui `renderer.dispose()`. Fără el, după dispose() rămânea o textură. La
+  // eliberare îl mai caută o dată în toate materialele scenei, pentru un `render()` care a
+  // aruncat după ce îl urcase: lista se golește de la coadă, deci terenul, Satelit, sanctuarul
+  // și clădirile, înscrise mai sus, își au încă materialele pe placă.
+  const lutDFG = urmaresteLutDFG(renderer);
+  deEliberat.push(() => lutDFG.dispose(scena));
+
   // Un cadru. Întoarce true numai după ce `render()` a întors.
   const cadru = () => {
     // Un singur ceas în pagină. Bucla rulează oricum la fiecare cadru — decide
@@ -599,6 +610,7 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     // strânge pe cutia potrivită, în cadrul acesta.
     umbreGrup?.pas();
     renderer.render(scena, camera);
+    lutDFG.prinde(teren.obiect.material);
     return true;
   };
 

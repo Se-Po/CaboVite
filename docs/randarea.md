@@ -165,7 +165,118 @@ de la `30a22c9` și cu compilarea mutată după buclă. Pe telefon nemăsurat
   ca pe calea de eroare de la pornire — și calea fără scenă
   (`data-scena="indisponibila"`, subsolul ascuns). Probe, în
   pagină: aruncând mereu, trei apeluri, un `console.error`, 0 erori neprinse, de la
-  14 geometrii și 9 texturi la 0 și 1; o excepție o singură dată, în `zbor.pas` sau
+  14 geometrii și 9 texturi la 0 și 1 (textura rămasă era LUT-ul DFG al lui three; din
+  2026-10-14, 0 și 0, vezi mai jos); o excepție o singură dată, în `zbor.pas` sau
   în `gest.pas` (după `cerut = false`), costă un cadru, redesenat la cel următor,
   iar scena rămâne activă — pe codul de dinainte, cea din `gest.pas` lăsa cadrul
   cerut nedesenat (0 cadre în 0,5 s).
+
+## Eliberarea: LUT-ul DFG al lui three
+
+Măsurat pe 2026-10-14. După cadre desenate, `renderer.info.memory` era `{ geometries: 10,
+textures: 9 }`, iar după `__scena.dispose()` `{ 0, 1 }`: pe v0.1.6 publicat și, după
+măsurătoarea autorului, pe build-ul local de dinainte. Fără cadre (panoul Browser ascuns),
+`{ 0, 6 }` → `{ 0, 0 }`: textura rămasă se făcea abia la randare.
+
+**Cum s-a găsit.** În panoul Browser, imediat după navigare și înaintea scenei, s-au înfășurat
+pe `WebGL2RenderingContext.prototype` `createTexture`, `deleteTexture`, `activeTexture`,
+`bindTexture`, `texStorage2D`, `texImage2D` și `compressedTexImage2D`: fiecare textură, cu
+formatul și mărimea primului ei nivel, și care s-a șters. S-au prins exact nouă:
+
+| # | formatul | mărimea | ce e |
+|---|---|---|---|
+| 1–6 | BC7 (0x8E8D), 5 niveluri | 2368 × 3008 … 896 × 832 | texturile Satelit (KTX2), urcate înaintea buclei |
+| 7 | RGBA8 (0x8058) | 2048² | culoarea hărții de umbre |
+| 8 | DEPTH_COMPONENT24 (0x81A6) | 2048² | adâncimea ei |
+| 9 | RG16F (0x822F) | 16² | `DFG_LUT`, urcată de `WebGLUniforms.upload` |
+
+După `dispose()` numai #9 mai era vie (`gl.isTexture`).
+
+**De ce.** three r186 ține LUT-ul DFG — tabelul reflexiei speculare al materialelor fizice —
+într-un singleton al modulului: `getDFGLUT()` din `DFGLUTData.js` îl face la prima chemare.
+`setProgram` (WebGLRenderer.js:2743) îl pune în uniforma `dfgLUT` a oricărui material care o
+are, prin `UniformsLib.envmap`: Basic, Lambert, Phong, Standard, Physical. Pe placă urcă abia
+când un program fizic îl eșantionează, deci la primul cadru (sanctuarul și clădirile, Standard,
+pe Satelit), nu la `compileAsync`, care nu cheamă `setProgram`: de aceea fără cadre nu apărea.
+`renderer.dispose()` golește numai ce ține rendererul, iar `getDFGLUT` nu e exportat, deci nu-l
+elibera nimeni.
+
+Ceilalți candidați se eliberează: umbrele (`soare.shadow.dispose()`; `deallocateRenderTarget`,
+WebGLTextures.js:413, ia și `depthTexture`), texturile Satelit (`satelit.js`); cerul și marea
+n-au texturi, fundalul e un `Color`, PMREM nu există. `emptyTexture` și `emptyShadowTexture`
+(WebGLUniforms.js:51-53) au `version` 0, deci nu urcă niciodată.
+
+**Reparația.** `urmaresteLutDFG(renderer)` din `dispose.js`: `prinde(material)` citește LUT-ul
+din uniformele unui material desenat (`renderer.properties`), iar `dispose()` îl eliberează.
+scena.js îl prinde imediat după `render()`, din materialul terenului — desenat în fiecare cadru,
+cu uniforma pe ambele vederi —, și îl înscrie în `deEliberat`, deci pleacă prin `curata()`,
+înaintea lui `renderer.dispose()`. Înscrierea, `lutDFG.dispose(scena)`, îl mai caută o dată în
+toate materialele scenei: un `render()` care aruncă după ce a desenat un material fizic îl urcă,
+dar sare peste `prinde` (recenzia `threejs-reviewer`; cu trei cadre la rând așa, `laEsec`).
+Lista se golește de la coadă, deci LUT-ul trebuie înscris DUPĂ terenul, marea, sanctuarul,
+clădirile, împrejurimile și Satelit: altfel `material.dispose()` le-ar fi scos deja uniformele
+din `renderer.properties`. Prinderea de după cadru rămâne calea principală: acoperă și
+materialele pe care Satelit le-a schimbat chiar înaintea eliberării, încă nedesenate.
+
+Ordinea contează și față de renderer: după `renderer.dispose()` proprietățile rendererului sunt
+golite, iar `Texture.dispose()` nu mai ajunge la placă. Eliberarea unui singleton e sigură:
+`dispose()` doar anunță ascultătorii texturii, datele rămân, iar un renderer nou îl urcă din nou.
+Printre ascultători sunt, după un context pierdut și refăcut, și ai modulelor de dinaintea
+pierderii: aceia mai șterg o dată mânerul vechi (vezi mai jos, „Ce rămâne”). Ne sprijinim pe un
+interior al lui three (`renderer.properties`, uniforma `dfgLUT`), deci o versiune nouă de three
+trece întâi prin `verifica-pagina`.
+
+**Probele.** `npm run verifica-pagina`, secțiunea LUT-ului DFG:
+- contractul r186, citit în build-ul pe care îl încarcă pagina: singletonul, uniforma pusă de
+  `setProgram`, `renderer.properties`, `renderer.dispose()` care nu-l atinge, uniforma în basic,
+  standard și physical. Controale: `setProgram` fără LUT și un `dispose()` care l-ar elibera
+  singur, cu apelul la coada corpului — corpul se găsește, deci pică detectorul, nu ancora — pică;
+- eliberarea, cu `WebGLTextures`, `WebGLProperties` și `WebGLInfo` din three peste un context
+  WebGL fals: de la 1 la 0 în contor și în context, și încă o dată într-un renderer nou, pe
+  același LUT; cu `render()` aruncat după sanctuar, `dispose(scena)` îl găsește și într-un
+  tablou de materiale. Controale: fără eliberare, 1; eliberat după `renderer.dispose()`, 1; același
+  `render()` aruncat, cu `dispose()` fără scenă, 1;
+- ordinea, pe sursa lui scena.js: `prinde` lipit de `render()`, înscrierea după cei șase care țin
+  materiale și înaintea buclei, lista înaintea rendererului. Controale: înscris imediat după
+  lumini (înaintea celor care țin materiale), fără înscrierea în listă, înscris fără scenă, cu
+  `renderer.dispose()` înaintea listei, cu `prinde` înaintea lui `render()` — pe o scenă care
+  desenează la cerere, un singur cadru nu l-ar mai prinde —, toate pică.
+
+În pagină, pe build (`cabo-espichel-productie`), cu aceeași înfășurare. Panoul era ascuns, deci
+`requestAnimationFrame` s-a înlocuit cu un temporizator de 16 ms: three îl cere din `self` la
+fiecare cadru, deci bucla și `cadru()` rămân aceleași. Geometrii / texturi:
+
+| calea | înainte de `dispose()` | după | v0.1.6, după |
+|---|---|---|---|
+| Satelit la pornire | 10 / 9 | 0 / 0, toate 9 șterse | 0 / 1 |
+| comutat pe Relief | 14 / 9 | 0 / 0 | nemăsurat |
+| preferința Relief | 14 / 3 | 0 / 0 | nemăsurat |
+| context pierdut și refăcut | 10 / 9 | 0 / 0 | 0 / 1 |
+| `laEsec`, trei excepții la rând în `zbor.pas` | 10 / 9 | 0 / 0 | nemăsurat |
+| `laEsec`, `render()` care aruncă după ce a desenat, de la primul cadru | necitit / 9 | 0 / 0 | nemăsurat |
+| 390 × 844 | 9 / 9 | 0 / 0 | nemăsurat |
+
+Pe rândul al șaselea, `render()` s-a înfășurat înaintea primului cadru (cadrele, ținute într-o
+coadă până atunci: `{ 0, 6 }`), deci `prinde` n-a rulat niciodată. În cele trei cadre, citit după
+fiecare `render()`, contorul a ajuns la 9 texturi, cu LUT-ul urcat; geometriile de dinaintea
+eliberării nu s-au citit. După `laEsec`, 0 / 0: LUT-ul l-a găsit căutarea din `dispose(scena)`.
+Controlul acestui caz e cel din Node, cu `dispose()` fără scenă.
+
+Rândurile 1 și 6 s-au refăcut pe build-ul final, mutat peste 0.1.7.02; celelalte s-au măsurat pe
+build-ul de dinaintea căutării din `dispose(scena)` și a mutării, cu aceeași prindere după cadru.
+
+Harta, privită pe desktop și la 390 px: neschimbată. Consola: 0 erori, 0 încălcări CSP.
+
+**Ce rămâne, în afara contorului.** `WebGLState` face patru texturi goale de 1 × 1 — 2D, cub,
+2D array, 3D (WebGLState.js:439-442) —, pe care three nu le șterge și nu le numără în
+`info.memory`. Trăiesc cât contextul, pe care `dispose()` îl lasă viu intenționat (scena.js).
+S-au văzut după un context refăcut, când se fac din nou. O repornire pe același canvas ar mai
+adăuga patru; nu s-a reparat. Tot după un context refăcut, `dispose()` dă avertismente
+`INVALID_OPERATION: delete: object does not belong to this context`, și pe v0.1.6. Cauza, citită
+în cod: `onContextRestore` (WebGLRenderer.js) cheamă `initGLContext()`, care face module noi fără
+să desprindă ascultătorii `dispose` ai celor vechi (de pildă `WebGLGeometries.js:55`). La
+eliberare, aceștia șterg obiecte ale contextului pierdut. Reparația adaugă cel mult încă unul:
+ascultătorul LUT-ului din `WebGLTextures`-ul vechi, pe care v0.1.6, care nu elibera LUT-ul, nu-l
+declanșa (recenzia, într-o simulare în Node cu codul three; contoarele rămân corecte, scăderea
+cade pe `WebGLInfo`-ul vechi). <!-- NEVERIFICAT: numărul avertismentelor, pe fiecare versiune -->
+Nereparate.

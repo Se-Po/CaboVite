@@ -48,6 +48,12 @@
 //   - compilarea înaintea primului cadru (scena.js): `compileAsync` după ultimul `scena.add`
 //     și înaintea buclei, pe sursă; timpii, în pagină
 //     (`docs/randarea.md`, „Compilarea, înaintea primului cadru”);
+//   - LUT-ul DFG al lui three (dispose.js, scena.js): contractul r186 — singletonul modulului,
+//     uniforma pusă de `setProgram`, `renderer.dispose()` care nu-l atinge —; eliberarea, cu
+//     codul three al texturilor peste un context WebGL fals, până la 0 în contor și în context,
+//     și după un `render()` care a aruncat (căutat în scenă); ordinea, pe sursă: prins după
+//     `render()`, înscris în listă cu scena înaintea buclei, lista golită înaintea lui
+//     `renderer.dispose()`;
 //   - anunțurile după apariția hărții (scena.js, busola.js): `arata()` cheamă `reanunta()` pe
 //     busolă și pe Satelit după două cadre ale paginii; busola, construită cu un DOM fals,
 //     golește anunțul și îl scrie din nou;
@@ -61,11 +67,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { WebGLInfo } from 'three/src/renderers/webgl/WebGLInfo.js';
+import { WebGLProperties } from 'three/src/renderers/webgl/WebGLProperties.js';
 import { WebGLRenderLists } from 'three/src/renderers/webgl/WebGLRenderLists.js';
+import { WebGLTextures } from 'three/src/renderers/webgl/WebGLTextures.js';
+import { WebGLUtils } from 'three/src/renderers/webgl/WebGLUtils.js';
 import * as L from '../src/scene/loaders.js';
+import { urmaresteLutDFG } from '../src/scene/dispose.js';
 import { creeazaCer } from '../src/scene/cer.js';
 import { creeazaMare } from '../src/scene/mare.js';
 import { creeazaLumini } from '../src/scene/lights.js';
@@ -2886,6 +2897,188 @@ console.log('\nCompilarea înaintea primului cadru (scena.js)');
   }
   const m = mutat === null ? null : ordine(mutat);
   proba(m !== null && !m.ok, `control, compilarea mutată după bucla: ${m === null ? NEAPLICATA : `${m.c} față de ${m.b}`} — pică`);
+}
+
+// ------------------------------------------------------------ LUT-ul DFG al lui three
+
+// three r186 ține LUT-ul DFG (16 × 16, RG16F) într-un singleton al modulului: `setProgram` îl
+// pune în uniforma `dfgLUT` a oricărui material Basic sau Standard, iar primul program fizic
+// desenat îl urcă pe placă. `renderer.dispose()` nu-l eliberează: după `__scena.dispose()`
+// rămânea o textură. Scena îl prinde după `render()` și îl eliberează prin `deEliberat`
+// (`urmaresteLutDFG`, dispose.js). Aici: (a) contractul r186 pe care se sprijină, citit în
+// build-ul pe care îl încarcă pagina; (b) eliberarea, cu codul three al texturilor —
+// `WebGLTextures`, `WebGLProperties`, `WebGLInfo` — peste un context WebGL fals, numărată și
+// în contorul lui three, și în texturile încă vii ale contextului; (c) ordinea din scena.js,
+// pe sursă. Pe GPU, proba e în pagină:
+// `docs/randarea.md`, „Eliberarea: LUT-ul DFG al lui three”.
+console.log('\nLUT-ul DFG al lui three: eliberat de scenă, înaintea rendererului (dispose.js, scena.js)');
+{
+  // (a) Contractul. Dacă pică după o versiune nouă de three, `urmaresteLutDFG` se revede: poate
+  // three îl eliberează singur acum, poate uniforma are alt nume sau LUT-ul alt loc.
+  const caleThree = fileURLToPath(import.meta.resolve('three'));
+  const textThree = LF(readFileSync(caleThree, 'utf8'));
+  // Corpul lui `dispose()` al rendererului: cel care începe prin a scoate ascultătorul
+  // contextului pierdut.
+  const corpDispose = (t) => /this\.dispose = function \(\) \{\s*canvas\.removeEventListener\( 'webglcontextlost', onContextLost[\s\S]*?\n\t\t\};/.exec(t)?.[0] ?? null;
+  const contract = (t) => {
+    const singleton = /\nlet lut = null;\n+function getDFGLUT\(\) \{\n+\tif \( lut === null \) \{\n+\t\tlut = new DataTexture\(/.test(t);
+    const uniforma = t.includes('m_uniforms = materialProperties.uniforms;') && t.includes('m_uniforms.dfgLUT.value = getDFGLUT();');
+    const proprietati = t.includes('_this.properties = properties;');
+    const corp = corpDispose(t);
+    const neatins = corp !== null && !/\blut\b|DFG/i.test(corp);
+    return { ok: singleton && uniforma && proprietati && neatins, singleton, uniforma, proprietati, neatins, corpGasit: corp !== null };
+  };
+  const ct = contract(textThree);
+  proba(ct.ok, `${caleThree.split(/[\\/]/).slice(-3).join('/')}: LUT-ul e un singleton al modulului (${ct.singleton}), pus de setProgram în uniforma materialului (${ct.uniforma}), proprietățile rendererului publice (${ct.proprietati}), renderer.dispose() nu-l atinge (${ct.neatins})`);
+  const faraUniforma = muta(textThree, ['m_uniforms.dfgLUT.value = getDFGLUT();', 'm_uniforms.dfgLUT.value = null;']);
+  const ctU = faraUniforma === null ? null : contract(faraUniforma);
+  proba(ctU !== null && !ctU.ok, `control, setProgram fără LUT în uniformă: ${ctU === null ? NEAPLICATA : `uniforma ${ctU.uniforma}`} — pică`);
+  // Apelul, la coada corpului: corpul se găsește încă, deci pică detectorul, nu ancora (recenzia).
+  const corpThree = corpDispose(textThree);
+  const eliberatDeThree = corpThree === null ? null
+    : muta(textThree, [corpThree, corpThree.replace(/\n\t\t\};$/, '\n\t\t\tgetDFGLUT().dispose();\n\n\t\t};')]);
+  const ctE = eliberatDeThree === null ? null : contract(eliberatDeThree);
+  proba(ctE !== null && ctE.corpGasit && !ctE.neatins, `control, renderer.dispose() care eliberează singur LUT-ul: ${ctE === null ? NEAPLICATA : `corpul găsit ${ctE.corpGasit}, neatins ${ctE.neatins}`} — pică`);
+  const cuUniforma = ['basic', 'standard', 'physical'].map((n) => `${n} ${THREE.ShaderLib[n].uniforms.dfgLUT !== undefined}`);
+  proba(cuUniforma.every((s) => s.endsWith('true')), `uniforma dfgLUT, în materialele terenului (Satelit: basic; Relief: standard) și în physical: ${cuUniforma.join(', ')}`);
+
+  // (b) Eliberarea, cu codul three al texturilor. Contextul fals: constante numerice distincte,
+  // metode care nu fac nimic, iar texturile create și șterse se țin într-o mulțime.
+  const renderer3 = () => {
+    const vii = new Set(), constante = new Map();
+    const gl = new Proxy({
+      createTexture: () => { const h = {}; vii.add(h); return h; },
+      deleteTexture: (h) => { vii.delete(h); },
+      getParameter: () => 0,
+      getExtension: () => null,
+    }, {
+      get(t, k) {
+        if (k in t) return t[k];
+        if (typeof k === 'string' && /^[A-Z][A-Z0-9_]*$/.test(k)) {
+          if (!constante.has(k)) constante.set(k, 0x10000 + constante.size);
+          return constante.get(k);
+        }
+        return () => {};
+      },
+    });
+    const extensions = { has: () => false, get: () => null };
+    const capabilities = { maxTextures: 16, maxTextureSize: 16384, maxCubemapSize: 16384, maxSamples: 4, getMaxAnisotropy: () => 1 };
+    const stare = new Proxy({}, { get: () => () => {} });
+    const properties = new WebGLProperties(), info = new WebGLInfo(gl);
+    const textures = new WebGLTextures(gl, extensions, stare, properties, capabilities, new WebGLUtils(gl, extensions), info);
+    // `renderer.dispose()`, pentru texturi: proprietățile golite (WebGLRenderer.js, `properties.dispose()`).
+    return { properties, info, textures, vii, dispose: () => properties.dispose() };
+  };
+  // Un LUT ca al lui three — `getDFGLUT` nu e exportat — și cadrul: setProgram pune LUT-ul în
+  // uniformele materialului (clonate din ShaderLib, ca la `getProgram`), iar
+  // `WebGLUniforms.upload` îl urcă (setTexture2D).
+  const lutCaAlLuiThree = () => {
+    const t = new THREE.DataTexture(new Uint16Array(16 * 16 * 2), 16, 16, THREE.RGFormat, THREE.HalfFloatType);
+    t.name = 'DFG_LUT'; t.generateMipmaps = false; t.needsUpdate = true;
+    return t;
+  };
+  const deseneaza = (r, material, lut, shader = 'standard') => {
+    const p = r.properties.get(material);
+    p.uniforms = THREE.UniformsUtils.clone(THREE.ShaderLib[shader].uniforms);
+    p.uniforms.dfgLUT.value = lut;
+    r.textures.setTexture2D(lut, 0);
+  };
+  const cate = (r) => `${r.info.memory.textures} în contorul three, ${r.vii.size} vii în context`;
+
+  // Calea scenei: cadrul, `prinde` după el, lista (`curata()`), abia apoi `renderer.dispose()`.
+  const lut = lutCaAlLuiThree();
+  const r = renderer3(), m = new THREE.MeshStandardMaterial();
+  const u = urmaresteLutDFG(r);
+  deseneaza(r, m, lut);
+  const dupaCadru = [r.info.memory.textures, r.vii.size], textCadru = cate(r);
+  u.prinde(m);
+  u.dispose(); u.dispose();
+  r.dispose();
+  proba(dupaCadru[0] === 1 && dupaCadru[1] === 1 && r.info.memory.textures === 0 && r.vii.size === 0,
+    `după cadru: ${textCadru}; după dispose(), înaintea rendererului, de două ori: ${cate(r)}`);
+  // Același singleton, într-un renderer nou pe același canvas, pe Satelit (basic): se urcă din nou
+  // și pleacă din nou. Eliberarea lui nu-l strică pentru cine vine după.
+  const r2 = renderer3(), m2 = new THREE.MeshBasicMaterial(), u2 = urmaresteLutDFG(r2);
+  deseneaza(r2, m2, lut, 'basic');
+  const dupaCadru2 = r2.info.memory.textures;
+  u2.prinde(m2); u2.dispose(); r2.dispose();
+  proba(dupaCadru2 === 1 && r2.info.memory.textures === 0 && r2.vii.size === 0,
+    `același LUT, într-un renderer nou, pe un material basic: ${dupaCadru2} după cadru, ${cate(r2)} după dispose()`);
+  // Un material încă nedesenat n-are uniforme: nu prinde nimic, iar `prinde` de după cadru tot îl găsește.
+  const r3 = renderer3(), lut3 = lutCaAlLuiThree(), m3 = new THREE.MeshStandardMaterial(), nedesenat = new THREE.MeshStandardMaterial();
+  deseneaza(r3, m3, lut3);
+  const u3 = urmaresteLutDFG(r3);
+  u3.prinde(nedesenat); u3.prinde(null); u3.dispose();
+  const dupaNedesenat = cate(r3);
+  u3.prinde(m3); u3.dispose(); r3.dispose();
+  proba(dupaNedesenat.startsWith('1 ') && r3.info.memory.textures === 0,
+    `prins de pe un material nedesenat: nimic (${dupaNedesenat}); apoi de pe cel desenat: ${cate(r3)}`);
+  // `render()` a aruncat după ce un material fizic (sanctuarul) urcase LUT-ul: `prinde` de după
+  // el n-a mai rulat, iar terenul n-a mai fost desenat. `dispose(scena)` îl caută în materialele
+  // scenei, și într-un tablou de materiale. Control: `dispose()` fără scenă — rămâne o textură.
+  const aruncat = (cuScena) => {
+    const ra = renderer3(), sanctuar = new THREE.MeshStandardMaterial(), teren = new THREE.MeshBasicMaterial();
+    deseneaza(ra, sanctuar, lutCaAlLuiThree());
+    const s = new THREE.Scene();
+    s.add(new THREE.Mesh(new THREE.BufferGeometry(), teren), new THREE.Mesh(new THREE.BufferGeometry(), [new THREE.MeshBasicMaterial(), sanctuar]));
+    const ua = urmaresteLutDFG(ra);
+    ua.dispose(cuScena ? s : undefined);
+    ra.dispose();
+    return ra;
+  };
+  const ra = aruncat(true), rn = aruncat(false);
+  proba(ra.info.memory.textures === 0 && ra.vii.size === 0, `render() aruncat după sanctuar, eliberat cu dispose(scena): ${cate(ra)}`);
+  proba(rn.info.memory.textures === 1, `control, același caz cu dispose() fără scenă: ${cate(rn)} — pică`);
+  // Control: fără eliberare, codul de dinainte — rămâne o textură, ca în pagină.
+  const rc = renderer3(), mc = new THREE.MeshStandardMaterial();
+  deseneaza(rc, mc, lutCaAlLuiThree());
+  rc.dispose();
+  proba(rc.info.memory.textures === 1 && rc.vii.size === 1, `control, fără eliberare: ${cate(rc)} — pică`);
+  // Control: eliberarea după `renderer.dispose()`. Proprietățile sunt golite, deci three nu mai
+  // găsește textura de șters, iar ea rămâne pe placă.
+  const ro = renderer3(), mo = new THREE.MeshStandardMaterial(), uo = urmaresteLutDFG(ro);
+  deseneaza(ro, mo, lutCaAlLuiThree());
+  uo.prinde(mo);
+  ro.dispose();
+  uo.dispose();
+  proba(ro.info.memory.textures === 1 && ro.vii.size === 1, `control, eliberat după renderer.dispose(): ${cate(ro)} — pică`);
+
+  // (c) Ordinea din scena.js, pe sursă.
+  const RANDARE = 'renderer.render(scena, camera);', PRINDE = 'lutDFG.prinde(', INSCRIE = 'deEliberat.push(() => lutDFG.dispose(scena));', BUCLA = 'renderer.setAnimationLoop(() =>';
+  // Cine ține materiale în scenă. Lista se golește de la coadă, deci căutarea din
+  // `dispose(scena)` găsește uniformele numai dacă LUT-ul e înscris DUPĂ ei: `material.dispose()`
+  // le scoate din `renderer.properties` (recenzia). Terenul și peticul se înscriu prin
+  // `construiesteAlpha` (`inscrie`).
+  const PROPRIETARI = ['construiesteAlpha(', 'deEliberat.push(() => mare.dispose());', 'deEliberat.push(() => sanctuar.dispose());',
+    'deEliberat.push(() => cladiri.dispose());', 'deEliberat.push(() => imp.dispose());', 'deEliberat.push(() => sat.dispose());'];
+  const ordineLut = (src) => {
+    const rr = src.indexOf(RANDARE), p = src.indexOf(PRINDE), i = src.indexOf(INSCRIE), b = src.indexOf(BUCLA);
+    // `prinde` imediat după `render()`, fără nimic între ele: un cadru e destul ca să-l prindă.
+    const lipit = rr >= 0 && p > rr && /^\s*$/.test(src.slice(rr + RANDARE.length, p));
+    const inainte = PROPRIETARI.filter((t) => { const k = src.indexOf(t); return k < 0 || k > i; });
+    const d = src.indexOf('    dispose() {\n      viu = false;');
+    const c = d < 0 ? -1 : src.indexOf('curata();', d), rd = d < 0 ? -1 : src.indexOf('renderer.dispose();', d);
+    return { ok: lipit && i >= 0 && i < b && inainte.length === 0 && d >= 0 && c > d && rd > c, lipit, i, b, c, rd, inainte };
+  };
+  const azi = textSursa('src/scene/scena.js');
+  const o = ordineLut(azi);
+  proba(o.ok, `prins imediat după render() (${o.lipit}); înscris în listă (${o.i}) după cei ${PROPRIETARI.length} care țin materiale (${o.inainte.length ? `NU după: ${o.inainte.join(' ')}` : 'toți'}) și înaintea buclei (${o.b}); în dispose(), lista (${o.c}) înaintea rendererului (${o.rd})`);
+  const PERECHE = '  const lutDFG = urmaresteLutDFG(renderer);\n  deEliberat.push(() => lutDFG.dispose(scena));\n';
+  const LUMINI = '  deEliberat.push(() => lumini.dispose());\n';
+  const variante = [
+    // Înscris înaintea terenului, a mării, a sanctuarului și a lui Satelit: s-ar elibera după ei.
+    ['înscris imediat după lumini, înaintea celor care țin materiale', muta(azi, [PERECHE, ''], [LUMINI, LUMINI + PERECHE])],
+    ['fără înscrierea în listă', muta(azi, [INSCRIE + '\n', ''])],
+    // Fără scenă, un `render()` care a aruncat după ce îl urcase îl lasă neprins: proba (b).
+    ['înscris fără căutarea în scenă', muta(azi, [INSCRIE, 'deEliberat.push(() => lutDFG.dispose());'])],
+    ['cu `renderer.dispose()` înaintea listei', muta(azi, ['      curata();\n      renderer.dispose();', '      renderer.dispose();\n      curata();'])],
+    // Prins înaintea lui render(): pe o scenă care desenează la cerere, un singur cadru nu-l mai prinde.
+    ['cu `prinde` înaintea lui render()', muta(azi, [`${RANDARE}\n    lutDFG.prinde(teren.obiect.material);`, `lutDFG.prinde(teren.obiect.material);\n    ${RANDARE}`])],
+  ];
+  for (const [nume, mutat] of variante) {
+    const om = mutat === null ? null : ordineLut(mutat);
+    proba(om !== null && !om.ok, `control, ${nume}: ${om === null ? NEAPLICATA : `prins după render ${om.lipit}, înscris la ${om.i}${om.inainte.length ? ` (înaintea a ${om.inainte.length} care țin materiale)` : ''}, lista la ${om.c}, rendererul la ${om.rd}`} — pică`);
+  }
 }
 
 // ------------------------------------------------------------ anunțurile după apariția hărții

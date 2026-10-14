@@ -12,9 +12,9 @@ se poartă în română.
 
 - three.js **0.186.0 (r186)**, versiune fixă în `package.json`, fără `^`
 - Vite 8.3.0 (dev server + build), tot fără `^`
-- three e fixat și pentru că `camera.js` folosește membri privați ai OrbitControls, iar
-  `loaders.js` `KTX2Loader.init()`: o versiune nouă trece întâi prin `verifica-controale` și
-  `verifica-pagina`, care îi verifică.
+- three e fixat și pentru că `camera.js` folosește membri privați ai OrbitControls, `loaders.js`
+  `KTX2Loader.init()`, iar `dispose.js` uniforma `dfgLUT`: o versiune nouă trece întâi prin
+  `verifica-controale` și `verifica-pagina`, care îi verifică.
 - JavaScript modern, module ES, fără framework. Nu introduce React, TypeScript
   sau alt strat fără să întrebi întâi.
 
