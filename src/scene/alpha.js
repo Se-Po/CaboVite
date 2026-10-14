@@ -9,6 +9,56 @@
 // Cutia e a NODURILOR bazei, nu dreptunghiul de decupare din `bbox_tm06`: în
 // convenția „muchii de celulă” primul nod stă la o jumătate de celulă în interior,
 // deci alpha merge pe x ∈ [−1163; 1163] și z ∈ [−1492; 1492], nu ±1164 / ±1493.
+//
+// Tot aici stă rețeta plaselor lui alpha (`pregatesteAlpha`, `construiesteAlpha`), una
+// singură pentru pagină (scena.js) și pentru probe: copiată de mână în cinci probe, ajunsese
+// să construiască altceva decât pagina (`docs/teren.md`, „Rețeta lui alpha”).
+
+import { creeazaTeren, mascaBazei } from './terrain.js';
+import { straturiNdvi } from './loaders.js';
+import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
+
+/**
+ * Rețeta lui alpha, înaintea plaselor: din ce a întors `incarcaRelief()` — un petic care își
+ * aduce baza, sau numai o bază — relieful bazei, al peticului, masca bazei și straturile NDVI,
+ * desprinse de pe relief (`straturiNdvi`), ca să nu rămână vii după coacerea culorii.
+ *
+ * @returns {{relief: object, reliefPetic: object|null, limitaDatelor: Array|null,
+ *   subPetic: Function|null, pastreaza: Function|undefined, ndvi: {baza?: object, petic?: object}}}
+ */
+export function pregatesteAlpha(incarcat) {
+  const relief = incarcat.baza ?? incarcat;
+  const reliefPetic = incarcat.baza ? incarcat : null;
+  const { limitaDatelor, subPetic, pastreaza } = mascaBazei(relief, reliefPetic);
+  const ndvi = straturiNdvi(relief, reliefPetic);
+  return { relief, reliefPetic, limitaDatelor, subPetic, pastreaza, ndvi };
+}
+
+/**
+ * Rețeta lui alpha, plasele: baza, apoi peticul în gaura ei, marginea de care se cos
+ * împrejurimile și altitudinea randată. Ce trebuie păstrat, cu motivul:
+ *  - `inscrie` primește eliberarea bazei imediat după ea, ÎNAINTEA construcției peticului:
+ *    dacă peticul aruncă, cei ~77 MB de atribute ai bazei trebuie să fie deja în lista
+ *    de eliberat a pornirii;
+ *  - aceeași `culoare` (previzualizarea) pe amândouă plasele;
+ *  - `margineAlpha` se ia cât stratul NDVI al bazei mai e viu, și numai fără
+ *    previzualizare: acolo împrejurimile nu se construiesc;
+ *  - `inaltimeLa`: peticul de 1 m unde există, baza de 2 m în rest.
+ * Straturile NDVI nu se întorc: cine le ține, le golește după apel.
+ *
+ * @returns {{teren: object, petic: object|null, margineAlpha: object[]|null, inaltimeLa: Function}}
+ */
+export function construiesteAlpha({ relief, reliefPetic, pastreaza, subPetic, ndvi }, { paleta, culoare, inscrie = () => {} } = {}) {
+  const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
+  inscrie(() => teren.dispose());
+  const petic = reliefPetic
+    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic, culoare })
+    : null;
+  if (petic) inscrie(() => petic.dispose());
+  const margineAlpha = culoare ? null : buclaNoduri(relief, { x: 0, z: 0 }, ndvi.baza ?? null, dreptunghiGrila(relief));
+  const inaltimeLa = (x, z) => (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z));
+  return { teren, petic, margineAlpha, inaltimeLa };
+}
 
 /**
  * @param {object} meta — sidecarul bazei, de la incarcaRelief()

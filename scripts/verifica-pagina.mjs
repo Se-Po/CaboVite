@@ -1908,7 +1908,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   }
 
   // (k) Harta o singură dată, pe sursa lui scena.js: relieful → toate datele → garda pornirii
-  //     oprită → descarcaSatelit (cu peticul) → creeazaTeren → creeazaSatelit (cu mânerul,
+  //     oprită → descarcaSatelit (cu peticul) → construiesteAlpha → creeazaSatelit (cu mânerul,
   //     progresul și ieșirea) → compileAsync → faza fotografiei → așteptarea lui Satelit, numai pe
   //     calea automată → bucla. Fără `primulCadru` și fără `data-panouri`. Construcția cere WebGL,
   //     deci ordinea se păzește pe sursă; că primul cadru e chiar Satelit se vede în pagină
@@ -1927,7 +1927,9 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       const toate = i('await asteapta(Promise.all([sanctuarGata, cladiriGata, imprejurimiGata]))');
       // garda oprită după date: prima oprire de după ele, înaintea cererilor Satelit
       const garda = toate >= 0 ? i('garda.opreste();', toate) : -1;
-      const dSat = i('descarcaSatelit({'), teren = i('creeazaTeren(relief'), cSat = i('creeazaSatelit({');
+      // Construcția lui alpha: rețeta din alpha.js; în codul de dinainte, creeazaTeren direct.
+      const dSat = i('descarcaSatelit({'), cSat = i('creeazaSatelit({');
+      const teren = i('construiesteAlpha(') >= 0 ? i('construiesteAlpha(') : i('creeazaTeren(relief');
       // Opțiunile lui creeazaSatelit, fără acolada de deschidere și fără golul de la capăt.
       const optSat = cSat >= 0 ? src.slice(cSat + 'creeazaSatelit({'.length, i('});', cSat)).trimEnd() : '';
       const cuPetic = /descarcaSatelit\(\{[^}]*\bnumePetic:/.test(src);
@@ -1953,7 +1955,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     };
     const azi = textSursa('src/scene/scena.js');
     const o = ordine(azi);
-    proba(o.ok, `scena.js: relieful (${o.relief}) → toate datele (${o.toate}) → garda oprită (${o.garda}) → descarcaSatelit (${o.dSat}, ${o.cuPetic ? 'cu' : 'FĂRĂ'} peticul) → creeazaTeren (${o.teren}) → creeazaSatelit (${o.cSat}: mânerul ${o.cuManer ? 'dat' : 'NEDAT'}, progresul ${o.cuProgres ? 'spre laIncarcare' : 'NELEGAT'}, ieșirea ${o.cuIesire ? 'faraSatelit' : 'NEDATĂ'}) → compileAsync (${o.comp}) → numai pe calea automată (${o.automat}): faza fotografiei (${o.faza}) → așteptarea lui Satelit (${o.astept}) → bucla (${o.bucla}); faraSatelit în construieste: argumentul ${o.kApel} în apel, ${o.kSemn} în semnătură; primulCadru / data-panouri: ${o.vechi ? 'ÎNCĂ ACOLO' : 'scoase'}`);
+    proba(o.ok, `scena.js: relieful (${o.relief}) → toate datele (${o.toate}) → garda oprită (${o.garda}) → descarcaSatelit (${o.dSat}, ${o.cuPetic ? 'cu' : 'FĂRĂ'} peticul) → construcția lui alpha (${o.teren}) → creeazaSatelit (${o.cSat}: mânerul ${o.cuManer ? 'dat' : 'NEDAT'}, progresul ${o.cuProgres ? 'spre laIncarcare' : 'NELEGAT'}, ieșirea ${o.cuIesire ? 'faraSatelit' : 'NEDATĂ'}) → compileAsync (${o.comp}) → numai pe calea automată (${o.automat}): faza fotografiei (${o.faza}) → așteptarea lui Satelit (${o.astept}) → bucla (${o.bucla}); faraSatelit în construieste: argumentul ${o.kApel} în apel, ${o.kSemn} în semnătură; primulCadru / data-panouri: ${o.vechi ? 'ÎNCĂ ACOLO' : 'scoase'}`);
     const vechi = textVechi('src/scene/scena.js');
     const ov = vechi === null ? null : ordine(vechi);
     proba(ov !== null && !ov.ok, `control, scena.js de la ${REPER_VECHI}: ${ov === null ? 'NECITIT' : `garda oprită după date la ${ov.garda}, descarcaSatelit la ${ov.dSat}, așteptarea lui Satelit la ${ov.astept}`} — pică`);
@@ -2779,6 +2781,73 @@ console.log('\nPagina fără scenă: titlul, capitolul sanctuarului cu sursele, 
     if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
     if (A0 === undefined) { delete globalThis.addEventListener; delete globalThis.removeEventListener; } else { globalThis.addEventListener = A0; globalThis.removeEventListener = R0; }
   }
+}
+
+// ------------------------------------------------------------ rețeta lui alpha, o singură dată
+
+// Plasele lui alpha se fac dintr-o singură rețetă, în alpha.js (`pregatesteAlpha`,
+// `construiesteAlpha`), pe care o cheamă și pagina, și probele. Copiată de mână în cinci probe,
+// ajunsese să construiască altceva decât pagina: fără NDVI, cu `inaltimeLa` fără garda
+// peticului, cu controale care loveau numai clădirile, cu o cameră scrisă din cifre. Aici, pe
+// sursă: scena.js cheamă rețeta și nimic din ea direct; niciun script de probă nu refă rețeta
+// sau camera paginii. Tiparele se scriu din bucăți, ca fișierul acesta să nu le conțină el
+// însuși. Controale: scena.js și verifica-cladiri.mjs de la 5ec413f, și o probă de azi cu un
+// petic construit de mână.
+//
+// Și ordinea cererilor din `construieste`: relieful, sanctuarul, clădirile și împrejurimile
+// pleacă toate înaintea primei așteptări, iar paleta e chiar ea, într-un singur dus-întors.
+// Control: relieful mutat după paletă.
+console.log('\nRețeta lui alpha, o singură dată (alpha.js), și ordinea cererilor (scena.js)');
+{
+  const fara = (s) => s.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*\*.*$/gm, '');
+  const T = (...p) => p.join('');
+  const DIN_RETETA = [T('creeazaTeren', '('), T('mascaBazei', '('), T('straturiNdvi', '('), T('buclaNoduri', '(')];
+  const scena = (src) => {
+    const s = fara(src);
+    const nr = (t) => s.split(t).length - 1;
+    return { pregateste: nr(T('pregatesteAlpha', '(')), construieste: nr(T('construiesteAlpha', '(')), direct: DIN_RETETA.filter((t) => nr(t) > 0) };
+  };
+  const bunaScena = (o) => o.pregateste === 1 && o.construieste === 1 && o.direct.length === 0;
+  const azi = scena(textSursa('src/scene/scena.js'));
+  proba(bunaScena(azi), `scena.js: pregatesteAlpha ×${azi.pregateste}, construiesteAlpha ×${azi.construieste}, direct din rețetă: ${azi.direct.join(', ') || 'nimic'}`);
+  const vScena = textLa('5ec413f', 'src/scene/scena.js');
+  proba(vScena !== null && !bunaScena(scena(vScena)), `control, scena.js de la 5ec413f: ${vScena === null ? 'NECITIT' : `direct ${scena(vScena).direct.join(', ')}`} — pică`);
+
+  const COPII = [
+    T('creeazaTeren', '(reliefPetic'), T('straturiNdvi', '('), T('mascaBazei', '('), T('buclaNoduri', '(relief,'),
+    T('incarcat.baza ?? ', 'incarcat'), T('incarcat.baza, reliefPetic = ', 'incarcat'),
+    T('new Controale', 'Harta('), T('PerspectiveCamera', '(45'),
+  ];
+  const copii = (src) => COPII.filter((t) => fara(src).includes(t));
+  const PROBE = readdirSync('scripts').filter((f) => /^verifica.*\.mjs$/.test(f));
+  const gasite = PROBE.flatMap((f) => copii(textSursa(`scripts/${f}`)).map((t) => `${f}: ${t}`));
+  proba(PROBE.length >= 10 && gasite.length === 0, `${PROBE.length} scripturi de probă, niciunul cu rețeta lui alpha sau camera paginii refăcute de mână${gasite.length ? `: ${gasite.join('; ')}` : ''}`);
+  const vCladiri = textLa('5ec413f', 'scripts/verifica-cladiri.mjs');
+  proba(vCladiri !== null && copii(vCladiri).length > 0, `control, verifica-cladiri.mjs de la 5ec413f: ${vCladiri === null ? 'NECITIT' : copii(vCladiri).join(', ')} — pică`);
+  const cuPetic = muta(textSursa('scripts/verifica-cladiri.mjs'), ['const { inaltimeLa } = construiesteAlpha(pregatit, { paleta });\n',
+    `const { inaltimeLa } = construiesteAlpha(pregatit, { paleta });\nconst p2 = ${T('creeazaTeren', '(reliefPetic')}, { paleta });\n`]);
+  proba(cuPetic !== null && copii(cuPetic).length > 0, `control, verifica-cladiri.mjs de azi cu un petic construit de mână: ${cuPetic === null ? NEAPLICATA : copii(cuPetic).join(', ')} — pică`);
+
+  // Ordinea cererilor, în corpul lui `construieste`.
+  const cereri = (src) => {
+    const de = src.indexOf('async function construieste(');
+    const corp = de < 0 ? '' : fara(src.slice(de, src.indexOf('\n}\n', de)));
+    // Prima așteptare a corpului: un rând care începe cu ea (nu `await`-ul din ajutorul `asteapta`).
+    const m = /^[ \t]+(?:const [^=\n]+= )?await\b/m.exec(corp);
+    const primul = m ? m.index + m[0].indexOf('await') : -1;
+    const randAwait = primul < 0 ? '' : corp.slice(primul, corp.indexOf('\n', primul));
+    const la = Object.fromEntries(['incarcaRelief(', 'incarcaSanctuar(', 'incarcaCladiri(', 'incarcaImprejurimi('].map((t) => [t, corp.indexOf(t)]));
+    const inainte = Object.values(la).every((i) => i >= 0 && i < primul);
+    return { ok: primul > 0 && inainte && randAwait.includes('incarcaPaleta('), la, primul, paleta: randAwait.includes('incarcaPaleta(') };
+  };
+  const SCENA = textSursa('src/scene/scena.js');
+  const c = cereri(SCENA);
+  proba(c.ok, `scena.js, construieste: ${Object.entries(c.la).map(([t, i]) => `${t.slice(0, -1)} la ${i}`).join(', ')}, înaintea primei așteptări (${c.primul}), în care e ${c.paleta ? 'paleta' : 'ALTCEVA'}`);
+  const RAND_RELIEF = '  const reliefGata = incarcaRelief(undefined, undefined, { garda });\n  reliefGata.catch(() => {});\n';
+  const PALETA = '  await asteapta(incarcaPaleta(undefined, { garda }));\n';
+  const mutat = muta(SCENA, [RAND_RELIEF, ''], [PALETA, PALETA + RAND_RELIEF]);
+  const cm = mutat === null ? null : cereri(mutat);
+  proba(cm !== null && !cm.ok, `control, relieful cerut după paletă: ${cm === null ? NEAPLICATA : `relieful la ${cm.la['incarcaRelief(']}, prima așteptare la ${cm.primul}`} — pică`);
 }
 
 // ------------------------------------------------------------ compilarea înaintea primului cadru

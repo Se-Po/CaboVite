@@ -126,3 +126,44 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
 
 Regula costă ~+45 ms la construcția bazei, în Node; `verifica-teren` tipărește cifra.
 
+
+## Rețeta lui alpha
+
+Plasele lui alpha se fac dintr-o singură rețetă, în `src/scene/alpha.js` (din 2026-10-14, lotul F
+al auditului), pe care o cheamă și pagina (`scena.js`), și probele:
+
+- `pregatesteAlpha(incarcat)`: din ce a întors `incarcaRelief()`, relieful bazei și al
+  peticului, masca bazei (`mascaBazei`: conturul, gaura de sub petic, `pastreaza`) și straturile
+  NDVI, desprinse de pe relief (`straturiNdvi`);
+- `construiesteAlpha(pregatit, { paleta, culoare, inscrie })`: baza, peticul, marginea de care se
+  cos împrejurimile (`margineAlpha`) și altitudinea randată (`inaltimeLa`).
+
+Ce păstrează, cu motivul:
+- eliberarea bazei se înscrie (`inscrie`) imediat după ea, înaintea construcției peticului: dacă
+  peticul aruncă, cei ~77 MB de atribute ai bazei trebuie să fie deja în lista de eliberat a
+  pornirii;
+- aceeași `culoare` (previzualizarea) pe amândouă plasele;
+- `margineAlpha` se ia cât stratul NDVI al bazei e viu, și numai fără previzualizare;
+- `inaltimeLa`: peticul de 1 m unde există, baza de 2 m în rest;
+- straturile NDVI nu se întorc din construcție: `scena.js` le golește după ea, iar rezultatul lui
+  `pregatesteAlpha` se destructurează direct, fără să rămână într-o variabilă care le-ar ține vii.
+
+De ce: rețeta era copiată de mână în cinci probe (`verifica-teren`, `-sanctuar`, `-cladiri`,
+`-imprejurimi`, `-controale`) și copiile se despărțiseră de pagină: fără NDVI, cu `inaltimeLa` fără
+garda peticului, cu controalele lovind numai clădirile, fără sanctuar, și cu o cameră scrisă din
+cifre în locul lui `creeazaCamera`. Azi niciuna nu avea efect măsurabil; o opțiune nouă pusă în
+`scena.js` n-ar fi ajuns însă în probe, care ar fi trecut verificând altă scenă.
+
+Probele:
+- identitatea: amprentele (sha256 pe atribute) din `verifica-teren`, `-sanctuar` și
+  `-imprejurimi` neschimbate, iar rândurile ok/PICĂ ale probelor identice cu cele de dinainte; în
+  `verifica-controale` s-a mișcat o singură cifră, la nivel de zgomot (deriva pe x și z a urcării
+  cu Shift, 7,0e-12 → 8,5e-12 m), după ce controalele lovesc și sanctuarul;
+- ordinea: în `verifica-teren`, regula de culoare trece de la bază la petic la prima înscriere,
+  deci o bază înscrisă după petic ar număra fațetele peticului la bază; controlul, `alpha.js`
+  mutat așa, dă 1 923 948 de fațete bazei în loc de 1 422 064;
+- pe sursă (`verifica-pagina`, „Rețeta lui alpha, o singură dată”): `scena.js` cheamă rețeta o
+  dată și nimic din ea direct; niciun script de probă nu refă rețeta sau camera paginii; relieful,
+  sanctuarul, clădirile și împrejurimile se cer înaintea primei așteptări, care e paleta.
+  Controale: `scena.js` și `verifica-cladiri.mjs` de la 5ec413f, un petic construit de mână
+  într-o probă de azi, relieful cerut după paletă.

@@ -15,14 +15,16 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
-import { creeazaTeren, inPoligon, mascaBazei } from '../src/scene/terrain.js';
+import { incarcaRelief } from '../src/scene/loaders.js';
+import { creeazaTeren, inPoligon } from '../src/scene/terrain.js';
+import { construiesteAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
 import { GRI_REZERVA, culoareTeren, incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
 import { ORTOFOTO_ALPHA, aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
 import { dinDisc, proba, rezumat, sari } from './comun/proba.mjs';
+import { modulDin, muta, NEAPLICATA, textSursa } from './comun/mutatii.mjs';
 
 const TRIUNGHIURI = 1923948;          // bază 1 422 064 + petic 501 884 (harta_v4 + harta_v5)
 const OCTETI_ATRIBUTE = 103893192;    // 54 × TRIUNGHIURI: position Float32 + color Uint16, ambele plase
@@ -64,18 +66,19 @@ console.warn = (...a) => { avertismente.push(a.join(' ')); };
 
 // ------------------------------------------------------------ construcția
 
-async function construieste(culoare) {
-  const incarcat = await incarcaRelief();
-  const relief = incarcat.baza ?? incarcat;
-  const reliefPetic = incarcat.baza ? incarcat : null;
-  const { pastreaza } = mascaBazei(relief, reliefPetic);
-  const ndvi = straturiNdvi(relief, reliefPetic);
-  const paleta = paletaCurenta();
-  const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare: culoare?.('baza') });
-  const petic = reliefPetic
-    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic, culoare: culoare?.('petic') })
-    : null;
-  return { relief, reliefPetic, pastreaza, teren, petic, ndvi };
+/**
+ * Alpha, cu rețeta paginii (alpha.js). `culoarePe(care)` dă regula de culoare a fiecărei plase;
+ * rețeta primește una singură, care trece pe „petic” la prima înscriere a unei eliberări. Deci
+ * proba 2 păzește și ordinea rețetei: o bază înscrisă abia după construcția peticului ar trece
+ * fațetele peticului drept ale bazei.
+ */
+async function construieste(culoarePe) {
+  const p = pregatesteAlpha(await incarcaRelief());
+  const f = culoarePe ? { baza: culoarePe('baza'), petic: culoarePe('petic') } : null;
+  let care = 'baza';
+  const culoare = f ? (...a) => f[care](...a) : undefined;
+  const { teren, petic } = construiesteAlpha(p, { paleta: paletaCurenta(), culoare, inscrie: () => { care = 'petic'; } });
+  return { ...p, teren, petic };
 }
 
 const octeti = (t) => Object.values(t.obiect.geometry.attributes).reduce((s, a) => s + a.array.byteLength, 0);
@@ -180,6 +183,23 @@ async function main() {
       `${care}: ${p.length} fațete, ${nepotrivite} nepotriviri; ${cu} cu NDVI, ${p.length - cu} fără`);
     proba(fara === 0, `${care}: ${fara} vârfuri de uscat fără NDVI`);
   }
+  {
+    // Controlul ordinii: o rețetă care înscrie baza abia după construcția peticului ar
+    // lăsa baza neeliberată dacă peticul aruncă; aici, fațetele peticului ar ajunge la bază.
+    const M = await modulDin(muta(textSursa('src/scene/alpha.js'),
+      ['  inscrie(() => teren.dispose());\n  const petic', '  const petic'],
+      ['  if (petic) inscrie(() => petic.dispose());\n', '  inscrie(() => teren.dispose());\n  if (petic) inscrie(() => petic.dispose());\n']));
+    let n = null;
+    if (M) {
+      const pv = M.pregatesteAlpha(await incarcaRelief());
+      const numar = { baza: 0, petic: 0 };
+      let care = 'baza';
+      const r = M.construiesteAlpha(pv, { paleta: paletaCurenta(), culoare: () => { numar[care]++; return 0x8a8578; }, inscrie: () => { care = 'petic'; } });
+      r.teren.dispose(); r.petic?.dispose();
+      n = numar;
+    }
+    proba(n && n.baza !== primit.baza.length, `control: baza înscrisă după petic — ${n ? `baza primește ${n.baza} fațete, nu ${primit.baza.length}` : NEAPLICATA} — pică`);
+  }
 
   console.log('\n3. Căile de eșec ale stratului: scena trebuie să pornească la fiecare');
   const citeste = (u) => readFileSync('public' + u);
@@ -200,8 +220,7 @@ async function main() {
     avertismente = [];
     let r, eroare = null;
     try {
-      const inc = await incarcaRelief();
-      r = straturiNdvi(inc.baza ?? inc, inc.baza ? inc : null);
+      r = pregatesteAlpha(await incarcaRelief()).ndvi;
     } catch (e) { eroare = e; }
     proba(!eroare && r.baza === undefined && r.petic === undefined && avertismente.length >= 1,
       `${nume}: ${eroare ? 'ARUNCĂ ' + eroare.message : `amândouă fără strat, ${avertismente.length} avertisment(e)`}`);
@@ -264,7 +283,7 @@ async function main() {
 
   // Peticul față de ce ar picta baza sub el. Baza n-are fațete acolo — gaura —,
   // deci se construiește o a treia plasă, numai din celulele găurii.
-  const { limitaDatelor, subPetic } = mascaBazei(sr.relief, sr.reliefPetic);
+  const { limitaDatelor, subPetic } = sr;
   const inGaura = (x, zz) => (!limitaDatelor || inPoligon(x, zz, limitaDatelor)) && subPetic(x, zz);
   primite.baza = [];
   const sub = creeazaTeren(sr.relief, { pastreaza: inGaura, paleta: paletaCurenta(), ndvi: sr.ndvi.baza, culoare: cuRegula('baza') });
@@ -316,16 +335,15 @@ async function main() {
 
   console.log('\n5. Construcția, la bit și pe numărătoare');
   {
-    const incarcat = await incarcaRelief();
-    const relief = incarcat.baza, reliefPetic = incarcat;
-    const masca = mascaBazei(relief, reliefPetic);
-    const ndvi = straturiNdvi(relief, reliefPetic);
-    let apeluri = 0;
+    // Amprenta e a plaselor pe care le face rețeta paginii; numărătoarea, pe `pastreaza` al ei.
+    const masca = pregatesteAlpha(await incarcaRelief());
+    const { relief, reliefPetic, ndvi } = masca;
+    let apeluri = 0, msBaza = null;
     const pastreaza = (x, zz) => { apeluri++; return masca.pastreaza(x, zz); };
     const t0 = performance.now();
-    const baza = creeazaTeren(relief, { pastreaza, paleta: paletaCurenta(), ndvi: ndvi.baza });
-    const msBaza = performance.now() - t0;
-    const petic = creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta: paletaCurenta(), ndvi: ndvi.petic });
+    const { teren: baza, petic } = construiesteAlpha({ ...masca, pastreaza }, {
+      paleta: paletaCurenta(), inscrie: () => { msBaza ??= performance.now() - t0; },
+    });
     const amprenta = (t) => {
       const g = t.obiect.geometry, b = g.boundingBox, sf = g.boundingSphere;
       const sha = (a) => createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex');

@@ -21,14 +21,12 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { incarcaCladiri, incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
-import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
-import { creeazaSanctuar } from '../src/scene/sanctuar.js';
+import { incarcaCladiri, incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
+import { creeazaSanctuar, lovesteCladiri } from '../src/scene/sanctuar.js';
 import { COTA_MARE } from '../src/scene/mare.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from '../src/scene/imprejurimi.js';
-import { buclaNoduri, dreptunghiGrila } from '../src/scene/cusatura.js';
-import { creeazaAlpha } from '../src/scene/alpha.js';
+import { construiesteAlpha, creeazaAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
 import { marsPeTeren, punctVazut, reliefRandat } from '../src/scene/raza.js';
 import { FACTOR_TREAPTA, pasZoom, treapta } from '../src/scene/rotita.js';
 import { ControaleHarta, creeazaCamera, descarcaInertia, LIBER_SOL, NEAR, PAS_MUTARE, razaPlanApropiat, STARE, urmaresteMarireaPaginii, VEDERE_START } from '../src/scene/camera.js';
@@ -63,24 +61,36 @@ const avertConstructie = [], warn = console.warn;
 console.warn = (...a) => { avertConstructie.push(a.join(' ')); };
 await incarcaPaleta();
 const paleta = paletaCurenta();
-const incarcat = await incarcaRelief();
-const relief = incarcat.baza, reliefPetic = incarcat;
-const { pastreaza, subPetic, limitaDatelor } = mascaBazei(relief, reliefPetic);
-const ndvi = straturiNdvi(relief, reliefPetic);
-const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza });
-const petic = creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic });
-const margineAlpha = buclaNoduri(relief, { x: 0, z: 0 }, ndvi.baza, dreptunghiGrila(relief));
+// Alpha, cu rețeta paginii (alpha.js), și împrejurimile cusute de ea.
+const pregatit = pregatesteAlpha(await incarcaRelief());
+const { relief, reliefPetic, pastreaza, subPetic, limitaDatelor } = pregatit;
+const { teren, petic, margineAlpha, inaltimeLa } = construiesteAlpha(pregatit, { paleta });
 const imp = creeazaImprejurimi({ niveluri: await incarcaImprejurimi(), margineAlpha, paleta });
-const inaltimeLa = (x, z) => (subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z));
-// Farul și celelalte clădiri, ca în pagină: zoomul și apucarea le văd.
+// Sanctuarul, farul și celelalte clădiri, ca în pagină: zoomul și apucarea le văd pe toate.
 const bb = relief.meta.bbox_tm06;
+const ancora = { x: (bb.xMin + bb.xMax) / 2, y: (bb.yMin + bb.yMax) / 2 };
+const dateSanctuar = await incarcaSanctuar();
+const sanctuar = creeazaSanctuar({ date: dateSanctuar, inaltimeLa, ancora, retea: { relief, reliefPetic, pastreaza, subPetic } });
 const dateCladiri = await incarcaCladiri();
-const cladiri = creeazaSanctuar({ date: dateCladiri, inaltimeLa, ancora: { x: (bb.xMin + bb.xMax) / 2, y: (bb.yMin + bb.yMax) / 2 }, eticheta: 'clădiri' });
+const cladiri = creeazaSanctuar({ date: dateCladiri, inaltimeLa, ancora, eticheta: 'clădiri' });
 console.warn = warn;
 proba(avertConstructie.length === 0, `construcția scenei de probă, fără avertismente (${avertConstructie.length}${avertConstructie.length ? `: ${avertConstructie.slice(0, 2).join(' | ')}` : ''})`);
 const alpha = creeazaAlpha(relief.meta);
 const inaltimeRandata = reliefRandat({ alpha, inaltimeLa, imprejurimi: imp });
-const TEREN = { inaltimeLa: inaltimeRandata, lim: imp.limite, alpha, loveste: (raza) => cladiri.loveste(raza) };
+const TEREN = { inaltimeLa: inaltimeRandata, lim: imp.limite, alpha, loveste: lovesteCladiri(sanctuar, cladiri) };
+{
+  // Controalele lovesc sanctuarul, ca pagina (lovesteCladiri, sanctuar.js): o rază verticală pe
+  // biserică se oprește pe acoperiș. Control: numai celelalte clădiri, cum dădea copia de
+  // dinainte probelor, o lasă să treacă până în teren.
+  // Centrul conturului navei, din datele pe care le-a construit sanctuarul (coordonatele scenei).
+  const nava = dateSanctuar.corpuri.find((k) => k.cheie === 'biserica.nava').contur;
+  const cx = nava.reduce((s, p) => s + p[0], 0) / nava.length, cz = nava.reduce((s, p) => s + p[1], 0) / nava.length;
+  const raza = new THREE.Ray(new THREE.Vector3(cx, 400, cz), new THREE.Vector3(0, -1, 0));
+  const lovit = TEREN.loveste(raza);
+  proba(lovit?.cheie?.startsWith('biserica'), `o rază verticală pe nava bisericii (${cx.toFixed(1)}, ${cz.toFixed(1)}): ${lovit ? `${lovit.cheie}, la cota ${(400 - lovit.t).toFixed(2)} m` : 'nimic lovit'}`);
+  const fara = lovesteCladiri(cladiri)(raza);
+  proba(fara === null, `control, numai celelalte clădiri: ${fara === null ? 'nimic lovit' : fara.cheie} — pică`);
+}
 
 const W = 1600, H = 900, RECT = { left: 0, top: 0, width: W, height: H };
 const raycaster = new THREE.Raycaster();
@@ -103,11 +113,17 @@ const subCursor = (camera, controale, x, y, teren = TEREN) => {
 // O cameră a paginii, la vederea de pornire, cu ceasul în mâna probei.
 let ceas = 0;
 performance.now = () => ceas;
-const pagina = () => {
-  const { camera, controale } = creeazaCamera(null);
+/**
+ * Camera și controalele paginii (`creeazaCamera`), pe ecranul probelor: aceleași limite, nu o
+ * copie a lor. `el`: un canvas fals, pentru evenimentele de pointer; `teren`: null pentru
+ * controale fără teren; `amortizare: false` pentru probele care citesc starea după fiecare pas.
+ */
+const pagina = (el = null, { teren = TEREN, amortizare = true } = {}) => {
+  const { camera, controale } = creeazaCamera(el);
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
-  controale.seteazaTeren(TEREN);
+  if (!amortizare) controale.enableDamping = false;
+  if (teren) controale.seteazaTeren(teren);
   return { camera, controale };
 };
 const cadre = (controale, max = 400) => {
@@ -405,13 +421,7 @@ console.log('\nCe a găsit recenzia');
     getBoundingClientRect: () => RECT, clientWidth: W, clientHeight: H });
   const ev = (o) => ({ pointerId: 1, pointerType: 'mouse', button: 0, clientX: 800, clientY: 450, pageX: 800, pageY: 450, ctrlKey: false, metaKey: false, shiftKey: false, ...o });
   const controaleFalse = () => {
-    const camera = new THREE.PerspectiveCamera(45, W / H, 10, 60000);
-    camera.position.fromArray(VEDERE_START.pozitie);
-    const k = new ControaleHarta(camera, fals());
-    k.target.fromArray(VEDERE_START.tinta);
-    k.minDistance = 80; k.maxDistance = 8000; k.maxPolarAngle = Math.PI / 2 - 0.04; k.minPolarAngle = 0.15;
-    k.update();
-    k.seteazaTeren(TEREN);
+    const { camera, controale: k } = pagina(fals(), { amortizare: false });
     return { camera, k };
   };
   const mijloc = (faraPivot) => {
@@ -485,11 +495,7 @@ console.log('\nStările gesturilor, citite la `start`, ca în gest.js');
     setPointerCapture() {}, releasePointerCapture() {},
     getBoundingClientRect: () => RECT, clientWidth: W, clientHeight: H,
   };
-  const camera = new THREE.PerspectiveCamera(45, W / H, 10, 60000);
-  camera.position.fromArray(VEDERE_START.pozitie);
-  const k = new ControaleHarta(camera, el);
-  k.target.fromArray(VEDERE_START.tinta);
-  k.update();
+  const { controale: k } = pagina(el, { teren: null, amortizare: false });
   proba(!('cursor' in stil), 'la creare, niciun cursor inline pe canvas (connect → disconnect îl scria)');
   let laStart = null;
   k.addEventListener('start', () => { laStart = k.state; });

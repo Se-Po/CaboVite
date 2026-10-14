@@ -4,7 +4,7 @@
 //   npm run verifica-imprejurimi
 //
 // Nu scrie nimic. Construiește alpha (baza cu peticul) și cele patru niveluri ale
-// împrejurimilor cu CODUL PAGINII — incarcaRelief, mascaBazei, creeazaTeren,
+// împrejurimilor cu CODUL PAGINII — incarcaRelief, rețeta lui alpha (alpha.js),
 // incarcaImprejurimi, creeazaImprejurimi, fermoar —, cu `fetch` înlocuit de o citire
 // din public/. Iese cu cod 1 dacă pică vreo probă.
 //
@@ -18,15 +18,16 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { creeazaCer } from '../src/scene/cer.js';
 import { creeazaLumini } from '../src/scene/lights.js';
-import { incarcaRelief, straturiNdvi } from '../src/scene/loaders.js';
-import { campNeted, creeazaTeren, INELE_APA, mascaBazei } from '../src/scene/terrain.js';
+import { incarcaRelief } from '../src/scene/loaders.js';
+import { campNeted, creeazaTeren, INELE_APA } from '../src/scene/terrain.js';
+import { construiesteAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
 import { culoareTeren, incarcaPaleta, paletaCurenta, SPRE_LINIAR } from '../src/scene/palette.js';
 import { creeazaImprejurimi, incarcaImprejurimi, NIVELURI_IMPREJURIMI, NIVELURI_NETEZITE } from '../src/scene/imprejurimi.js';
 import { buclaNoduri, dreptunghiExterior, dreptunghiGrila, fermoar, geometriaGrilei, ndviNod } from '../src/scene/cusatura.js';
 import { laOklab } from './comun/oklab.mjs';
 import { gama } from './comun/oklab.mjs';
 import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, proba, rezumat } from './comun/proba.mjs';
-import { modulDin, muta, textSursa } from './comun/mutatii.mjs';
+import { modulDin, muta, textLa, textSursa } from './comun/mutatii.mjs';
 
 const BUGET = { triunghiuri: 600000, octeti_fisiere: 8 * 1048576 };
 const TRIUNGHIURI_ALPHA = 1923948;
@@ -75,6 +76,17 @@ console.log('\nÎncărcătorul: o cale de eșec dă null și un singur avertisme
     return new Response(JSON.stringify({ ...m, interior: 'harta_v4' }), { status: 200 });
   }, () => incarcaImprejurimi());
   proba(strain.r === null && !strain.e, `un nivel cusut de alt interior: ${strain.r === null ? 'null' : 'a trecut'}`);
+  // Baza refăcută sub alt nume, cu aceeași cutie: primul nivel se încarcă, numele ei nu e în cod.
+  const altaBaza = async (url) => {
+    if (!url.includes('harta_v6-dem.json')) return dinDisc(url);
+    const m = JSON.parse(readFileSync('public' + url, 'utf8'));
+    return new Response(JSON.stringify({ ...m, interior: 'harta_v10' }), { status: 200 });
+  };
+  const redenumita = await cuFetch(altaBaza, () => incarcaImprejurimi());
+  proba(Array.isArray(redenumita.r), `primul nivel cusut de o bază cu alt nume (harta_v10): ${Array.isArray(redenumita.r) ? 'se încarcă' : `null, „${redenumita.avert.at(-1)?.slice(0, 60)}”`}`);
+  const V0 = await modulDin(textLa('5ec413f', 'src/scene/imprejurimi.js'));
+  const redVechi = V0 ? await cuFetch(altaBaza, () => V0.incarcaImprejurimi()) : null;
+  proba(redVechi && redVechi.r === null, `control, imprejurimi.js de la 5ec413f, cu numele bazei scris în cod: ${redVechi === null ? 'NECITIT' : redVechi.r === null ? 'null' : 'se încarcă'} — pică`);
   // Gaura lui harta_v7 mutată cu un pas al lui harta_v9 spre nord: nu mai e cutia ei.
   // Recenzia a mărit-o cu 96 m și toate probele de mai jos treceau.
   const gaura = await cuFetch(async (url) => {
@@ -95,13 +107,9 @@ console.log('\nÎncărcătorul: o cale de eșec dă null și un singur avertisme
 console.log('\nConstrucția, cu codul paginii');
 await incarcaPaleta();
 const paleta = paletaCurenta();
-const incarcat = await incarcaRelief();
-const relief = incarcat.baza, reliefPetic = incarcat;
-const { pastreaza } = mascaBazei(relief, reliefPetic);
-const ndvi = straturiNdvi(relief, reliefPetic);
-const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza });
-const petic = creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic });
-const margineAlpha = buclaNoduri(relief, { x: 0, z: 0 }, ndvi.baza, dreptunghiGrila(relief));
+const pregatit = pregatesteAlpha(await incarcaRelief());
+const { relief } = pregatit;
+const { teren, petic, margineAlpha } = construiesteAlpha(pregatit, { paleta });
 proba(teren.nrTriunghiuri + petic.nrTriunghiuri === TRIUNGHIURI_ALPHA, `alpha rămâne la ${teren.nrTriunghiuri + petic.nrTriunghiuri} triunghiuri (${TRIUNGHIURI_ALPHA} înainte)`);
 
 const niveluri = await incarcaImprejurimi();
@@ -118,6 +126,25 @@ proba(avertImp.length === 0, `construcția împrejurimilor, fără avertismente 
   const c = M ? await cuAvertismente(() => M.creeazaImprejurimi({ niveluri, margineAlpha, paleta })) : null;
   c?.r?.dispose();
   proba(c && c.avert.length === 1, `control: cu un console.warn pus în creeazaImprejurimi, proba de mai sus pică (${c ? `${c.avert.length} avertisment` : 'MUTAȚIA NU S-A APLICAT'})`);
+}
+{
+  // Primul nivel se coase de alpha după geometrie, nu după numele bazei: o margine a lui alpha
+  // care nu e gaura lui harta_v6 — o bază refăcută cu alt contur — oprește construcția.
+  // Controlul: imprejurimi.js de la 5ec413f, care cerea numele `harta_v4`, o cosea tăcut.
+  const mutata = margineAlpha.map((v) => ({ ...v, x: v.x + 4 }));
+  const nouaFasie = (M) => {
+    try {
+      const i = M.creeazaImprejurimi({ niveluri: niveluri.map((L) => ({ ...L, ndvi: null })), margineAlpha: mutata, paleta });
+      const t = i.plase[0].cusatura.triunghiuri;
+      i.dispose();
+      return { arunca: null, t };
+    } catch (e) { return { arunca: e.message, t: null }; }
+  };
+  const azi = nouaFasie({ creeazaImprejurimi });
+  proba(azi.arunca?.includes('nu e marginea lui alpha'), `marginea lui alpha mutată cu 4 m pe x: ${azi.arunca ? `aruncă, „${azi.arunca.slice(0, 90)}”` : `cusută tăcut, fâșia cu ${azi.t} triunghiuri`}`);
+  const V = await modulDin(textLa('5ec413f', 'src/scene/imprejurimi.js'));
+  const vechi = V ? nouaFasie(V) : null;
+  proba(vechi && !vechi.arunca, `control, imprejurimi.js de la 5ec413f: ${vechi === null ? 'NECITIT' : vechi.arunca ? `aruncă (${vechi.arunca.slice(0, 60)})` : `cusută tăcut, fâșia cu ${vechi.t} triunghiuri în loc de ${imp.plase[0].cusatura.triunghiuri}`} — pică`);
 }
 let total = 0;
 for (const p of imp.plase) {

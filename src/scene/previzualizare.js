@@ -10,8 +10,8 @@
 // Fără parametrul din adresă modulul nu face nimic, iar plasa iese cu regula
 // adevărată. Ca să-l scoți: fișierul acesta; în scena.js importul lui, blocul care
 // începe cu comentariul `?previzualizare=ndvi` (`mod`, `culoare`, legenda) și
-// argumentul `culoare` din cele două apeluri creeazaTeren, plus `culoare` din
-// calculul surselor; în main.css blocul #legenda. `npm run build` NU prinde un
+// opțiunea `culoare` din apelul construiesteAlpha, plus `culoare` din calculul
+// surselor; în alpha.js, `culoare` din construiesteAlpha; în main.css blocul #legenda. `npm run build` NU prinde un
 // `culoare` uitat — ar ieși ReferenceError abia la pornire, iar pagina ar rămâne
 // fără scenă. Rulează `npm run verifica-teren` și deschide pagina.
 

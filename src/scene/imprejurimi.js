@@ -50,12 +50,14 @@ export async function incarcaImprejurimi(nume = NIVELURI_IMPREJURIMI, { garda = 
     // Abandonată cât mai sosea un strat: straturile au ieșit `null` tăcut, deci n-are rost
     // nici avertismentul „numai X din Y”.
     if (garda?.semnal.aborted) return null;
-    let interior = 'harta_v4';
+    // Primul nivel se coase de baza lui alpha, al cărei nume vine din date, nu de aici: pe el
+    // îl verifică `creeazaImprejurimi`, pe geometrie. De la al doilea încolo, lanțul.
+    let interior = null;
     for (const [k, L] of niveluri.entries()) {
       const m = L.meta;
       if (m?.nume !== nume[k]) throw new Error(`${nume[k]}: sidecarul e al lui ${m?.nume}`);
       if (m.rol !== 'imprejurimi') throw new Error(`${m.nume}: rolul ${m.rol}, nu „imprejurimi”`);
-      if (m.interior !== interior) throw new Error(`${m.nume}: cusută de ${m.interior}, aștept ${interior}`);
+      if (k > 0 && m.interior !== interior) throw new Error(`${m.nume}: cusută de ${m.interior}, aștept ${interior}`);
       const s = m.interior_noduri_scena, d = m.deplasare_scena;
       if (![s?.x0, s?.x1, s?.z0, s?.z1, d?.x, d?.z].every(Number.isFinite)) throw new Error(`${m.nume}: lipsesc gaura sau deplasarea`);
       // Gaura trebuie să fie chiar cutia nodurilor nivelului dinăuntru. Numele nu
@@ -131,6 +133,16 @@ export function creeazaImprejurimi({ niveluri, margineAlpha, paleta, culoare, ce
     materiale.plat.dispose(); materiale.neted.dispose();
   };
   try {
+    // Gaura primului nivel trebuie să fie chiar cutia nodurilor lui alpha, în metri de scenă
+    // (în TM06 nu se poate compara: cutia bazei e scrisă pe muchiile celulelor, gaura pe
+    // noduri, la o jumătate de pas). Altfel o bază refăcută cu alt contur ar fi cusută tăcut:
+    // mutată cu 4 m, fâșia scădea de la 2 645 de triunghiuri la 556, fără nicio eroare.
+    const g0 = niveluri[0]?.meta.interior_noduri_scena;
+    let ax0 = Infinity, ax1 = -Infinity, az0 = Infinity, az1 = -Infinity;
+    for (const v of margineAlpha) { ax0 = Math.min(ax0, v.x); ax1 = Math.max(ax1, v.x); az0 = Math.min(az0, v.z); az1 = Math.max(az1, v.z); }
+    const lipit = (a, b) => Math.abs(a - b) <= 1e-6;
+    if (!g0 || !lipit(g0.x0, ax0) || !lipit(g0.x1, ax1) || !lipit(g0.z0, az0) || !lipit(g0.z1, az1))
+      throw new Error(`${niveluri[0]?.meta.nume}: gaura (${g0?.x0}…${g0?.x1} × ${g0?.z0}…${g0?.z1}) nu e marginea lui alpha (${ax0}…${ax1} × ${az0}…${az1})`);
     let interior = margineAlpha;
     for (const [k, L] of niveluri.entries()) {
       const m = L.meta, dep = m.deplasare_scena, s = m.interior_noduri_scena;

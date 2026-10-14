@@ -238,9 +238,15 @@ indirecte, după `aomap_fragment`, ca un `aoMap`. Albedoul rămâne cel măsurat
 - Talpa pereților: cel mai jos punct al reliefului paginii (`inaltimeLa`, interpolat
   biliniar) în colțurile și la mijlocul laturilor conturului, minus 0,5 m — marja
   acoperă diferența dintre interpolare și triunghiurile plasei.
-- `loveste(raza)` dă clădirea din fața razei: cutia fiecărui element, apoi
-  Möller–Trumbore numai pe triunghiurile lui. Panoul punctului o preferă terenului
-  când e mai aproape și scrie și cota solului.
+- `loveste(raza)` dă clădirea din fața razei: întâi cutia tuturor (din 2026-10-14), apoi
+  cutia fiecărui element, apoi Möller–Trumbore numai pe triunghiurile lui. Panoul punctului o
+  preferă terenului când e mai aproape și scrie și cota solului. `lovesteCladiri(...seturi)`
+  (sanctuar.js) alege lovitura cea mai apropiată din sanctuar și din celelalte clădiri, pentru
+  pagină și pentru probe. Cutia tuturor a venit când `verifica-controale` a început să lovească
+  și sanctuarul, ca pagina: probele dronei, cu paza solului pe tot trunchiul vederii, trimit
+  mii de raze, cele mai multe departe de complex, iar fiecare cerceta cutiile tuturor
+  elementelor — proba a urcat de la 12 s la 55 s. Cu verificarea, 10 s, cu aceleași rezultate
+  (o rază care ratează cutia tuturor nu poate atinge cutia unui element).
 - Eticheta e un buton DOM, proiectat în ramura de randare, după
   `camera.updateMatrixWorld()`: `OrbitControls.update()` cheamă `lookAt()`, care
   reface matricea cu poziția nouă și rotația VECHE, iar `render()` o reface abia

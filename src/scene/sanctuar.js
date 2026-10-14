@@ -187,6 +187,10 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea, eticheta = 's
     const o = new THREE.Vector3(), d = new THREE.Vector3(), tmp = new THREE.Vector3();
     const loveste = (raza) => {
       if (!viu || !pozitii) return null;
+      // Întâi cutia tuturor: cutia fiecărui element stă în ea, deci o rază care o ratează nu
+      // lovește nimic. Paza solului a dronei trimite mii de raze pe secundă, cele mai multe
+      // departe de complex; fără verificarea asta, fiecare cerceta cutiile tuturor elementelor.
+      if (!raza.intersectsBox(geometrie.boundingBox)) return null;
       o.copy(raza.origin); d.copy(raza.direction);
       const cand = [];
       // Cu originea în cutie, intersectBox dă punctul de IEȘIRE; atunci cutia se
@@ -250,4 +254,23 @@ export function creeazaSanctuar({ date, inaltimeLa, ancora, retea, eticheta = 's
     console.warn(`${eticheta}: nu s-a putut construi — ${e.message}`);
     return null;
   }
+}
+
+/**
+ * Clădirea cea mai apropiată de-a lungul unei raze, din oricare set — sanctuarul, celelalte
+ * clădiri —; la egalitate, a primului set. `undefined` fără niciun set, ca o hartă fără
+ * clădiri. Pagina și probele o folosesc pe aceasta: o copie din probe dădea controalelor
+ * numai clădirile, fără sanctuar.
+ */
+export function lovesteCladiri(...seturi) {
+  const s = seturi.filter(Boolean);
+  if (!s.length) return undefined;
+  return (raza) => {
+    let cea = null;
+    for (const x of s) {
+      const h = x.loveste(raza) ?? null;
+      if (h && (!cea || h.t < cea.t)) cea = h;
+    }
+    return cea;
+  };
 }

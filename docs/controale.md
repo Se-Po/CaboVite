@@ -283,7 +283,13 @@ paza solului, pe build: Ctrl până la 27,42 m peste mare, apoi Q ×6 (216° →
   conturul rgb(255, 255, 255), pivotul rgb(18, 18, 18); control, regulile de la 6ad3a47: N
   rgb(217, 145, 119). Contrastul forțat adevărat <!-- NEVERIFICAT: Windows High Contrast -->.
 
-**Probele** — `npm run verifica-controale`, cu codul paginii, pe 1600 × 900:
+**Probele** — `npm run verifica-controale`, cu codul paginii, pe 1600 × 900. Scena de probă se
+face cu rețeta paginii (`docs/teren.md`, „Rețeta lui alpha”), cu sanctuarul și clădirile, iar
+camera, cu `creeazaCamera` (din 2026-10-14; înainte, două camere scrise din cifre, fără
+amortizare, și controale care loveau numai clădirile):
+- construcția scenei de probă, fără avertismente (înainte, înghițite);
+- o rază verticală pe nava bisericii se oprește pe acoperiș, la cota 146,84 m; control: numai
+  celelalte clădiri, cum dădea copia de dinainte probelor, nu lovesc nimic;
 - treptele, trecute prin `_customWheelEvent` al controalelor: 100 și 120 px, 3 linii, o
   pagină, 4,000244 px pe macOS, 40 px la 250% și 33 px la 300%, 33 px cu „1 linie pe clic”
   dau exact o treaptă; 12 × 8,33 px de touchpad, una ± 1%; o rafală 60, 75, 90 px, 2,25,

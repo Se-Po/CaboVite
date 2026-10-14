@@ -4,7 +4,7 @@
 //   npm run verifica-sanctuar
 //
 // Nu scrie nimic. Construiește terenul și sanctuarul cu CODUL PAGINII —
-// incarcaRelief, mascaBazei, creeazaTeren, incarcaSanctuar, creeazaSanctuar,
+// incarcaRelief, rețeta lui alpha (alpha.js), incarcaSanctuar, creeazaSanctuar,
 // creeazaZbor —, cu `fetch` înlocuit de o citire din public/. Rulează toate
 // probele și iese cu cod 1 dacă a picat vreuna.
 //
@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
-import { creeazaTeren, mascaBazei } from '../src/scene/terrain.js';
+import { construiesteAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { creeazaDrapaj } from '../src/scene/drapaj.js';
@@ -103,14 +103,10 @@ for (const [nume, r] of cai) {
 console.log('\nConstrucția, cu codul paginii');
 await incarcaPaleta();
 const t0 = performance.now();
-const incarcat = await incarcaRelief();
-const relief = incarcat.baza ?? incarcat;
-const reliefPetic = incarcat.baza ? incarcat : null;
-const { pastreaza, subPetic } = mascaBazei(relief, reliefPetic);
+const pregatit = pregatesteAlpha(await incarcaRelief());
+const { relief, reliefPetic, pastreaza, subPetic } = pregatit;
 const paleta = paletaCurenta();
-const teren = creeazaTeren(relief, { pastreaza, paleta });
-const petic = reliefPetic ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta }) : null;
-const inaltimeLa = (x, z) => (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z));
+const { teren, petic, inaltimeLa } = construiesteAlpha(pregatit, { paleta });
 const tTeren = performance.now();
 const b = relief.meta.bbox_tm06;
 const ancora = { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 };

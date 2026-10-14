@@ -94,7 +94,14 @@ Diferența se ia cu aceeași regulă ca nodurile — la `harta_v8` media 8 × 8,
 eșantion punctual, care o anula —, iar un nod de pe marginea găurii ia latura cea mai
 apropiată. Înainte de bandă, p90 |Δ| e 3,82 / 3,77 m la `harta_v7` față de `harta_v9` (N / E) și
 3,55 / 6,39 m la `harta_v8`. Gaura fiecărui nivel trebuie să fie cutia nodurilor nivelului
-dinăuntru de pe disc: o verifică și construcția, și pagina (`incarcaImprejurimi`).
+dinăuntru de pe disc: o verifică și construcția, și pagina (`incarcaImprejurimi`). Gaura lui
+`harta_v6`, primul nivel, se verifică în pagină pe geometrie, nu pe numele bazei
+(`creeazaImprejurimi`, din 2026-10-14): cutia nodurilor de margine ale lui alpha trebuie să fie
+`interior_noduri_scena`, în metri de scenă — în TM06 nu se poate, cutia bazei e scrisă pe muchii,
+gaura pe noduri. Înainte, numele `harta_v4` stătea scris în `imprejurimi.js`, iar o bază
+refăcută cu alt contur, dar cu numele păstrat, se cosea tăcut: mutată cu 4 m, fâșia scădea de la
+2 645 de triunghiuri la 556, fără nicio eroare. Acum numele bazei nu mai e în cod (îl dau datele,
+ca în `loaders.js`), iar o bază cu alt nume și aceeași cutie se încarcă.
 Apa: oceanul din masca WBM, lacurile și râurile numai sub 1 m — un lac de baraj e
 relief —, coborâtă la −8 m ca la alpha. Nodurile din adâncul găurii au cota apei, ca
 fișierul să se comprime. Pământul rămâne plat (~159 m de curbură la 45 km, sub ceață).
@@ -216,9 +223,14 @@ rămân pe `inaltimeLa` al lui alpha.
 busola (`acasa()`) și tasta Home. Rozeta poartă eticheta „Acasă — vederea de pornire”.
 
 **Probele.** `npm run verifica-imprejurimi`:
-- încărcătorul: un nivel lipsă, un nivel cusut de alt interior → `null`; un strat lipsă
-  → niciun strat (totul sau nimic);
-- alpha rămâne la 1 923 948 de triunghiuri;
+- încărcătorul: un nivel lipsă (cu un singur avertisment), un nivel cusut de alt interior →
+  `null`; un strat lipsă → niciun strat (totul sau nimic); fișierele adevărate, fără niciun
+  avertisment; o bază cu alt nume (`harta_v10`) se încarcă, iar codul de la 5ec413f, cu numele
+  scris, o respingea (control);
+- alpha rămâne la 1 923 948 de triunghiuri; construcția împrejurimilor, fără avertismente
+  (control: un `console.warn` pus prin mutație în `creeazaImprejurimi` e prins);
+- marginea lui alpha mutată cu 4 m pe x: construcția aruncă; control, `imprejurimi.js` de la
+  5ec413f: cusută tăcut, fâșia cu 556 de triunghiuri în loc de 2 645;
 - **0 crăpături** pe 749 971 de muchii: fiecare muchie de uscat e a două triunghiuri, în
   afara marginii exterioare a lui `harta_v8`, și niciuna a trei; control: `harta_v6`
   fără fâșie are 2 640;

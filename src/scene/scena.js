@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { creeazaRenderer, redimensioneaza } from './renderer.js';
 import { creeazaCamera, urmaresteMarireaPaginii, VEDERE_START } from './camera.js';
 import { creeazaLumini } from './lights.js';
-import { creeazaTeren, mascaBazei } from './terrain.js';
 import { creeazaMare } from './mare.js';
 import { creeazaCer } from './cer.js';
 import { creeazaSatelit, descarcaSatelit } from './satelit.js';
-import { creeazaGardaPornirii, incarcaCladiri, incarcaRelief, incarcaSanctuar, straturiNdvi } from './loaders.js';
-import { creeazaSanctuar } from './sanctuar.js';
+import { creeazaGardaPornirii, incarcaCladiri, incarcaRelief, incarcaSanctuar } from './loaders.js';
+import { creeazaSanctuar, lovesteCladiri } from './sanctuar.js';
 import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
 import { creeazaCadruFisa } from './fisa-cadru.js';
@@ -18,12 +17,11 @@ import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './p
 import { creeazaBusola } from './busola.js';
 import { creeazaGeo } from './geo.js';
 import { creeazaPunct } from './punct.js';
-import { creeazaAlpha } from './alpha.js';
+import { construiesteAlpha, creeazaAlpha, pregatesteAlpha } from './alpha.js';
 import { creeazaGest } from './gest.js';
 import { creeazaTastatura } from './tastatura.js';
 import { reliefRandat } from './raza.js';
 import { creeazaImprejurimi, incarcaImprejurimi } from './imprejurimi.js';
-import { buclaNoduri, dreptunghiGrila } from './cusatura.js';
 import { instantaneuMemorie } from './dispose.js';
 import { numeElement } from './nume.js';
 
@@ -179,18 +177,17 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // Fișierul cerut poate fi un petic de rezoluție mai mare, care își aduce baza
   // cu el. Terenul principal rămâne baza; peticul e o a doua plasă, așezată în
   // gaura lăsată de ea. Două plase, nu una cu densitate variabilă: o singură
-  // grilă are un singur pas, prin definiție.
-  // `let`, nu `const`: getterul de mai jos îl captează, iar obiectul întors
-  // trăiește în `globalThis.__scena` pe vecie. Fără să poată fi golit, `viu = false`
-  // ar ascunde doar referința, nu ar stinge-o — cei 6,63 MiB ai bazei ar rămâne
-  // vii după dispose(), exact ce spunea comentariul de jos că NU se întâmplă.
-  let relief = incarcat.baza ?? incarcat;
-  const reliefPetic = incarcat.baza ? incarcat : null;
-
-  // Masca bazei — conturul hărții, minus gaura de sub petic. Stă în terrain.js,
-  // cu motivele ei, ca unealta de verificare să construiască aceeași plasă.
-  // Peticul NU o primește; vezi acolo de ce.
-  const { limitaDatelor, subPetic, pastreaza } = mascaBazei(relief, reliefPetic);
+  // grilă are un singur pas, prin definiție. Rețeta — relieful, masca bazei (care
+  // peticului nu i se dă; vezi terrain.js), straturile NDVI — stă în alpha.js, una
+  // singură pentru pagină și pentru probe.
+  //
+  // Toate `let`, destructurate direct, fără vreun obiect intermediar ținut într-o
+  // variabilă: el ar ține straturile NDVI vii după golirea lor de mai jos. `relief`:
+  // getterul de mai jos îl captează, iar obiectul întors trăiește în `globalThis.__scena`
+  // pe vecie. Fără să poată fi golit, `viu = false` ar ascunde doar referința, nu ar
+  // stinge-o — cei 6,63 MiB ai bazei ar rămâne vii după dispose(), exact ce spunea
+  // comentariul de jos că NU se întâmplă. `ndvi`: golit după ce ambele plase s-au construit.
+  let { relief, reliefPetic, limitaDatelor, subPetic, pastreaza, ndvi } = pregatesteAlpha(incarcat);
 
   let cerut = true;
   const cereRandare = () => { cerut = true; };
@@ -215,10 +212,6 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     controale.addEventListener('change', tineInAlpha);
     deEliberat.push(() => controale.removeEventListener('change', tineInAlpha));
   }
-
-  // Straturile NDVI, totul sau nimic, desprinse de pe relief ca să nu rămână vii
-  // după coacerea culorii. `let`, și golit după ce ambele plase s-au construit.
-  let ndvi = straturiNdvi(relief, reliefPetic);
 
   // `?previzualizare=ndvi` pictează datele din care se face culoarea, nu culoarea.
   // Cu o scară vădit nenaturală, ca nimeni să n-o ia drept teren.
@@ -270,28 +263,20 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
     [ndviPeEcran ? ndvi.petic?.meta?.sursa : null, NDVI],
   ].filter(([s]) => s?.atributie).map(([s, prelucrare]) => [s.atributie, { ...s, prelucrare }])).values()];
 
-  const teren = creeazaTeren(relief, { pastreaza, paleta, ndvi: ndvi.baza, culoare });
+  // Baza, peticul, marginea lui alpha și altitudinea randată (alpha.js). Eliberarea
+  // fiecărei plase se înscrie imediat după ea, nu amândouă la sfârșit: dacă peticul
+  // aruncă, baza, cu ~77 MB de atribute, trebuie să fie deja în listă ca s-o elibereze
+  // `curata()`. `margineAlpha` — nod cu nod, cu NDVI-ul ei — e marginea de care se cos
+  // împrejurimile, luată cât stratul mai e viu. `inaltimeLa`, un singur accesor al
+  // altitudinii randate, îl folosesc sanctuarul — pentru talpa pereților —, panoul
+  // punctului și obiectul întors.
+  const { teren, petic, margineAlpha, inaltimeLa } = construiesteAlpha(
+    { relief, reliefPetic, pastreaza, subPetic, ndvi },
+    { paleta, culoare, inscrie: (f) => deEliberat.push(f) },
+  );
   scena.add(teren.obiect);
-  // Înregistrat imediat, nu amândouă la sfârșit: dacă peticul aruncă, baza, cu
-  // ~77 MB de atribute, trebuie să fie deja în listă ca s-o elibereze `curata()`.
-  deEliberat.push(() => teren.dispose());
-
-  const petic = reliefPetic
-    ? creeazaTeren(reliefPetic, { deplasare: reliefPetic.meta.deplasare_scena, paleta, ndvi: ndvi.petic, culoare })
-    : null;
-  if (petic) {
-    scena.add(petic.obiect);
-    deEliberat.push(() => petic.dispose());
-  }
-  // Marginea lui alpha, nod cu nod, cu NDVI-ul ei: împrejurimile se cos de ea. Se ia
-  // acum, cât stratul mai e viu — câteva mii de noduri, nu grila întreagă.
-  const margineAlpha = culoare ? null : buclaNoduri(relief, { x: 0, z: 0 }, ndvi.baza ?? null, dreptunghiGrila(relief));
+  if (petic) scena.add(petic.obiect);
   ndvi = null;
-
-  // Un singur accesor al altitudinii randate: peticul de 1 m unde există, baza de
-  // 2 m în rest. Îl folosesc sanctuarul — pentru talpa pereților —, panoul punctului
-  // și obiectul întors.
-  const inaltimeLa = (x, z) => (petic && subPetic?.(x, z) ? petic.inaltimeLa(x, z) : teren.inaltimeLa(x, z));
 
   // Santuário de Nossa Senhora do Cabo Espichel. Se adaugă peste teren; dacă
   // lipsește sau nu se poate construi, scena merge mai departe fără el.
@@ -502,11 +487,8 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // vin și `colturi_geo`, pe care peticul nici nu le are.
   const geo = creeazaGeo(relief.meta);
 
-  // Clădirea cea mai apropiată de-a lungul razei, din oricare set.
-  const lovesteCladire = sanctuar || cladiri ? (raza) => {
-    const a = sanctuar?.loveste(raza) ?? null, c = cladiri?.loveste(raza) ?? null;
-    return !a ? c : !c ? a : a.t <= c.t ? a : c;
-  } : undefined;
+  // Clădirea cea mai apropiată de-a lungul razei, din oricare set (sanctuar.js).
+  const lovesteCladire = lovesteCladiri(sanctuar, cladiri);
 
   // Pe același relief, cu clădirile, merg zoomul spre cursor, apucarea hărții și pivotul.
   if (geo?.limite) controale.seteazaTeren({ inaltimeLa: inaltimeRandata, lim: imprejurimi?.limite ?? geo.limite, alpha, loveste: lovesteCladire });
