@@ -8,9 +8,11 @@
 //
 // Rulează: npm run build-zona                    (pas de 2 m, rezoluția nativă → NUME)
 //          npm run build-zona -- 4 harta_vN       (mediere 2 × 2: altă hartă, alt nume)
+//          npm run build-zona -- --proba          (reface NUME în memorie și o compară cu git)
 import { writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { dinTM06, inPoligon, arie } from './comun/tm06.mjs';
 import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 
@@ -24,6 +26,25 @@ import { citesteTiffDGT, randTiff } from './comun/tiff.mjs';
 // cutia, nu poligonul ales în pagină: uscatul din afara lui (1,1 km²) se vedea ca
 // mare. Și zScara se ia pe toată cutia, ca niciun nod să nu mai fie tăiat.
 const NUME = 'harta_v4';
+
+// Dalele hărții, pe nume, nu „toate .tif din director”: în date-sursa/lidar stau și dalele altor
+// hărți (harta_v9 are 25), iar una nouă care atinge cutia ar fi schimbat tăcut NUME la o
+// reconstrucție. Sunt cele 11 dale MDT de 2 m care ating cutia — 104161 și 104163 se sar (colț
+// nealiniat, numai apă și NODATA), 104162 se reface din 50 cm — și dala de 50 cm a refacerii; în
+// sidecar: `sursa.dale`, `dale_sarite`, `corectii`. Un .tif de pe disc, nenumit aici, care atinge
+// cutia oprește scriptul.
+const DALE = ['104161', '104162', '104163', '105161', '105162', '105163', '105164', '106161', '106162', '106163', '106164']
+  .map((i) => `MDT-2m-${i}-06-2024_v01.tif`);
+const DALE_50 = ['MDT-50cm-104162-06-2024_v01.tif'];
+
+// `--proba`: harta se reface în memorie, fără să scrie nimic, și se compară cu cea din git, ca
+// blob: trebuie să iasă identică la octet. `--proba-fara <indice>` scoate o dală din DALE —
+// controlul probei, care trebuie să iasă diferit.
+const PROBA = process.argv.includes('--proba');
+const iFara = process.argv.indexOf('--proba-fara');
+const FARA = iFara > 0 ? process.argv[iFara + 1] : null;
+if (FARA !== null && (!PROBA || !DALE.some((f) => f.includes(`-${FARA}-`))))
+  throw new Error(`--proba-fara cere --proba și un indice din DALE (${FARA})`);
 
 const DIR = 'date-sursa/lidar';
 const DIR_50 = 'date-sursa/lidar-50cm';
@@ -61,8 +82,9 @@ if (!nume || (pas !== REZ_SURSA && nume === NUME))
 
 // Un nume se scrie o singură dată: o hartă pe care git o urmărește deja nu se
 // rescrie, oricât de mică ar fi schimbarea — pe ea stau peticul, NDVI-ul și pagina.
-// Cât încă nu e urmărită, se poate reface (`--suprascrie-lucru`), ca la sanctuar.
-{
+// Cât încă nu e urmărită, se poate reface (`--suprascrie-lucru`), ca la sanctuar. Proba nu
+// scrie nimic, deci n-are ce refuza.
+if (!PROBA) {
   const urmarit = spawnSync('git', ['ls-files', '--error-unmatch', `public/data/${nume}-dem.bin`], { stdio: 'ignore' }).status === 0;
   if (urmarit) throw new Error(`public/data/${nume}-dem.bin e deja în depozit; o hartă nouă primește un nume nou`);
   if (existsSync(`public/data/${nume}-dem.bin`) && !process.argv.includes('--suprascrie-lucru'))
@@ -115,14 +137,12 @@ const REGULA_BLOC = 'apă numai dacă toate cele 16 sub-celule de 50 cm sunt ap�
  */
 function refaDin50cm(d, g) {
   const indice = d.nume.match(/-(\d{6})-/)?.[1];
-  const nume50 = indice && existsSync(DIR_50)
-    // Numai MDT: în același director stau și MDS-urile sanctuarului, cu aceiași
-    // indici, iar „MDS" vine alfabetic înaintea lui „MDT" — ar fi găsit primul.
-    && readdirSync(DIR_50).find((f) => f.startsWith('MDT-50cm-') && f.includes(`-${indice}-`) && /\.tif$/i.test(f));
-  if (!nume50)
+  // Din DALE_50, nu din director: acolo stau și MDS-urile sanctuarului, cu aceiași indici.
+  const nume50 = indice && DALE_50.find((f) => f.includes(`-${indice}-`));
+  if (!nume50 || !existsSync(join(DIR_50, nume50)))
     throw new Error(`${d.nume}: colțul (x0 ${d.x0}, y0 ${d.y0}) nu cade pe muchiile de celulă ale hărții, `
       + 'deci pixelii ei stau la o jumătate de celulă de noduri, iar dala are uscat — nu se poate sări. '
-      + `Pune în ${DIR_50} dala MDT-50cm cu indicele ${indice} (cdd.dgterritorio.gov.pt): celulele ei se refac din ea.`);
+      + `Pune în DALE_50 și în ${DIR_50} dala MDT-50cm cu indicele ${indice} (cdd.dgterritorio.gov.pt): celulele ei se refac din ea.`);
   const m = { nume: nume50, ...citesteTiffDGT(join(DIR_50, nume50)) };
   if (m.rezolutie !== REZ_50) throw new Error(`${nume50}: rezoluție ${m.rezolutie} m, aștept ${REZ_50}`);
   const a = new Float32Array(m.latime * m.inaltime);
@@ -235,19 +255,23 @@ const main = () => {
   const ws = Math.round((X_MAX - X_MIN) / REZ_SURSA), hs = Math.round((Y_MAX - Y_MIN) / REZ_SURSA);
   const sursa = new Float32Array(ws * hs).fill(NaN);
 
-  const fisiere = readdirSync(DIR).filter((f) => f.toLowerCase().endsWith('.tif'));
-  if (!fisiere.length) throw new Error(`niciun .tif în ${DIR}`);
-  const dale = fisiere.map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
+  const lipsa = DALE.filter((f) => !existsSync(join(DIR, f)));
+  if (lipsa.length) throw new Error(`lipsesc din ${DIR}: ${lipsa.join(', ')} — vezi DALE`);
+  const atingeCutia = (d) => !(d.x0 + d.latime * REZ_SURSA <= X_MIN || d.x0 >= X_MAX || d.y0 <= Y_MIN || d.y0 - d.inaltime * REZ_SURSA >= Y_MAX);
+  const straine = readdirSync(DIR).filter((f) => /\.tif$/i.test(f) && !DALE.includes(f) && atingeCutia(citesteTiffDGT(join(DIR, f))));
+  if (straine.length)
+    throw new Error(`${straine.join(', ')}: în ${DIR}, nenumite în DALE, dar ating cutia — ar schimba harta tăcut. `
+      + 'Cu ele iese altă hartă: adaugă-le în DALE și dă-i un nume nou.');
+  const dale = DALE.filter((f) => FARA === null || !f.includes(`-${FARA}-`)).map((f) => ({ nume: f, ...citesteTiffDGT(join(DIR, f)) }));
   if (dale.some((d) => d.rezolutie !== REZ_SURSA)) throw new Error('dale cu altă rezoluție decât 2 m');
+  const departe = dale.filter((d) => !atingeCutia(d)).map((d) => d.nume);
+  if (departe.length) throw new Error(`${departe.join(', ')}: în DALE, dar nu ating cutia`);
 
   // Cine a scris fiecare celulă: 0 nimeni, 1 o dală aliniată, 2 o dală refăcută
   // din 50 cm. Două surse pe aceeași celulă ar însemna o amprentă greșit înțeleasă.
   const scris = new Uint8Array(ws * hs);
   const folosite = [], nealiniate = [], sarite = [], corectii = [];
   for (const d of dale) {
-    const dx1 = d.x0, dx2 = d.x0 + d.latime * REZ_SURSA;
-    const dy2 = d.y0, dy1 = d.y0 - d.inaltime * REZ_SURSA;
-    if (dx2 <= X_MIN || dx1 >= X_MAX || dy2 <= Y_MIN || dy1 >= Y_MAX) continue;
     // Colțul trebuie să cadă pe o muchie de celulă a hărții; altfel floor-ul de
     // mai jos mută tăcut fiecare pixel cu o jumătate de celulă — vezi refaDin50cm.
     if ((d.x0 - X_MIN) % REZ_SURSA !== 0 || (Y_MAX - d.y0) % REZ_SURSA !== 0) {
@@ -368,9 +392,8 @@ const main = () => {
   }
   if (limitate) throw new Error(`${limitate} noduri ies din Uint16 cu zScara ${scara}: zMax nu e maximul cutiei`);
 
-  mkdirSync(IESIRE, { recursive: true });
-  writeFileSync(join(IESIRE, `${nume}-dem.bin`), Buffer.from(u16.buffer));
-  writeFileSync(join(IESIRE, `${nume}-dem.json`), JSON.stringify({
+  const bin = Buffer.from(u16.buffer);
+  const json = JSON.stringify({
     nume,
     descriere: `Cutia de la Cabo Espichel, cu tot uscatul ei. LiDAR DGT 2024-2025, MDT 2 m, redus la ${pas} m`
       + (corectii.length ? `; dalele nealiniate refăcute din MDT 50 cm (vezi corectii)` : '')
@@ -418,9 +441,34 @@ const main = () => {
       portal: 'https://cdd.dgterritorio.gov.pt/',
       dale: folosite,
     },
-  }, null, 2));
+  }, null, 2);
+
+  if (PROBA) { compara(nume, bin, Buffer.from(json)); return; }
+  mkdirSync(IESIRE, { recursive: true });
+  writeFileSync(join(IESIRE, `${nume}-dem.bin`), bin);
+  writeFileSync(join(IESIRE, `${nume}-dem.json`), json);
 
   console.log(`scris: public/data/${nume}-dem.bin (${(u16.byteLength / 1048576).toFixed(2)} MiB) + .json`);
 };
+
+/**
+ * Proba: fișierele refăcute față de cele din HEAD, ca blob git — sha1 pe „blob <lungime>\0” și
+ * octeți, ce ar urca `git add`. Comparația e pe blob, nu pe disc: cu core.autocrlf, JSON-ul din
+ * copia de lucru poate avea CRLF, iar indexul are LF, cât scrie JSON.stringify. Cod 1 dacă diferă.
+ */
+function compara(nume, ...octeti) {
+  const blob = (b) => createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex');
+  let diferite = 0;
+  [`${nume}-dem.bin`, `${nume}-dem.json`].forEach((f, i) => {
+    const cale = `${IESIRE}/${f}`;
+    const r = spawnSync('git', ['rev-parse', `HEAD:${cale}`], { encoding: 'utf8' });
+    const git = r.status === 0 ? r.stdout.trim() : null;
+    const al = blob(octeti[i]);
+    if (al !== git) diferite++;
+    console.log(`${cale}: ${git === null ? 'nu e în git' : al === git ? `identic la octet cu HEAD (${al.slice(0, 12)})` : `DIFERĂ de HEAD (${al.slice(0, 12)} față de ${git.slice(0, 12)})`}`);
+  });
+  console.log(diferite ? `proba: ${diferite} din 2 fișiere diferă de HEAD${FARA ? ` (fără dala ${FARA})` : ''}` : `proba: ${nume} iese identică la octet cu HEAD`);
+  process.exitCode = diferite ? 1 : 0;
+}
 
 main();

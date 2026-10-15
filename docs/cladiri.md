@@ -112,14 +112,16 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
   | Relief (18° / 244°) | 0,604 | 0,211 | 0,124 | 0,102 |
   | al zborului (39,5° / 94°) | 0,497 | 0,216 | 0,118 | 0,097 |
 
-- **`urmaresteGrupul()`** din `scena.js` alege cutia la fiecare cadru desenat:
+- **`urmaresteGrupul()`**, din `umbre.js` (până la 0.1.7.05 stătea în `scena.js`, unde n-o
+  putea încerca nicio probă), alege cutia la fiecare cadru desenat:
   - cutia unită, dacă texelul ei stă sub TEXEL_MAXIM (0,3 m) sau nu trece de
     pixelul ecranului la țintă. Pixelul e al canvasului (`canvas.height`), nu CSS și nu
     neapărat de dispozitiv: raportul e plafonat la 2, iar canvasul la 2560 × 1440;
   - la pornire ținta e la 611 m, iar primul cadru are de acum soarele zborului (harta apare
-    direct pe Satelit): cutia unită rămâne pe un canvas înalt de cel mult ~1 121 px
+    direct pe Satelit): cutia unită rămâne pe un canvas înalt de cel mult ~1 120 px
     (1120 → „toate”, 1122 → „sanctuar”); cu preferința Relief, cu soarele Relief, ~922 px
-    (920 / 925). Se alege la primul cadru: la creare canvasul are încă 300 × 150. Măsurat în
+    (920 / 925). Socotit în probă, de la vederea de pornire: Relief pleacă la 923 px și revine la
+    754, Satelit pleacă la 1 121 și revine la 916. Se alege la primul cadru: la creare canvasul are încă 300 × 150. Măsurat în
     pagină, la primul cadru, pe Satelit: 1440 × 900 la DPR 1 dă „toate”, 0,497 m pe texel; la
     DPR 2 (canvas 2428 × 1517) „sanctuar”, 0,216 m; telefonul în portret, 390 × 844 la 3×
     (780 × 1688), „sanctuar”; în PEISAJ, 844 × 390 la 3× (1688 × 780), „toate”, 0,497 m —
@@ -157,5 +159,34 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
     1 m, pică;
   - amprentele stau pe clădire în 97,3% din aria lor; mutate 2 m, cel mult 85,2%.
     **Proba amprentelor nu e independentă:** înregistrarea a maximizat chiar mărimea
-    asta, deci prinde numai o greșeală de transport până în pagină.
+    asta, deci prinde numai o greșeală de transport până în pagină;
+- **umbrele pe grupuri** (din 0.1.7.05). Totul vine din codul paginii:
+  - `creeazaUmbre`, `urmaresteGrupul` și grupurile (`grupuriUmbre`), toate din `umbre.js`;
+  - soarele, din `creeazaLumini`, iar al zborului din `soareZborDin` (satelit.js), cu sidecarul
+    `harta_v4-orto_v1`;
+  - camera, din `creeazaCamera`;
+  - sanctuarul și clădirile, construite ca în pagină.
+
+  Ce verifică proba:
+  - texelul celor patru cutii, cu soarele Relief și cu al zborului:
+    - e cât tabelul de mai sus, citit chiar din fișierul acesta;
+    - e cât îl socotește proba singură: colțurile cutiei lărgite cu 60 m, proiectate pe axele
+      camerei de umbră;
+    - controlul, cu „0,211” scris „0,221” în tabel, pică;
+  - canvasul urcat de la 600 la 1 400 px și coborât înapoi: cutia unită pleacă spre sanctuar
+    și revine exact la pragurile socotite din texel și din pixelul de la 611 m (923 / 754 pe
+    Relief, 1 121 / 916 pe Satelit), iar cele de plecare stau între cele măsurate în pagină;
+  - ținta mutată pe segmentul sanctuar–far, cu farul mai aproape cu −30, 19, 21, −19, −30 m:
+    grupul se schimbă la 21 m, nu la 19;
+  - fără sanctuar (pagina merge mai departe fără el), farul și Casa da Ronca au cutia unită la
+    0,280 m pe texel cu soarele Relief și la 0,225 m cu al zborului, sub `TEXEL_MAXIM`. Pe un
+    canvas de 4 000 px, cu ținta pe far, harta rămâne pe ea. E singura cale pe care lucrează
+    ramura `TEXEL_MAXIM`;
+  - șase controale, pe `umbre.js` schimbat:
+    - fără histerezis pe pixel, pragurile se lipesc: 839 / 838;
+    - fără recitirea texelului când se mută soarele, Satelit rămâne la 923 / 754;
+    - fără marginea umbrei, texelul unit iese 0,526 m în loc de 0,604;
+    - cu histerezisul între grupuri de 15 m, schimbarea vine la 19 m;
+    - cu histerezisul de 25 m, schimbarea nu mai vine;
+    - fără ramura `TEXEL_MAXIM`, harta fără sanctuar trece pe far.
 

@@ -30,11 +30,12 @@ butonul stau în ecran, fără defilare orizontală.
 pornit conținutul lui `<noscript>` e text. Fără scenă, după anunț vine capitolul sanctuarului
 (`src/chapters/sanctuar.js`): textul fișei, cu sursele ca legături, fără nota despre model și
 fără id-uri — calea fără scenă poate veni și după o excepție cu eticheta încă vie.
-- `verifica-pagina`: fără WebGL2, cu garda expirată și după o excepție, `#continut` are 2 994 de
-  caractere, 20 de legături, un singur `h1`, în afara lui, și 0 id-uri duble. Controale: main.js
-  de la 6ad3a47, 26 de caractere; `h1` pus în `#continut`, 13; `<noscript>` acolo, 72; capitolul
-  cu id-urile fișei, `sanctuar-fisa` ×2. Fișa etichetei, eticheta.js de la 6ad3a47 față de azi:
-  outerHTML identic, 7 281 de caractere (controale: fără `rel`, fără `tabIndex`, diferă);
+- `verifica-pagina`: fără WebGL2 și după o excepție, `#continut` are 2 994 de caractere; cu garda
+  expirată, cu butonul „Reîncearcă”, 3 034. Pe toate trei, 20 de legături, un singur `h1`, în afara
+  lui, și 0 id-uri duble. Controale: main.js de la 6ad3a47, 26 de caractere; `h1` pus în
+  `#continut`, 13; `<noscript>` acolo, 72; capitolul cu id-urile fișei, `sanctuar-fisa` ×2. Fișa
+  etichetei, eticheta.js de la 6ad3a47 față de azi: outerHTML identic, 7 281 de caractere
+  (controale: fără `rel`, fără `tabIndex`, diferă);
 - `verifica-livrare`: index.html și dist/ au un `h1` și un `<noscript>`, cu `#continut` gol;
 - în pagină (2026-10-09), build-ul fără WebGL pe serverul de probă, cu CSP impus: 3 006 caractere
   vizibile; textul 17,76 px, `--ink` pe `--bg` 14,6:1; sursele 16 px, 7,1:1; legăturile 7,2:1,

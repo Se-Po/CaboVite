@@ -242,7 +242,26 @@ ca decodorul să refuze fluxul cu regula GIF. Pe date reale:
 - cusătura 105163 (brută) | 105162 (LZW) arată 0,109 m între rândurile vecine,
   cât între două rânduri din aceeași dală, 0,111 m.
 
-**`build-zona` caută în `lidar-50cm/` numai `MDT-50cm-*`.** În același director
-stau și MDS-urile sanctuarului, cu aceiași indici; „MDS" vine alfabetic înaintea
-lui „MDT", deci înainte ar fi fost găsit primul.
+**`build-zona` își numește dalele, din 2026-10-14.** Citea toate `.tif` din
+`date-sursa/lidar` care îi atingeau cutia, iar directorul a ajuns la 25 de dale — ale lui
+`harta_v9` și ale împrejurimilor. Azi niciuna dintre cele noi nu atinge cutia, deci harta n-ar
+fi ieșit altfel; o dală nouă pe marginea ei ar fi schimbat-o tăcut, la o reconstrucție.
+- `DALE`: cele 11 dale MDT de 2 m care ating cutia — 104161 și 104163 se sar (colț
+  nealiniat, numai apă și NODATA), 104162 se reface din 50 cm. `DALE_50`: dala de 50 cm a
+  refacerii. Listele sunt chiar ce scrie sidecarul lui `harta_v4` (`sursa.dale`,
+  `dale_sarite`, `corectii`).
+- O dală numită care lipsește de pe disc, una numită care nu atinge cutia și un `.tif` de pe
+  disc, nenumit, care o atinge opresc scriptul.
+- Dala de 50 cm se ia din `DALE_50`, după indice. Înainte se căuta în `lidar-50cm/`, numai
+  printre `MDT-50cm-*`: în același director stau și MDS-urile sanctuarului, cu aceiași indici,
+  iar „MDS" vine alfabetic înaintea lui „MDT".
+- `npm run build-zona -- --proba` reface `harta_v4` în memorie, fără să scrie nimic, și o
+  compară cu HEAD, ca blob git (sha1 pe `blob <lungime>\0` și octeți): `.bin` și `.json` ies
+  identice la octet. Proba stă în `npm run verifica-tiff`, cu trei controale:
+  - `--proba-fara 106163` scoate o dală, iar harta (`.bin`) iese altfel, cu cod 1;
+  - 106164 scrisă greșit în `DALE` oprește scriptul, iar proba pică, nu se sare;
+  - 106164 scoasă din `DALE`, dar lăsată pe disc, oprește scriptul.
+
+  Dacă proba se sare o hotărăsc datele, nu ieșirea scriptului. Contează cele 12 dale pe care le
+  numește sidecarul lui `harta_v4` din git: proba se sare numai dacă lipsește vreuna de pe disc.
 

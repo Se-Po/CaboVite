@@ -96,6 +96,14 @@ Gestul îl scrie `src/scene/gest.js` pe `<html>` (`data-gest`), din `controale.s
 cursorul. Valorile stărilor sunt `_STATE`, privat în OrbitControls, scrise în `STARE`;
 proba le citește înapoi. `connect()` trece prin `disconnect()`, care scrie pe canvas
 `style.cursor = 'auto'` inline: `ControaleHarta` îl scoate la creare și la `dispose()`.
+Proba lui gest.js, în `verifica-controale` (din 0.1.7.05), merge cu controalele paginii și un
+DOM fals:
+- butonul drept scrie `rotire` și aprinde pivotul, cel stâng `mutare`, iar `end` le șterge;
+- un `start` cu starea NIMIC — rotița în timpul unei rotiri — lasă cursorul neatins;
+- `dispose()` lasă 0 ascultători pe controale.
+
+Două controale pică: fără garda NIMIC, cursorul se șterge; fără `removeEventListener`, rămân 2
+ascultători.
 
 **Gestul se încheie și fără `pointerup`.** OrbitControls îl încheie numai la `pointerup`
 sau `pointercancel`, iar `pointermove` îl ascultă pe document, fără să citească `buttons`.

@@ -24,8 +24,8 @@ import * as THREE from 'three';
 // atunci `potriveste()` reîncadrează cutia și redesenează harta o dată.
 //
 // Clădirile stau în trei grupuri — sanctuarul, farul, Casa da Ronca —, la sute de
-// metri unul de altul. O cutie peste toate ar lărgi texelul peste pragul ales în
-// scena.js; atunci harta se strânge pe grupul privit (`incadreazaPe`), tot cu o
+// metri unul de altul. O cutie peste toate ar lărgi texelul peste pragul ales mai
+// jos (`TEXEL_MAXIM`); atunci harta se strânge pe grupul privit (`incadreazaPe`), tot cu o
 // singură redesenare, iar celelalte grupuri rămân fără umbră cât nu sunt privite.
 
 /**
@@ -122,5 +122,98 @@ export function creeazaUmbre({ renderer, soare, cutie, arunca, primesc, lungimeU
       soare.shadow.dispose();          // harta de umbre e un WebGLRenderTarget
       renderer.shadowMap.enabled = false;
     },
+  };
+}
+
+/** Texelul cel mai mare, în metri, cu care harta de umbre rămâne pe cutia tuturor grupurilor. */
+export const TEXEL_MAXIM = 0.3;
+
+/**
+ * Grupurile umbrelor — sanctuarul, apoi grupurile clădirilor (farul, Casa da Ronca) —, fără cele
+ * goale, și cutia unită peste ele. Aici, nu în scena.js, ca proba (verifica-cladiri) să încerce
+ * aceleași grupuri ca pagina.
+ *
+ * @param {{sanctuar?: {cutieCladiri: THREE.Box3}|null, cladiri?: {cutiiGrupuri: Map<string, THREE.Box3>}|null}} o
+ */
+export function grupuriUmbre({ sanctuar = null, cladiri = null } = {}) {
+  const grupuri = [
+    ...(sanctuar ? [{ nume: 'sanctuar', cutie: sanctuar.cutieCladiri }] : []),
+    ...(cladiri ? [...cladiri.cutiiGrupuri].map(([nume, cutie]) => ({ nume, cutie })) : []),
+  ].filter((g) => !g.cutie.isEmpty());
+  return { grupuri, unita: grupuri.reduce((a, g) => a.union(g.cutie), new THREE.Box3()) };
+}
+
+/**
+ * Pe ce cutie se strânge harta de umbre, la fiecare cadru desenat. Stă aici, nu în scena.js,
+ * ca probele (verifica-cladiri) s-o încerce pe ea, cu umbrele și luminile paginii.
+ *
+ * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
+ * Altfel, de departe tot ea: cât texelul ei nu trece de mărimea unui pixel de ecran
+ * la țintă, o hartă mai strânsă n-ar desena nimic în plus. Pixelul e al CANVASULUI
+ * (`canvas.height`), nu CSS și nu neapărat de dispozitiv: raportul e plafonat la 2.
+ * De aproape, grupul cel mai apropiat de țintă.
+ *
+ * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Alegerea se face
+ * abia la primul cadru: la creare canvasul n-are încă mărimea lui — o capătă în buclă —,
+ * deci aici iese mereu cutia unită. Primul cadru are soarele zborului — harta apare direct
+ * pe Satelit —, cu 0,497 m pe texel, deci cutia unită rămâne pe un canvas înalt de cel
+ * mult ~1 120 px de canvas (măsurat în pagină: 1120 → cutia unită, 1122 → sanctuarul).
+ * Cu preferința Relief primul cadru are soarele Relief, 0,604 m, iar pragul e ~922 px.
+ * Pe telefoanele în portret și pe ecranele dense harta pornește strânsă pe sanctuar
+ * (~430 m de țintă; farul e la ~800 m), cu 0,216 m pe texel — farul își primește umbra
+ * când te apropii de el. Un telefon în peisaj rămâne pe cutia unită: cu raportul de
+ * pixeli plafonat la 2 (renderer.js), canvasul de 844 × 390 la 3× are 780 px înălțime,
+ * nu 1170. Măsurat în pagină, la primul cadru: 1440 × 900 la DPR 1 → cutia unită, la
+ * DPR 2 (2428 × 1517) → sanctuarul; 390 × 844 la 3× (780 × 1688) → sanctuarul;
+ * 844 × 390 la 3× (1688 × 780) → cutia unită.
+ *
+ * Două praguri cu histerezis — ±10% pe pixel,
+ * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu
+ * redeseneze harta la fiecare cadru; o schimbare costă o singură redesenare.
+ *
+ * Texelul cutiei unite depinde de soare (0,60 m cu soarele Relief, 0,50 m cu al
+ * zborului), deci se recitește când `umbre.versiuneSoare` s-a schimbat.
+ *
+ * @param {{incadreazaPe: (c: THREE.Box3) => void, texelPentru: (c: THREE.Box3) => number,
+ *          texelMetri: number, versiuneSoare: number}} o.umbre
+ * @param {{nume: string, cutie: THREE.Box3}[]} o.grupuri
+ */
+export function urmaresteGrupul({ umbre, grupuri, unita, texelMaxim, camera, controale, canvas }) {
+  const HISTEREZIS = 20;
+  const p = new THREE.Vector3();
+  const tinta = controale.target;
+  const distanta = (g) => g.cutie.distanceToPoint(p.set(tinta.x, (g.cutie.min.y + g.cutie.max.y) / 2, tinta.z));
+  const toate = { nume: 'toate', cutie: unita };
+  const texel = new Map();
+  let curent = toate, texelUnit = 0, versiune = -1;
+  const pas = () => {
+    if (versiune !== umbre.versiuneSoare) {
+      versiune = umbre.versiuneSoare;
+      texelUnit = umbre.texelPentru(unita);
+      texel.clear();
+      texel.set('toate', texelUnit);
+      if (curent !== toate) texel.set(curent.nume, umbre.texelMetri);
+    }
+    let ales = toate;
+    if (texelUnit > texelMaxim) {
+      // mărimea unui pixel de ecran la distanța țintei, în metri
+      const pixel = (camera.position.distanceTo(tinta) * 2 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, canvas.height);
+      if (texelUnit > pixel * (curent === toate ? 1.1 : 0.9)) {
+        let cel = grupuri[0], dCel = distanta(cel);
+        for (let k = 1; k < grupuri.length; k++) { const d = distanta(grupuri[k]); if (d < dCel) { cel = grupuri[k]; dCel = d; } }
+        ales = curent !== toate && cel !== curent && distanta(curent) - dCel < HISTEREZIS ? curent : cel;
+      }
+    }
+    if (ales === curent) return;
+    curent = ales;
+    umbre.incadreazaPe(curent.cutie);
+    texel.set(curent.nume, umbre.texelMetri);
+  };
+  pas();
+  return {
+    pas,
+    get grup() { return curent.nume; },
+    /** Texelul fiecărei cutii deja încadrate cu soarele de acum, în metri. */
+    get texel() { return Object.fromEntries(texel); },
   };
 }

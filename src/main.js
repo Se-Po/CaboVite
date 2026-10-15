@@ -104,6 +104,15 @@ const LICENTE = {
 
 const el = (tag, text) => { const e = document.createElement(tag); if (text) e.textContent = text; return e; };
 
+// Adresele din surse vin din fișierele de date: devin legături numai dacă sunt http(s). Un
+// `javascript:` sau un `data:` ar rula la clic; o adresă fără schemă nu se poate deschide. Ce
+// nu trece rămâne text — atribuirea nu se pierde, numai legătura. `null` pentru orice altceva.
+const hrefSigur = (p) => {
+  let url;
+  try { url = new URL(p); } catch { return null; }
+  return /^https?:$/.test(url.protocol) ? url.href : null;
+};
+
 // Numele scurt al unui producător, pentru rândul vizibil: acronimul dintre
 // paranteze („Direção-Geral do Território (DGT)" → „DGT"), „OpenStreetMap" pentru
 // contribuitorii lui, altfel numele întreg.
@@ -172,7 +181,8 @@ function scrieSurse(surse) {
 
   // Rândul vizibil. ODbL: „© OpenStreetMap" duce la pagina lor de copyright, dacă o
   // sursă are portalul acolo. Ceilalți producători sunt butonul care deschide modala.
-  const portalOsm = (p) => surse.find((s) => s.producator === p && /openstreetmap\.org\/copyright/.test(s.portal ?? ''))?.portal;
+  const portalOsm = (p) => surse.map((s) => (s.producator === p ? hrefSigur(s.portal) : null))
+    .find((h) => h && /^https?:\/\/(www\.)?openstreetmap\.org\/copyright/.test(h));
   const producatori = unice('producator');
   // Două surse Copernicus — relieful și Sentinel-2 — au producători diferiți, dar
   // același nume scurt: în rând apare o dată.
@@ -218,7 +228,7 @@ function scrieSurse(surse) {
   const nota = el('p', `Prelucrate pentru această pagină: ${prelucrari.join('; ')}. Licența: `);
   unice('licenta').forEach((l, i) => {
     if (i) nota.append(', ');
-    const href = LICENTE[l] ?? surse.find((s) => s.licenta === l && s.licenta_url)?.licenta_url;
+    const href = LICENTE[l] ?? surse.map((s) => (s.licenta === l ? hrefSigur(s.licenta_url) : null)).find(Boolean);
     if (!href) { nota.append(l); return; }
     const a = el('a', l);
     a.href = href;
@@ -226,12 +236,12 @@ function scrieSurse(surse) {
   });
   nota.append('.');
   for (const p of unice('portal')) {
-    // Un portal scris fără schemă nu e un motiv să pierzi atribuirea: rămâne textul.
-    let url;
-    try { url = new URL(p); } catch { continue; }
-    if (!/^https?:$/.test(url.protocol)) continue;
-    const a = el('a', url.host);
-    a.href = url.href;
+    // Un portal fără schemă, sau cu alta decât http(s), nu e un motiv să pierzi atribuirea:
+    // rămâne textul ei, din listă.
+    const href = hrefSigur(p);
+    if (!href) continue;
+    const a = el('a', new URL(href).host);
+    a.href = href;
     nota.append(' Datele: ', a, '.');
   }
   // Un focus din conținutul care se rescrie ar cădea pe <body>, sub modală.

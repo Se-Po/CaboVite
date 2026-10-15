@@ -2795,6 +2795,56 @@ console.log('\nPagina fără scenă: titlul, capitolul sanctuarului cu sursele, 
       ["el('h2', {}, continut.nume)", "el('h2', { id: 'sanctuar-fisa-titlu' }, continut.nume)"]);
     if (cuId === null) proba(false, `control, capitolul cu id-urile fișei: ${NEAPLICATA} — pică`);
     else await control('capitolul cu id-urile fișei', MAIN_JS, INDEX, 'după pornire', cuId);
+
+    // 3. Legăturile din atribuire (`hrefSigur`), pe calea cu scenă: adresele vin din fișierele de
+    // date, deci numai cele http(s) devin legături. Sursele ostile — `javascript:` care conține
+    // „openstreetmap.org/copyright”, `data:`, o adresă fără schemă, un `licenta_url` cu
+    // `javascript:` — rămân text; cele bune, cu portalul OSM adevărat, se leagă, inclusiv „©
+    // OpenStreetMap” din rând. Control: main.js de la 5ec413f, care lega portalul OSM după o
+    // simplă căutare în text și `licenta_url` fără să-i citească schema.
+    const cuScena = async (mainJs, surse) => {
+      if (mainJs === null || !mainJs.includes(IMPORT)) return null;
+      const doc = document_(INDEX);
+      globalThis.document = doc;
+      globalThis.__pornesteProba = async () => ({ surse, nrTriunghiuri: 0, petic: null, teren: {}, triunghiuri: null, renderer: null,
+        arata() {}, memorie: () => '', dispose() {} });
+      const info0 = console.info;
+      console.info = () => {};
+      try {
+        await modul(mainJs.replace(IMPORT, 'const porneste = (...a) => globalThis.__pornesteProba(...a);'));
+      } finally {
+        console.info = info0;
+        delete globalThis.__pornesteProba;
+        delete globalThis.__modulPornit;
+        delete globalThis.__scena;
+      }
+      const subsol = doc.getElementById('surse');
+      const a = subsol.querySelectorAll('a');
+      return { href: a.map((x) => x.href), text: subsol.textContent, rand: subsol.querySelectorAll('span').flatMap((s) => s.querySelectorAll('a')).map((x) => x.href), ascuns: subsol.hidden };
+    };
+    const DGT = { producator: 'Direção-Geral do Território (DGT)', atributie: 'Ortofoto DGT', licenta: 'CC BY 4.0', portal: 'https://cdd.dgterritorio.gov.pt/', prelucrare: 'culorile' };
+    const OSM = (portal) => ({ producator: 'contribuitorii OpenStreetMap', atributie: '© contribuitorii OpenStreetMap', licenta: 'ODbL 1.0', portal, prelucrare: 'contururile' });
+    const OSTILE = [DGT, OSM('javascript:alert(1)//openstreetmap.org/copyright'),
+      { producator: 'X', atributie: 'Sursa X', licenta: 'Licența X', licenta_url: 'javascript:alert(2)', portal: 'data:text/html,<b>x</b>' },
+      { producator: 'Y', atributie: 'Sursa Y', licenta: 'Licența Y', licenta_url: 'https://exemplu.org/licenta', portal: 'exemplu.org/fara-schema' }];
+    const BUNE = [DGT, OSM('https://www.openstreetmap.org/copyright')];
+    const sigure = (r) => r !== null && r.href.length > 0 && r.href.every((h) => /^https?:\/\//.test(h));
+    const ro = await cuScena(MAIN_JS, OSTILE), rb = await cuScena(MAIN_JS, BUNE);
+    proba(sigure(ro) && ro.href.length === 4 && ro.rand.length === 0 && /Licența X/.test(ro.text) && /Sursa X/.test(ro.text) && !ro.ascuns,
+      `surse cu adrese ostile: ${ro === null ? 'NECITIT' : `${ro.href.length} legături, toate http(s) (${ro.href.join(', ')}); „Licența X” și „Sursa X” rămân text; în rând ${ro.rand.length} legături OSM`}`);
+    proba(sigure(rb) && rb.rand.length === 1 && rb.rand[0] === 'https://www.openstreetmap.org/copyright' && rb.href.includes('https://www.openstreetmap.org/copyright'),
+      `surse bune: „© OpenStreetMap” din rând duce la ${rb?.rand[0] ?? '—'}; ${rb?.href.length ?? 0} legături în subsol`);
+    const vechi5 = textLa('5ec413f', 'src/main.js');
+    const rv = await cuScena(vechi5, OSTILE);
+    proba(rv !== null && !sigure(rv), `control, main.js de la 5ec413f: ${rv === null ? 'NECITIT' : `legături ${rv.href.filter((h) => !/^https?:\/\//.test(h)).join(', ')}`} — pică`);
+    // Portalul OSM e o adresă https pe altă gazdă, care numai conține „openstreetmap.org/copyright”:
+    // „© OpenStreetMap” din rând nu duce acolo. Control: ancora gazdei scoasă din main.js.
+    const STRAIN = [DGT, OSM('https://exemplu.org/openstreetmap.org/copyright')];
+    const rs = await cuScena(MAIN_JS, STRAIN);
+    proba(rs !== null && rs.rand.length === 0, `portalul OSM pe altă gazdă (https://exemplu.org/openstreetmap.org/copyright): ${rs?.rand.length ?? '—'} legături în rând`);
+    const faraAncora = muta(MAIN_JS, ['/^https?:\\/\\/(www\\.)?openstreetmap\\.org\\/copyright/', '/openstreetmap\\.org\\/copyright/']);
+    const rf = faraAncora === null ? null : await cuScena(faraAncora, STRAIN);
+    proba(rf !== null && rf.rand.length > 0, `control, main.js fără ancora gazdei: ${rf === null ? NEAPLICATA : `în rând ${rf.rand.join(', ')}`} — pică`);
   } finally {
     for (const f of temporare) rmSync(f, { force: true });
     if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
@@ -2836,6 +2886,8 @@ console.log('\nRețeta lui alpha, o singură dată (alpha.js), și ordinea cerer
     T('creeazaTeren', '(reliefPetic'), T('straturiNdvi', '('), T('mascaBazei', '('), T('buclaNoduri', '(relief,'),
     T('incarcat.baza ?? ', 'incarcat'), T('incarcat.baza, reliefPetic = ', 'incarcat'),
     T('new Controale', 'Harta('), T('PerspectiveCamera', '(45'),
+    // grupurile umbrelor (`grupuriUmbre`) și soarele zborului (`soareZborDin`)
+    T('.union(', 'g.cutie)'), T('azimut_grila', ' * R)'),
   ];
   const copii = (src) => COPII.filter((t) => fara(src).includes(t));
   const PROBE = readdirSync('scripts').filter((f) => /^verifica.*\.mjs$/.test(f));
@@ -2843,9 +2895,13 @@ console.log('\nRețeta lui alpha, o singură dată (alpha.js), și ordinea cerer
   proba(PROBE.length >= 10 && gasite.length === 0, `${PROBE.length} scripturi de probă, niciunul cu rețeta lui alpha sau camera paginii refăcute de mână${gasite.length ? `: ${gasite.join('; ')}` : ''}`);
   const vCladiri = textLa('5ec413f', 'scripts/verifica-cladiri.mjs');
   proba(vCladiri !== null && copii(vCladiri).length > 0, `control, verifica-cladiri.mjs de la 5ec413f: ${vCladiri === null ? 'NECITIT' : copii(vCladiri).join(', ')} — pică`);
-  const cuPetic = muta(textSursa('scripts/verifica-cladiri.mjs'), ['const { inaltimeLa } = construiesteAlpha(pregatit, { paleta });\n',
-    `const { inaltimeLa } = construiesteAlpha(pregatit, { paleta });\nconst p2 = ${T('creeazaTeren', '(reliefPetic')}, { paleta });\n`]);
+  const cuPetic = muta(textSursa('scripts/verifica-cladiri.mjs'), ['= construiesteAlpha(pregatit, { paleta });\n',
+    `= construiesteAlpha(pregatit, { paleta });\nconst p2 = ${T('creeazaTeren', '(reliefPetic')}, { paleta });\n`]);
   proba(cuPetic !== null && copii(cuPetic).length > 0, `control, verifica-cladiri.mjs de azi cu un petic construit de mână: ${cuPetic === null ? NEAPLICATA : copii(cuPetic).join(', ')} — pică`);
+  const cuUmbre = muta(textSursa('scripts/verifica-cladiri.mjs'),
+    ['umbreAzi.grupuriUmbre({ sanctuar, cladiri });\n', `umbreAzi.grupuriUmbre({ sanctuar, cladiri });\nconst u2 = grupuriUmbra.reduce((a, g) => a${T('.union(', 'g.cutie)')}, new THREE.Box3());\n`],
+    ['const soareZbor = soareZborDin(S, soare.position.length());\n', `const soareZbor = new THREE.Vector3(Math.sin(S.${T('azimut_grila', ' * R)')}, 0, 0);\n`]);
+  proba(cuUmbre !== null && copii(cuUmbre).length === 2, `control, verifica-cladiri.mjs de azi cu grupurile umbrelor și soarele zborului refăcute de mână: ${cuUmbre === null ? NEAPLICATA : copii(cuUmbre).join(', ')} — pică`);
 
   // Ordinea cererilor, în corpul lui `construieste`.
   const cereri = (src) => {
@@ -3498,6 +3554,73 @@ console.log('\nAnunțurile după apariția hărții (scena.js, busola.js)');
   globalThis.setTimeout = ST;
   globalThis.clearTimeout = CT;
   if (D0 === undefined) delete globalThis.document; else globalThis.document = D0;
+}
+
+// ------------------------------------------------------------ matricea UV a texturilor Satelit
+
+// `matriceUV` (satelit.js) duce (x, z) de scenă în coordonatele texturii, cu centrul BAZEI, pentru
+// orice textură: baza, peticul, împrejurimile. Pe fiecare sidecar `*-orto_v1.json`, centrul
+// texelilor din colțuri și din mijloc, citit după `conventie` (muchii de pixel, rândul 0 la nord):
+// texelul (q, r) are centrul în X = xMin + (q + ½)·pas, Y = yMax − (r + ½)·pas, deci u = (q + ½) / L,
+// v = (r + ½) / H, cu L și H din `latime` și `inaltime`, nu din cutie. Scena: x = X − cx, z = cy − Y.
+// Control: matricea cu v întors (nordul jos), care pică.
+console.log('\nMatricea UV a texturilor Satelit (satelit.js)');
+{
+  const { matriceUV } = await import('../src/scene/satelit.js');
+  const baza = JSON.parse(readFileSync('public/data/harta_v4-dem.json', 'utf8')).bbox_tm06;
+  const centru = { x: (baza.xMin + baza.xMax) / 2, y: (baza.yMin + baza.yMax) / 2 };
+  const sidecare = readdirSync('public/data').filter((f) => /^harta_v\d+-orto_v\d+\.json$/.test(f)).sort();
+  const abatere = (f) => {
+    let max = 0;
+    for (const nume of sidecare) {
+      const m = JSON.parse(readFileSync(`public/data/${nume}`, 'utf8'));
+      if (!/muchii de pixel/.test(m.conventie) || !/rândul 0 e nordul/.test(m.conventie)) return Infinity;
+      const M = f(m, centru), L = m.latime, H = m.inaltime, b = m.bbox_tm06;
+      for (const [q, r] of [[0, 0], [L - 1, 0], [0, H - 1], [L - 1, H - 1], [L >> 1, H >> 1]]) {
+        const X = b.xMin + (q + 0.5) * m.pas_m, Y = b.yMax - (r + 0.5) * m.pas_m;
+        const uv = new THREE.Vector3(X - centru.x, centru.y - Y, 1).applyMatrix3(M);
+        // în texeli, nu în unități de textură: o abatere de o zecime de texel se vede
+        max = Math.max(max, Math.abs(uv.x * L - (q + 0.5)), Math.abs(uv.y * H - (r + 0.5)));
+      }
+    }
+    return max;
+  };
+  const a = abatere(matriceUV);
+  proba(sidecare.length >= 6 && a < 1e-6, `${sidecare.length} sidecare (${sidecare.map((f) => f.replace(/-orto.*/, '')).join(', ')}): centrul texelilor din colțuri și din mijloc cade pe texelul lui, abatere ${a.toExponential(1)} texeli`);
+  const sursa = textSursa('src/scene/satelit.js');
+  const intors = muta(sursa, ['0, 1 / H, -z0 / H, 0, 0, 1);', '0, -1 / H, 1 + z0 / H, 0, 0, 1);']);
+  const M2 = intors === null ? null : (await modulDin(intors)).matriceUV;
+  const a2 = M2 ? abatere(M2) : null;
+  proba(a2 !== null && !(a2 < 1e-6), `control, v întors (nordul jos): ${a2 === null ? NEAPLICATA : `abatere ${a2.toFixed(1)} texeli`} — pică`);
+}
+
+// ------------------------------------------------------------ sursele unite
+
+// `unesteSurse` (scena.js) strânge sursele terenului, ale sanctuarului, ale clădirilor și ale
+// împrejurimilor după `atributie`: aceeași atribuire, folosită de doi, devine o singură intrare,
+// cu prelucrările amândurora, o singură dată fiecare; listele primite rămân neatinse. Control:
+// un Map simplu (a doua intrare o înlocuiește pe prima), care pică.
+console.log('\nSursele unite (unesteSurse)');
+{
+  const scenariu = (unesteSurse) => {
+    const a = [{ atributie: 'DGT', prelucrare: 'relieful' }, { atributie: 'Copernicus', prelucrare: 'împrejurimile' }];
+    const b = [{ atributie: 'DGT', prelucrare: 'acoperișurile' }, { atributie: 'OSM', prelucrare: 'contururile' }];
+    const c = [{ atributie: 'DGT', prelucrare: 'relieful' }, { atributie: 'OSM' }];
+    const copie = JSON.stringify([a, b, c]);
+    const r = unesteSurse(unesteSurse(a, b), c);
+    return { r, neatinse: JSON.stringify([a, b, c]) === copie };
+  };
+  const bun = (z) => z.neatinse && JSON.stringify(z.r) === JSON.stringify([
+    { atributie: 'DGT', prelucrare: 'relieful; acoperișurile' },
+    { atributie: 'Copernicus', prelucrare: 'împrejurimile' },
+    { atributie: 'OSM', prelucrare: 'contururile' },
+  ]);
+  const { unesteSurse } = await import('../src/scene/scena.js');
+  const z = scenariu(unesteSurse);
+  proba(bun(z), `trei liste cu DGT de trei ori și OSM de două: ${z.r.map((s) => `${s.atributie} („${s.prelucrare}”)`).join(', ')}; listele primite ${z.neatinse ? 'neatinse' : 'SCHIMBATE'}`);
+  const simplu = muta(textSursa('src/scene/scena.js'), ['    if (!vechi) { m.set(s.atributie, { ...s }); continue; }\n', '    m.set(s.atributie, { ...s }); continue;\n']);
+  const zc = simplu === null ? null : scenariu((await modulDin(simplu)).unesteSurse);
+  proba(zc !== null && !bun(zc), `control, un Map simplu: ${zc === null ? NEAPLICATA : zc.r.map((s) => `${s.atributie} („${s.prelucrare}”)`).join(', ')} — pică`);
 }
 
 console.warn = warn;

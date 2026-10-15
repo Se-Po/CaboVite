@@ -56,9 +56,14 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea
   plaselor e identitatea): `vMapUv = mapTransform · (x, z, 1)`, cu `texture.matrix`
   scris din bbox. v crește spre SUD — KTX2 comprimat nu se întoarce la încărcare.
   Un atribut `uv` ar fi costat 23–46 MB (5 771 844 de vârfuri ale lui alpha, cu 4 sau 8 octeți
-  pe vârf).
-- **Soarele** trece pe al zborului (94,0° / 39,5°), ca clădirile modelate și cerul
-  să arate ora fotografiei; umbrele se reîncadrează (`umbre.potriveste()`), cerul
+  pe vârf). Matricea o face `matriceUV(meta, centru)`, cu centrul bazei pentru orice textură.
+  Proba ei, în `verifica-pagina` (din 0.1.7.05):
+  - pe toate cele șase sidecare `*-orto_v1.json`, centrul texelilor din colțuri și din
+    mijloc, socotit după `conventie` (muchii de pixel, rândul 0 la nord), cu `latime` și
+    `inaltime`, nu cu cutia, cade pe texelul lui (abatere 4,5·10⁻¹³ texeli);
+  - controlul, cu v întors, iese la 3 007 texeli.
+- **Soarele** trece pe al zborului (94,0° / 39,5°; poziția o dă `soareZborDin`, exportată și
+  pentru verifica-cladiri), ca clădirile modelate și cerul să arate ora fotografiei; umbrele se reîncadrează (`umbre.potriveste()`), cerul
   își reface expunerea, ceața și fundalul iau noul orizont. Înapoi, soarele se pune
   DIN COPIE, nu recalculat.
 - **Marea**, în cutia texturii, e fotografia; în afara ei, apa adâncă măsurată;

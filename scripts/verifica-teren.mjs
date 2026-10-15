@@ -23,7 +23,7 @@ import { COTA_MARE } from '../src/scene/mare.js';
 import { laOklab } from './comun/oklab.mjs';
 import { ORTOFOTO_ALPHA, aliniaza, deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
 import { incarcaHarta } from './comun/relief.mjs';
-import { dinDisc, proba, rezumat, sari } from './comun/proba.mjs';
+import { cuAvertismente, dinDisc, proba, rezumat, sari } from './comun/proba.mjs';
 import { modulDin, muta, NEAPLICATA, textSursa } from './comun/mutatii.mjs';
 
 const TRIUNGHIURI = 1923948;          // bază 1 422 064 + petic 501 884 (harta_v4 + harta_v5)
@@ -385,6 +385,81 @@ async function main() {
       }
     }
     proba(gresite === 0, `mascaBazei: scurtătura dreptunghiului dă ce dă inPoligon pe ${n} puncte (${gresite} diferite)`);
+  }
+
+  // ---------------------------------------------------------- previzualizarea (?previzualizare=ndvi)
+  //
+  // previzualizare.js pictează NDVI-ul pe scara viridis, cu magenta unde nu e NDVI, și scrie o
+  // legendă în colț. Referința se socotește aici: viridis la 0, ¼, ½, ¾ și 1 (valorile publicate
+  // ale scării, #440154, #3b528b, #21918c, #5ec962, #fde725), pe NDVI −0,10, 0,10, 0,20, 0,35,
+  // 0,50, cu fiecare canal interpolat liniar și rotunjit. Legenda se face pe un DOM fals, cu un
+  // mod din adresă ostil: modul intră numai ca text. Controale: o oprire a scării schimbată cu o
+  // unitate; titlul legendei scris cu innerHTML.
+  console.log('\nPrevizualizarea NDVI (previzualizare.js)');
+  {
+    const VIRIDIS = [[-0.10, [0x44, 0x01, 0x54]], [0.10, [0x3b, 0x52, 0x8b]], [0.20, [0x21, 0x91, 0x8c]], [0.35, [0x5e, 0xc9, 0x62]], [0.50, [0xfd, 0xe7, 0x25]]];
+    const ref = (v) => {
+      if (v <= VIRIDIS[0][0]) return VIRIDIS[0][1];
+      const k = VIRIDIS.findIndex(([p]) => v <= p);
+      if (k < 0) return VIRIDIS.at(-1)[1];
+      const [v0, a] = VIRIDIS[k - 1], [v1, b] = VIRIDIS[k], t = (v - v0) / (v1 - v0);
+      return a.map((c, i) => Math.round(c + (b[i] - c) * t));
+    };
+    const rgb = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
+    const ESANTIOANE = [];
+    for (let v = -0.3; v <= 0.7 + 1e-9; v += 0.0025) ESANTIOANE.push(Math.round(v * 1e4) / 1e4);
+    const OSTIL = '<img src=x onerror="alert(1)">';
+    /** Tot ce spune proba despre un modul previzualizare.js. */
+    const incearca = async (P) => {
+      const f = P.culoarePrevizualizare('ndvi');
+      const gresite = ESANTIOANE.filter((v) => rgb(f(0, 0, null, v)).some((c, i) => c !== ref(v)[i]));
+      const fara = [NaN, undefined, null, Infinity].map((v) => f(0, 0, null, v));
+      const necunoscut = await cuAvertismente(() => P.culoarePrevizualizare('altceva'));
+      const nimic = await cuAvertismente(() => [P.culoarePrevizualizare(null), P.culoarePrevizualizare('')]);
+      // Legenda, pe un DOM fals care ține minte orice HTML scris.
+      const html = [];
+      const nod = (clasa) => {
+        const n = { clasa, style: {}, copii: new Map(), atribute: {}, scos: false, textContent: '' };
+        Object.defineProperty(n, 'innerHTML', { set(s) { html.push(s); for (const m of s.matchAll(/class="([^"]+)"/g)) n.copii.set(m[1], nod(m[1])); }, get() { return ''; } });
+        n.querySelector = (sel) => n.copii.get(sel.slice(1)) ?? [...n.copii.values()].map((c) => c.querySelector(sel)).find(Boolean) ?? null;
+        n.setAttribute = (k, v) => { n.atribute[k] = v; };
+        n.remove = () => { n.scos = true; };
+        return n;
+      };
+      const D0 = globalThis.document;
+      let el = null, gazda = [];
+      globalThis.document = { createElement: () => (el = nod('aside')) };
+      let leg = null;
+      try { leg = P.creeazaLegenda({ appendChild: (e) => gazda.push(e) }, OSTIL); } finally { if (D0 === undefined) delete globalThis.document; else globalThis.document = D0; }
+      const titlu = el?.querySelector('.titlu');
+      const bara = el?.querySelector('.bara')?.style.background ?? '';
+      const mostra = el?.querySelector('.mostra')?.style.background ?? '';
+      leg?.dispose();
+      return {
+        gresite, fara, necunoscut: { r: necunoscut.r, avert: necunoscut.avert }, nimic: { r: nimic.r, avert: nimic.avert },
+        inHtml: html.some((s) => s.includes(OSTIL) || s.includes('onerror')), titlu: titlu?.textContent ?? '', bara, mostra,
+        adaugat: gazda.length === 1 && gazda[0] === el, scos: el?.scos === true, id: el?.id,
+      };
+    };
+    const bun = (z) => z.gresite.length === 0;
+    const legendaBuna = (z) => !z.inHtml && z.titlu === `Previzualizare: ${OSTIL}`;
+    const P = await import('../src/scene/previzualizare.js');
+    const z = await incearca(P);
+    proba(bun(z), `ndvi: ${ESANTIOANE.length} valori între −0,30 și 0,70, culoarea cât viridis socotit aici${z.gresite.length ? `; diferă la ${z.gresite.slice(0, 5).join(', ')}` : ''}`);
+    proba(z.fara.every((c) => c === 0xff00ff), `fără NDVI (NaN, undefined, null, Infinity): magenta (${z.fara.map((c) => '#' + c.toString(16).padStart(6, '0')).join(', ')})`);
+    proba(z.necunoscut.r === undefined && z.necunoscut.avert.length === 1 && z.nimic.r.every((r) => r === undefined) && z.nimic.avert.length === 0,
+      `un mod necunoscut: nicio culoare, un avertisment („${z.necunoscut.avert[0]?.slice(0, 50)}”); fără mod: nicio culoare, niciun avertisment`);
+    proba(legendaBuna(z) && z.adaugat && z.scos,
+      `legenda, cu modul ${OSTIL} din adresă: ${z.inHtml ? 'modul a ajuns în HTML' : 'niciun HTML cu modul'}, titlul „${z.titlu}” ca text; adăugată în gazdă și scoasă la dispose()`);
+    const hexuri = VIRIDIS.map(([, c]) => '#' + c.map((x) => x.toString(16).padStart(2, '0')).join(''));
+    proba(hexuri.every((h) => z.bara.includes(h)) && z.mostra === '#ff00ff', `bara legendei are cele cinci culori ale scării, prin CSSOM; mostra „fără NDVI” e ${z.mostra}`);
+    const sursa = textSursa('src/scene/previzualizare.js');
+    const oprire = muta(sursa, ['[0.20, 0x21918c]', '[0.20, 0x21918d]']);
+    const zo = oprire === null ? null : await incearca(await modulDin(oprire));
+    proba(zo !== null && !bun(zo), `control, oprirea de la 0,20 schimbată cu o unitate: ${zo === null ? NEAPLICATA : `${zo.gresite.length} valori diferite`} — pică`);
+    const html = muta(sursa, ["el.querySelector('.titlu').textContent =", "el.querySelector('.titlu').innerHTML ="]);
+    const zh = html === null ? null : await incearca(await modulDin(html));
+    proba(zh !== null && !legendaBuna(zh), `control, titlul legendei scris cu innerHTML: ${zh === null ? NEAPLICATA : zh.inHtml ? 'modul ajunge în HTML' : 'trece'} — pică`);
   }
 
   console.warn = warnOriginal;

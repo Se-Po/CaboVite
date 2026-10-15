@@ -118,14 +118,32 @@ export function descarcaSatelit({ renderer, numeBaza, numePetic = null, imprejur
   return cereTexturile({ renderer, numeBaza, numePetic, imprejurimi });
 }
 
-/** Matricea care duce (x, z) de scenă în coordonatele texturii; v crește spre SUD. */
-function matriceUV(meta, centru) {
+/**
+ * Matricea care duce (x, z) de scenă în coordonatele texturii; v crește spre SUD. `centru` e
+ * centrul bazei, în TM06, pentru orice textură: a bazei, a peticului, a împrejurimilor.
+ * Exportată pentru verifica-pagina, care o încearcă pe muchiile texelilor din fiecare sidecar.
+ */
+export function matriceUV(meta, centru) {
   const b = meta.bbox_tm06, L = b.xMax - b.xMin, H = b.yMax - b.yMin;
   const x0 = b.xMin - centru.x, z0 = centru.y - b.yMax;
   return new THREE.Matrix3().set(1 / L, 0, -x0 / L, 0, 1 / H, -z0 / H, 0, 0, 1);
 }
 
-const UV_DIN_POZITIE = '#include <uv_vertex>\n\tvMapUv = ( mapTransform * vec3( position.xz, 1.0 ) ).xy;';
+/**
+ * Poziția soarelui zborului, la `d` metri: `soare_zbor` din sidecarul bazei, cu azimutul de grilă
+ * și elevația în grade, în convenția soarelui din lights.js (nordul e −Z). Exportată pentru
+ * verifica-cladiri, care încearcă umbrele cu soarele acesta.
+ */
+export function soareZborDin(s, d) {
+  const R = Math.PI / 180;
+  return new THREE.Vector3(
+    d * Math.cos(s.elevatie * R) * Math.sin(s.azimut_grila * R),
+    d * Math.sin(s.elevatie * R),
+    -d * Math.cos(s.elevatie * R) * Math.cos(s.azimut_grila * R),
+  );
+}
+
+const UV_DIN_POZITIE ='#include <uv_vertex>\n\tvMapUv = ( mapTransform * vec3( position.xz, 1.0 ) ).xy;';
 
 /**
  * Materialul mării în Satelit: în cutia texturii, fotografia (pe apă, amestecată deja cu
@@ -435,12 +453,7 @@ export function creeazaSatelit(o) {
           p.textura.dispose();
           p = null;
         }
-        const R = Math.PI / 180, d = soareRelief.length();
-        soareZbor = new THREE.Vector3(
-          d * Math.cos(s.elevatie * R) * Math.sin(s.azimut_grila * R),
-          d * Math.sin(s.elevatie * R),
-          -d * Math.cos(s.elevatie * R) * Math.cos(s.azimut_grila * R),
-        );
+        soareZbor = soareZborDin(s, soareRelief.length());
         // Ultima așteptare a texturilor: de aici încolo încărcarea se termină, iar o
         // renunțare doar n-o mai aplică.
         oprireIncarcare = null;

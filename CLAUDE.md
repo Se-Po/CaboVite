@@ -30,7 +30,7 @@ se poartă în română.
 | `npm run ortofoto` | culori din ortofotoul aerian DGT (RGB + infraroșu) |
 | `npm run paleta` | culorile etichetate → `public/data/paleta-teren.json` |
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
-| `npm run build-zona` / `build-petic` | baza și peticul lui alpha → `public/data/harta_vN-dem.*`; un nume nou pe fiecare hartă |
+| `npm run build-zona` / `build-petic` | baza și peticul lui alpha → `public/data/harta_vN-dem.*`; un nume nou pe fiecare hartă; `build-zona -- --proba` o reface și o compară cu git |
 | `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface |
 | `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele dalelor, straturile, candidații |
 | `npm run masoara-sanctuar` | formele sanctuarului, măsurate pe MDS → `date-sursa/derivate/` |
@@ -135,16 +135,17 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   cele vechi rămân în istoricul git. `date-sursa/` nu intră în depozit, datele produse în
   `public/data` da. O hartă nouă — alt contur, alt pas, alt conținut — primește un nume nou.
   → harti-relief
-- `build-petic`, `build-imprejurimi` și scripturile ortofotoului își numesc sursele (`DALE`,
-  `NIVELURI`, `ORTOFOTO_ALPHA`), nu iau „primul din director”; `build-imprejurimi` se oprește la
-  o dală nenumită care îi atinge amprenta. `build-zona` încă citește toate `.tif` din
-  `date-sursa/lidar` care ating cutia. → harti-relief, imprejurimi, fotografii
+- `build-zona`, `build-petic`, `build-imprejurimi` și scripturile ortofotoului își numesc sursele
+  (`DALE`, `NIVELURI`, `ORTOFOTO_ALPHA`), nu iau „primul din director”; `build-zona` și
+  `build-imprejurimi` se opresc la o dală nenumită care le atinge amprenta. → harti-relief,
+  imprejurimi, fotografii
 - Sursele pe care le aduce un script (Copernicus, Sentinel-2, OSM) se aduc o singură dată, cu
   manifest; dalele DGT le aduce autorul de mână, din CDD. O construcție nu descarcă nimic. OSM:
   versiuni fixate, instantanee care nu se suprascriu, fără Overpass, sub o cerere pe secundă.
   → imprejurimi, sanctuar
-- Texturile KTX2 ies la octet din aceleași date (`--threads 1`, `--uastc-rdo-m`); fișierele JSON
-  scrise de build-*, `paleta` și `strat-ndvi` poartă `generat`, deci nu. Octeții
+- Texturile KTX2 ies la octet din aceleași date (`--threads 1`, `--uastc-rdo-m`), ca `harta_v4`
+  (`build-zona -- --proba`); JSON-urile cu `generat` (`build-sanctuar`, `build-cladiri`,
+  `paleta`, `strat-ndvi`) nu. Octeții
   comparați cu git se compară ca blob git (`hash-object --path`): cu `core.autocrlf`, capetele
   de rând diferă. Extragerile binare din git, în Git Bash, nu în PowerShell 5.1. → livrarea,
   satelit, harti-relief

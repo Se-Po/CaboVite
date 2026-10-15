@@ -195,6 +195,16 @@ ancorate pe **centrul** lui `bbox_tm06` — vezi `docs/harti-relief.md`, „Conv
 și latitudinea se dau cu **6 zecimale**, exact câte are `colturi_geo` în sidecar:
 mai multe ar fi precizie inventată peste o sursă rotunjită.
 
+Proba conversiilor, în `verifica-controale` (din 0.1.7.05), merge pe 51 × 51 de noduri ale lui
+alpha:
+- `laTM06` iese exact pe nodurile citite independent, cu `scripts/comun/relief.mjs`: abaterea
+  e 0 m;
+- `laGeo` stă la cel mult 0,134 m de proiecția inversă exactă (`dinTM06` din
+  `scripts/comun/tm06.mjs`, prag 0,2 m). Interpolarea între colțurile cu 6 zecimale nu face mai
+  mult;
+- `limite` e cutia nodurilor lui alpha;
+- controlul, cu ancora pe convenția „noduri”, mută conversiile cu 1,41 m și 1,53 m, deci pică.
+
 **Rândurile mici** — scena și TM06 — au câte un element pe axă (`.axa`), în linie,
 despărțite de un spațiu lărgit cu `word-spacing` cât două spații. Erau un text cu două spații între
 axe, pe care `white-space` le strângea într-unul (CSS Text 3): pe ecran rămânea unul.

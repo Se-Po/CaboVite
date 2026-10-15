@@ -12,9 +12,13 @@
 // scris numai pentru probă, produce fluxuri cu ambele reguli, iar decodorul
 // trebuie să le citească pe cea bună și să le refuze pe cea greșită.
 
-import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { anuleazaPredictor, decodeazaLzw } from './comun/lzw.mjs';
 import { citesteTiffDGT } from './comun/tiff.mjs';
+import { muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 import { proba, rezumat, sari } from './comun/proba.mjs';
 
 // ------------------------------------------------------------ codorul de probă
@@ -205,6 +209,54 @@ if (![MDT50_105162, MDT50_105163, MDT2_105162].every(existsSync)) {
   const inauntru = (in63.d + in62.d) / 2;
   proba(peste.d < 1.5 * inauntru,
     `peste cusătură ${peste.d.toFixed(3)} m (${peste.k} px), între rânduri vecine în dală ${inauntru.toFixed(3)} m — cerut sub 1,5×`);
+}
+
+// ------------------------------------------------------------ build-zona, din dalele numite
+
+// build-zona își numește dalele (`DALE`, `DALE_50`), nu ia tot ce e în date-sursa/lidar, unde
+// stau și dalele altor hărți. `--proba` reface harta_v4 în memorie și o compară cu HEAD, ca blob
+// git: trebuie să iasă identică la octet, .bin și .json. Dacă se sare o hotărăsc datele, nu
+// ieșirea scriptului: dalele pe care le numește sidecarul lui harta_v4 din git (`sursa.dale`,
+// `dale_sarite`, `corectii`), căutate pe disc. Cu ele pe disc, orice eșec al scriptului pică —
+// și o listă DALE greșită. Controale: fără dala 106163 (`--proba-fara`) harta iese altfel; un
+// nume greșit în DALE oprește proba; 106164 scoasă din DALE, dar lăsată pe disc, oprește scriptul.
+console.log('\nbuild-zona: harta_v4 din dalele numite, identică la octet cu git');
+{
+  const sidecar = textLa('HEAD', 'public/data/harta_v4-dem.json');
+  const m = sidecar === null ? null : JSON.parse(sidecar);
+  const necesare = m === null ? [] : [...m.sursa.dale, ...m.dale_sarite.map((d) => d.dala), ...m.corectii.map((c) => c.dala)]
+    .map((f) => (f.startsWith('MDT-50cm-') ? `date-sursa/lidar-50cm/${f}` : `date-sursa/lidar/${f}`));
+  const lipsa = necesare.filter((f) => !existsSync(f));
+  if (m === null) sari('build-zona --proba: sidecarul lui harta_v4 nu se poate citi din git');
+  else if (lipsa.length) sari(`build-zona --proba: lipsesc ${lipsa.length} din cele ${necesare.length} dale ale lui harta_v4 (${lipsa.map((f) => f.split('/').pop()).slice(0, 3).join(', ')}${lipsa.length > 3 ? ', …' : ''})`);
+  else {
+    const ruleaza = (fisier, ...argumente) => {
+      const r = spawnSync(process.execPath, [fisier, ...argumente], { encoding: 'utf8' });
+      return { cod: r.status, iesire: `${r.stdout}${r.stderr}` };
+    };
+    // Rândul care spune ce s-a întâmplat: rezumatul probei, sau mesajul erorii, nu linia de cod din stivă.
+    const motiv = (x) => x.iesire.match(/^(?:proba: |Error: )[^\n]*/m)?.[0] ?? `cod ${x.cod}`;
+    // Scriptul schimbat, din text, cu importurile duse la scripts/comun.
+    const mutat = (...perechi) => {
+      const src = muta(textSursa('scripts/build-zona.mjs'), ...perechi);
+      if (src === null) return null;
+      const tmp = join(tmpdir(), `cabo-build-zona-${process.pid}.mjs`);
+      writeFileSync(tmp, src.replace(/from '\.\/comun\/([^']+)'/g, (_, f) => `from '${new URL(`./comun/${f}`, import.meta.url).href}'`));
+      try { return ruleaza(tmp, '--proba'); } finally { rmSync(tmp, { force: true }); }
+    };
+    const azi = ruleaza('scripts/build-zona.mjs', '--proba');
+    proba(azi.cod === 0 && /^proba: harta_v4 iese identică la octet cu HEAD/m.test(azi.iesire) && (azi.iesire.match(/: identic la octet cu HEAD/g) ?? []).length === 2,
+      `build-zona --proba, cu cele ${necesare.length} dale ale sidecarului pe disc: „${motiv(azi)}” (cod ${azi.cod})`);
+    const fara = ruleaza('scripts/build-zona.mjs', '--proba', '--proba-fara', '106163');
+    proba(fara.cod === 1 && /harta_v4-dem\.bin: DIFERĂ de HEAD/.test(fara.iesire),
+      `control, fără dala 106163: harta (.bin) iese altfel, „${motiv(fara)}” (cod ${fara.cod}) — pică`);
+    const gresit = mutat(["'106163', '106164']", "'106163', '106146']"]);
+    proba(gresit !== null && gresit.cod !== 0 && /lipsesc din date-sursa\/lidar: MDT-2m-106146/.test(gresit.iesire),
+      `control, 106164 scris greșit în DALE: ${gresit === null ? NEAPLICATA : `„${motiv(gresit)}”`} — proba pică, nu se sare`);
+    const scoasa = mutat(["'106163', '106164']", "'106163']"]);
+    proba(scoasa !== null && scoasa.cod !== 0 && /106164[^\n]*nenumite în DALE/.test(scoasa.iesire),
+      `control, 106164 scoasă din DALE, lăsată pe disc: scriptul se oprește (${scoasa === null ? NEAPLICATA : `„${motiv(scoasa).slice(0, 90)}”`})`);
+  }
 }
 
 rezumat();

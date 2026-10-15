@@ -126,6 +126,24 @@ chiar iese mai închis decât în pozele de la amiază; asta se reglează în lu
 
 Regula costă ~+45 ms la construcția bazei, în Node; `verifica-teren` tipărește cifra.
 
+**Previzualizarea** (`?previzualizare=ndvi`, `previzualizare.js`) are proba ei în
+`verifica-teren` din 0.1.7.05:
+- **Scara:** pe 401 valori NDVI între −0,30 și 0,70, culoarea e cea socotită în probă, pe
+  viridis. Proba ia valorile publicate ale scării la 0, ¼, ½, ¾ și 1 (#440154, #3b528b,
+  #21918c, #5ec962, #fde725), așezate pe NDVI −0,10, 0,10, 0,20, 0,35 și 0,50, cu fiecare
+  canal interpolat și rotunjit.
+- **Fără NDVI:** pentru NaN, `undefined`, `null` și `Infinity` iese magenta.
+- **Modul:** unul necunoscut nu dă nicio culoare și scrie un singur avertisment; fără mod,
+  nicio culoare și niciun avertisment.
+- **Legenda,** pe un DOM fals, cu modul `<img src=x onerror="alert(1)">` venit din adresă:
+  - modul nu ajunge în niciun HTML;
+  - titlul îl arată ca text;
+  - bara are cele cinci culori, puse prin CSSOM;
+  - legenda pleacă la `dispose()`.
+- **Două controale,** care pică:
+  - oprirea de la 0,20 schimbată cu o unitate (48 de valori diferite);
+  - titlul scris cu `innerHTML`.
+
 
 ## Rețeta lui alpha
 

@@ -11,7 +11,7 @@ import { creeazaZbor } from './zbor.js';
 import { creeazaEticheta } from './eticheta.js';
 import { creeazaCadruFisa } from './fisa-cadru.js';
 import { creeazaCadruLiber } from './cadru-liber.js';
-import { creeazaUmbre } from './umbre.js';
+import { creeazaUmbre, grupuriUmbre, TEXEL_MAXIM, urmaresteGrupul } from './umbre.js';
 import { creeazaLegenda, culoarePrevizualizare, modPrevizualizare } from './previzualizare.js';
 import { atribuirePaleta, incarcaPaleta, paletaCurenta, terenMasurat } from './palette.js';
 import { creeazaBusola } from './busola.js';
@@ -345,15 +345,10 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
   // harta trece între cutia unită (de departe) și grupul cel mai apropiat de ținta
   // camerei (de aproape), cu o redesenare la fiecare schimbare (`umbreGrup`, în buclă).
   // Măsurat, cu soarele Relief: cutia unită 0,60 m pe texel, farul singur 0,12 m.
-  const TEXEL_MAXIM = 0.3;
   let umbre = null, umbreGrup = null;
-  const grupuriUmbra = [
-    ...(sanctuar ? [{ nume: 'sanctuar', cutie: sanctuar.cutieCladiri }] : []),
-    ...(cladiri ? [...cladiri.cutiiGrupuri].map(([nume, cutie]) => ({ nume, cutie })) : []),
-  ].filter((g) => !g.cutie.isEmpty());
+  const { grupuri: grupuriUmbra, unita } = grupuriUmbre({ sanctuar, cladiri });
   if (grupuriUmbra.length) {
     try {
-      const unita = grupuriUmbra.reduce((a, g) => a.union(g.cutie), new THREE.Box3());
       umbre = creeazaUmbre({
         renderer, soare: lumini.soare,
         cutie: unita,
@@ -783,8 +778,9 @@ async function construieste(canvas, renderer, deEliberat, curata, garda, continu
  * Unește două liste de surse pe `atributie`. Două intrări cu aceeași atribuire —
  * ortofotoul, de pildă, folosit și de teren și de sanctuar — devin una, cu
  * prelucrările amândurora: un Map simplu ar fi păstrat-o numai pe a doua.
+ * Exportată pentru verifica-pagina.
  */
-function unesteSurse(a, b) {
+export function unesteSurse(a, b) {
   const m = new Map(a.map((s) => [s.atributie, { ...s }]));
   for (const s of b) {
     const vechi = m.get(s.atributie);
@@ -813,78 +809,4 @@ export function asteaptaSatelitul(gata, semnal = null) {
     semnal.addEventListener('abort', laIesire, { once: true });
     bun.then((v) => { semnal.removeEventListener('abort', laIesire); res(v); });
   });
-}
-
-/**
- * Pe ce cutie se strânge harta de umbre, la fiecare cadru desenat.
- *
- * Cât texelul cutiei peste toate grupurile nu trece de `texelMaxim`, rămâne ea.
- * Altfel, de departe tot ea: cât texelul ei nu trece de mărimea unui pixel de ecran
- * la țintă, o hartă mai strânsă n-ar desena nimic în plus. Pixelul e al CANVASULUI
- * (`canvas.height`), nu CSS și nu neapărat de dispozitiv: raportul e plafonat la 2.
- * De aproape, grupul cel mai apropiat de țintă.
- *
- * La pornire ținta e la 611 m, iar texelul cutiei unite 0,50–0,60 m. Alegerea se face
- * abia la primul cadru: la creare canvasul n-are încă mărimea lui — o capătă în buclă —,
- * deci aici iese mereu cutia unită. Primul cadru are soarele zborului — harta apare direct
- * pe Satelit —, cu 0,497 m pe texel, deci cutia unită rămâne pe un canvas înalt de cel
- * mult ~1 120 px de canvas (măsurat în pagină: 1120 → cutia unită, 1122 → sanctuarul).
- * Cu preferința Relief primul cadru are soarele Relief, 0,604 m, iar pragul e ~922 px.
- * Pe telefoanele în portret și pe ecranele dense harta pornește strânsă pe sanctuar
- * (~430 m de țintă; farul e la ~800 m), cu 0,216 m pe texel — farul își primește umbra
- * când te apropii de el. Un telefon în peisaj rămâne pe cutia unită: cu raportul de
- * pixeli plafonat la 2 (renderer.js), canvasul de 844 × 390 la 3× are 780 px înălțime,
- * nu 1170. Măsurat în pagină, la primul cadru: 1440 × 900 la DPR 1 → cutia unită, la
- * DPR 2 (2428 × 1517) → sanctuarul; 390 × 844 la 3× (780 × 1688) → sanctuarul;
- * 844 × 390 la 3× (1688 × 780) → cutia unită.
- *
- * Două praguri cu histerezis — ±10% pe pixel,
- * HISTEREZIS metri între grupuri —, ca o cameră care stă pe o margine să nu
- * redeseneze harta la fiecare cadru; o schimbare costă o singură redesenare.
- *
- * Texelul cutiei unite depinde de soare (0,60 m cu soarele Relief, 0,50 m cu al
- * zborului), deci se recitește când `umbre.versiuneSoare` s-a schimbat.
- *
- * @param {{incadreazaPe: (c: THREE.Box3) => void, texelPentru: (c: THREE.Box3) => number,
- *          texelMetri: number, versiuneSoare: number}} o.umbre
- * @param {{nume: string, cutie: THREE.Box3}[]} o.grupuri
- */
-function urmaresteGrupul({ umbre, grupuri, unita, texelMaxim, camera, controale, canvas }) {
-  const HISTEREZIS = 20;
-  const p = new THREE.Vector3();
-  const tinta = controale.target;
-  const distanta = (g) => g.cutie.distanceToPoint(p.set(tinta.x, (g.cutie.min.y + g.cutie.max.y) / 2, tinta.z));
-  const toate = { nume: 'toate', cutie: unita };
-  const texel = new Map();
-  let curent = toate, texelUnit = 0, versiune = -1;
-  const pas = () => {
-    if (versiune !== umbre.versiuneSoare) {
-      versiune = umbre.versiuneSoare;
-      texelUnit = umbre.texelPentru(unita);
-      texel.clear();
-      texel.set('toate', texelUnit);
-      if (curent !== toate) texel.set(curent.nume, umbre.texelMetri);
-    }
-    let ales = toate;
-    if (texelUnit > texelMaxim) {
-      // mărimea unui pixel de ecran la distanța țintei, în metri
-      const pixel = (camera.position.distanceTo(tinta) * 2 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, canvas.height);
-      if (texelUnit > pixel * (curent === toate ? 1.1 : 0.9)) {
-        let cel = grupuri[0], dCel = distanta(cel);
-        for (let k = 1; k < grupuri.length; k++) { const d = distanta(grupuri[k]); if (d < dCel) { cel = grupuri[k]; dCel = d; } }
-        ales = curent !== toate && cel !== curent && distanta(curent) - dCel < HISTEREZIS ? curent : cel;
-      }
-    }
-    if (ales === curent) return;
-    curent = ales;
-    umbre.incadreazaPe(curent.cutie);
-    texel.set(curent.nume, umbre.texelMetri);
-  };
-  pas();
-  return {
-    pas,
-    get grup() { return curent.nume; },
-    /** Texelul fiecărei cutii deja încadrate cu soarele de acum, în metri. */
-    get texel() { return Object.fromEntries(texel); },
-  };
 }

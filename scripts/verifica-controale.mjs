@@ -38,6 +38,8 @@ import { creeazaTastatura, DESCRIERE_TASTE } from '../src/scene/tastatura.js';
 import * as BUSOLA from '../src/scene/busola.js';
 import * as ETICHETA from '../src/scene/eticheta.js';
 import { dinDisc, proba, rezumat } from './comun/proba.mjs';
+import { incarcaHarta as incarcaHartaScript } from './comun/relief.mjs';
+import { dinTM06 } from './comun/tm06.mjs';
 import { LF, modulDin, muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 
 const { creeazaPunct } = PUNCT;
@@ -90,6 +92,48 @@ const TEREN = { inaltimeLa: inaltimeRandata, lim: imp.limite, alpha, loveste: lo
   proba(lovit?.cheie?.startsWith('biserica'), `o rază verticală pe nava bisericii (${cx.toFixed(1)}, ${cz.toFixed(1)}): ${lovit ? `${lovit.cheie}, la cota ${(400 - lovit.t).toFixed(2)} m` : 'nimic lovit'}`);
   const fara = lovesteCladiri(cladiri)(raza);
   proba(fara === null, `control, numai celelalte clădiri: ${fara === null ? 'nimic lovit' : fara.cheie} — pică`);
+}
+
+// ------------------------------------------------------------ conversiile panoului (geo.js)
+
+// Ce scrie panoul „Coordonate”, pe 51 × 51 de noduri ale bazei, cu colțurile: TM06 față de
+// nodurile pe care le citește independent scripts/comun/relief.mjs (convenția cutiei dedusă
+// din aritmetică), longitudinea și latitudinea față de proiecția inversă exactă din tm06.mjs,
+// fără rotunjire. Interpolarea biliniară a colțurilor din sidecar e aproximativă: sub 0,2 m
+// (6 zecimale înseamnă ~0,1 m). Controlul: ancora pe convenția „noduri” în loc de centrul
+// cutiei, adică un nod mutat cu o jumătate de celulă pe fiecare axă (~1,41 m).
+console.log('\nConversiile panoului „Coordonate” (geo.js)');
+{
+  const ref = incarcaHartaScript(relief.meta.nume);
+  const { latime: w, inaltime: h, pasX_m: pas } = relief.meta;
+  const masoara = (G) => {
+    let tm = 0, gm = 0;
+    for (let i = 0; i <= 50; i++) {
+      for (let j = 0; j <= 50; j++) {
+        const c = Math.round((i / 50) * (w - 1)), r = Math.round((j / 50) * (h - 1));
+        const x = (c - (w - 1) / 2) * pas, z = (r - (h - 1) / 2) * pas;
+        const X = ref.nodX(c), Y = ref.nodY(r);
+        const t = G.laTM06(x, z);
+        tm = Math.max(tm, Math.hypot(t.x - X, t.y - Y));
+        const g = G.laGeo(x, z), e = dinTM06(X, Y, null);
+        const dLat = (g.lat - e.lat) * 111_320, dLon = (g.lon - e.lon) * 111_320 * Math.cos((e.lat * Math.PI) / 180);
+        gm = Math.max(gm, Math.hypot(dLat, dLon));
+      }
+    }
+    return { tm, gm };
+  };
+  const geo = creeazaGeo(relief.meta);
+  const azi = masoara(geo);
+  proba(azi.tm < 1e-6, `laTM06 pe 2 601 noduri: abaterea maximă față de nodurile citite independent ${azi.tm.toExponential(1)} m (prag 1e-6)`);
+  proba(azi.gm < 0.2, `laGeo pe aceleași noduri: abaterea maximă față de proiecția inversă exactă ${azi.gm.toFixed(3)} m (prag 0,2)`);
+  const L = geo.limite;
+  proba(L.xMin === alpha.xMin && L.xMax === alpha.xMax && L.zMin === alpha.zMin && L.zMax === alpha.zMax,
+    `limite: ${L.xMin}…${L.xMax} × ${L.zMin}…${L.zMax}, cutia nodurilor, ca alpha`);
+  const M = await modulDin(muta(textSursa('src/scene/geo.js'),
+    ['const centru = b ? { x: (b.xMin + b.xMax) / 2, y: (b.yMin + b.yMax) / 2 } : null;',
+      'const centru = b ? { x: b.xMin + (w - 1) / 2 * pasX, y: b.yMax - (h - 1) / 2 * pasZ } : null;']));
+  const gr = M ? masoara(M.creeazaGeo(relief.meta)) : null;
+  proba(gr && gr.tm > 1 && gr.gm > 1, `control, ancora pe convenția „noduri”: ${gr ? `laTM06 la ${gr.tm.toFixed(2)} m, laGeo la ${gr.gm.toFixed(2)} m` : NEAPLICATA} — pică`);
 }
 
 const W = 1600, H = 900, RECT = { left: 0, top: 0, width: W, height: H };
@@ -530,6 +574,61 @@ console.log('\nStările gesturilor, citite la `start`, ca în gest.js');
   proba(controale instanceof ControaleHarta && controale.mouseButtons.LEFT === THREE.MOUSE.PAN && controale.mouseButtons.RIGHT === THREE.MOUSE.ROTATE
     && controale.touches.ONE === THREE.TOUCH.PAN && controale.touches.TWO === THREE.TOUCH.DOLLY_ROTATE && controale.screenSpacePanning === false,
   'creeazaCamera: stânga mută, dreapta rotește, un deget mută, două ciupesc și rotesc, mutarea pe orizontală');
+}
+
+// Cursorul gestului și pivotul (gest.js), cu controalele paginii și un DOM fals: butonul drept
+// scrie `rotire` pe <html> și aprinde pivotul, cel stâng `mutare`, `end` le șterge; un `start`
+// cu starea NIMIC (rotița) nu schimbă nimic; dispose() lasă controalele fără ascultătorii lui.
+// Controale: fără garda NIMIC, fără scoaterea ascultătorilor.
+console.log('\nCursorul gestului și pivotul (gest.js)');
+{
+  const D0 = globalThis.document;
+  const nod = () => ({ addEventListener() {}, removeEventListener() {} });
+  const el = { ...nod(), style: { removeProperty() {} }, ownerDocument: nod(), getRootNode: nod, setPointerCapture() {}, releasePointerCapture() {},
+    getBoundingClientRect: () => RECT, clientWidth: W, clientHeight: H };
+  const ev = (o) => ({ pointerId: 1, pointerType: 'mouse', button: 0, clientX: 800, clientY: 450, pageX: 800, pageY: 450, ctrlKey: false, metaKey: false, shiftKey: false, ...o });
+  const incearca = (G) => {
+    const radacina = { dataset: {} };
+    const clase = new Set();
+    const pivot = { className: '', style: {}, setAttribute() {}, remove() { this.scos = true; }, classList: { toggle: (c, da) => (da ? clase.add(c) : clase.delete(c)) } };
+    globalThis.document = { documentElement: radacina, createElement: () => pivot };
+    const gazda = { appendChild() {} };
+    const { camera, controale: k } = pagina(el, { teren: null, amortizare: false });
+    const nr = () => (k._listeners?.start?.length ?? 0) + (k._listeners?.end?.length ?? 0);
+    const inainte = nr();
+    const g = G.creeazaGest({ gazda, canvas: el, camera, controale: k });
+    const r = { ascultatori: nr() - inainte };
+    k._onPointerDown(ev({ button: 2 }));
+    r.drept = [radacina.dataset.gest, clase.has('activ'), Boolean(pivot.style.transform)];
+    k._onPointerUp(ev({ button: 2 }));
+    r.dupa = radacina.dataset.gest ?? null;
+    k._onPointerDown(ev({ button: 0 }));
+    r.stang = [radacina.dataset.gest, clase.has('activ')];
+    k._onPointerUp(ev({ button: 0 }));
+    // Rotița, în timpul unei rotiri: `start` cu starea NIMIC.
+    k.state = STARE.ROTIRE; k.dispatchEvent({ type: 'start' });
+    k.state = STARE.NIMIC; k.dispatchEvent({ type: 'start' });
+    r.rotita = radacina.dataset.gest ?? null;
+    k.dispatchEvent({ type: 'end' });
+    g.dispose();
+    r.ramasi = nr() - inainte;
+    r.curat = !('gest' in radacina.dataset) && pivot.scos === true;
+    k.dispose();
+    globalThis.document = D0;
+    return r;
+  };
+  const GEST_JS = textSursa('src/scene/gest.js');
+  const r = incearca(await modulDin(GEST_JS));
+  proba(r.ascultatori === 2 && r.drept[0] === 'rotire' && r.drept[1] && r.drept[2] && r.dupa === null && r.stang[0] === 'mutare' && !r.stang[1],
+    `dreapta: ${r.drept[0]}, pivotul ${r.drept[1] ? 'aprins' : 'stins'} și ${r.drept[2] ? 'așezat' : 'neașezat'}; după end: ${r.dupa ?? 'nimic'}; stânga: ${r.stang[0]}, pivotul ${r.stang[1] ? 'aprins' : 'stins'}`);
+  proba(r.rotita === 'rotire', `un start cu starea NIMIC (rotița) în timpul rotirii: cursorul rămâne ${r.rotita ?? 'ȘTERS'}`);
+  proba(r.ramasi === 0 && r.curat, `dispose(): ${r.ramasi} ascultători rămași, data-gest ${r.curat ? 'scos, pivotul scos' : 'RĂMAS'}`);
+  const fg = await modulDin(muta(GEST_JS, ['    if (controale.state === STARE.NIMIC) return;\n', '']));
+  const rg = fg ? incearca(fg) : null;
+  proba(rg && rg.rotita !== 'rotire', `control, fără garda NIMIC: ${rg ? `rotița lasă cursorul ${rg.rotita ?? 'șters'}` : NEAPLICATA} — pică`);
+  const fd = await modulDin(muta(GEST_JS, ["      controale.removeEventListener('start', laStart);\n      controale.removeEventListener('end', laSfarsit);\n", '']));
+  const rd = fd ? incearca(fd) : null;
+  proba(rd && rd.ramasi > 0, `control, dispose() fără removeEventListener: ${rd ? `${rd.ramasi} ascultători rămași` : NEAPLICATA} — pică`);
 }
 
 // ------------------------------------------------------------ 8. panoul punctului

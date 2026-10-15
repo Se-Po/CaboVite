@@ -92,6 +92,16 @@ scriere a subsolului; Satelit cerut din buton, după pornire, rescrie numai text
 modală deschisă rămâne deschisă. Cât e deschisă, Escape-ul e al ei: fișa
 sanctuarului, inertă dedesubt, nu-l mai fură.
 
+Adresele din surse (`licenta_url`, `portal`, portalul OSM al rândului) trec prin
+`hrefSigur()` și devin legături numai dacă sunt http(s). Una cu `javascript:` sau `data:`, ori
+fără schemă, rămâne text. Portalul OSM se recunoaște după începutul adresei — schema, gazda
+(openstreetmap.org, cu sau fără www) și calea `/copyright` —, nu după o bucată de oriunde din ea. Proba, în `verifica-pagina` (din 0.1.7.05), rulează `main.js` cu o scenă falsă:
+- cu surse ostile, toate cele 4 legături ies http(s);
+- cu surse bune, „© OpenStreetMap” duce la pagina lor de copyright;
+- un portal https pe altă gazdă, care numai conține „openstreetmap.org/copyright”, nu ajunge în
+  rând; controlul, fără ancora gazdei, îl pune acolo;
+- controlul, `main.js` de la 5ec413f, lega `javascript:` de două ori.
+
 Piramida lui are nivel la **2 m** și la **1 m** — exact pașii lui `harta_v4` și
 `harta_v5`. Colțul e la TM06 (−96000, −135000) cu pas 0,25 m, iar decalajul până
 la `harta_v4` (aceeași cutie ca `harta_v2`) iese **106 × 703 pixeli, întregi**:
