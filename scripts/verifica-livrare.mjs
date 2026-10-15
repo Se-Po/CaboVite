@@ -359,14 +359,161 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
 // dimensiunile și textul alternativ; `twitter:card` cere imaginea mare. Fișierul, scris de
 // `npm run captura-og`, trebuie să fie chiar acela: JPEG, cu dimensiunile din antetul lui (SOF),
 // 1200 × 630, cel mult 300 KB. Textul alternativ numește fiecare sursă cu licența ei — DGT cu
-// CC BY 4.0, Copernicus, OpenStreetMap cu ODbL —, pentru cine nu vede imaginea; fișierul n-are
-// metadate, deci, salvat singur, păstrează numai rândul din pixeli. În sursă (cu public/) și în
-// build (cu dist/). Controale, fiecare cu problema pe care trebuie s-o numească: pe marcaj, nouă
-// index.html stricate; pe fișier, trei JPEG-uri stricate în memorie (alte dimensiuni în SOF, peste
-// prag, un PNG sub numele lui).
+// CC BY 4.0, Copernicus, OpenStreetMap cu ODbL —, pentru cine nu vede imaginea.
+//
+// Fișierul poartă și el atribuirea întreagă, ca XMP, ca s-o aibă și salvat singur. Cititorul de
+// aici e al probei, independent de captura-og (care scrie din modala paginii), și citește cum
+// citește un cititor XMP: un singur segment înaintea imaginii, în xpacket; XML bine format, cu
+// spațiile de nume (prefixe declarate, atribute unice, o singură rădăcină); structura
+// x:xmpmeta > rdf:RDF > rdf:Description; proprietățile după URI-ul spațiului de nume, nu după
+// prefix. Referința se calculează aici:
+// - în `dc:rights`: textul SNIG (scris aici, din metadatele SNIG — niciun sidecar nu-l are),
+//   fiecare `atributie` și `raspundere` ale sidecarurilor din public/data — depozitul ține exact
+//   hărțile pe care le încarcă pagina — și nota „Prelucrate pentru această pagină: …”, cu o listă
+//   care nu e goală (CC BY cere să se spună ce s-a schimbat; frazele le scrie scena, la rulare,
+//   deci nu au referință în sidecaruri);
+// - în `xmpRights:UsageTerms`: adresele CC BY 4.0 și ODbL 1.0 (scrise aici; sidecarurile le dau
+//   numai numele), fiecare `licenta_url` și fiecare `portal`;
+// - `dc:description` e chiar `og:image:alt`, iar `xmpRights:WebStatement`, `og:url`.
+// O sursă nouă sau un text alternativ schimbat cer deci o captură nouă.
+//
+// În sursă (cu public/) și în build (cu dist/). Controale, fiecare cu problema pe care trebuie s-o
+// numească: pe marcaj, zece index.html stricate; pe fișier, JPEG-uri stricate în memorie — alte
+// dimensiuni în SOF, peste prag, un PNG sub numele lui; XMP-ul lipsă, dublat, fără xpacket, fără
+// textul SNIG, fără o atribuire, fără prelucrări, fără o licență, fără un portal, cu altă pagină,
+// cu descrierea veche; XML rupt, un prefix nedeclarat, un atribut dublat, a doua rădăcină,
+// dc:rights în afara rdf:Description, URI-ul xmpRights greșit.
 const OG = { domeniu: 'https://sebastians.life/', W: 1200, H: 630, kb: 300 };
 const ALT_OG = ['DGT', 'CC BY 4.0', 'Copernicus', 'OpenStreetMap', 'ODbL'];
 const meta = (h, k) => new RegExp(`<meta (?:property|name)="${k.replace(/[.:]/g, '\\$&')}" content="([^"]*)"`).exec(h)?.[1] ?? null;
+const SNIG = 'Informação geográfica cedida pela Direção-Geral do Território';
+const NS_XMP = 'http://ns.adobe.com/xap/1.0/\0';
+// Spațiile de nume, din specificația XMP (ISO 16684-1) și din Dublin Core.
+const NS = {
+  x: 'adobe:ns:meta/', rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#', xml: 'http://www.w3.org/XML/1998/namespace',
+  dc: 'http://purl.org/dc/elements/1.1/', xmpRights: 'http://ns.adobe.com/xap/1.0/rights/', photoshop: 'http://ns.adobe.com/photoshop/1.0/',
+};
+/** Ce trebuie să ducă XMP-ul, din sidecaruri (adresele normalizate ca în pagină, `new URL().href`). */
+const REF_XMP = (() => {
+  const din = { drepturi: new Set(), licente: new Set(), portaluri: new Set() };
+  const adresa = (v) => { try { const u = new URL(v); return /^https?:$/.test(u.protocol) ? u.href : null; } catch { return null; } };
+  const umbla = (o) => {
+    if (Array.isArray(o)) { o.forEach(umbla); return; }
+    if (!o || typeof o !== 'object') return;
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v !== 'string') umbla(v);
+      else if (k === 'atributie' || k === 'raspundere') din.drepturi.add(v);
+      else if (k === 'licenta_url' && adresa(v)) din.licente.add(adresa(v));
+      else if (k === 'portal' && adresa(v)) din.portaluri.add(adresa(v));
+    }
+  };
+  for (const f of readdirSync('public/data').filter((n) => n.endsWith('.json'))) umbla(JSON.parse(readFileSync(`public/data/${f}`, 'utf8')));
+  const fixe = { drepturi: [SNIG], licente: ['https://creativecommons.org/licenses/by/4.0/', 'https://opendatacommons.org/licenses/odbl/1-0/'] };
+  const licente = new Set([...fixe.licente, ...din.licente]);
+  return {
+    drepturi: [...fixe.drepturi, ...din.drepturi],
+    termeni: [...licente, ...din.portaluri],
+    descrie: `în dc:rights textul SNIG, ${din.drepturi.size} atribuiri și clauze din sidecaruri și nota prelucrărilor; `
+      + `în UsageTerms ${licente.size} adrese de licențe (CC BY 4.0 și ODbL 1.0 cerute aici, restul din licenta_url) și ${din.portaluri.size} portaluri`,
+  };
+})();
+/** Segmentele APP1 cu XMP de dinaintea imaginii (până la SOF sau SOS): `{ i, L, pachet }`. */
+const segmenteXmp = (b) => {
+  const g = [];
+  for (let i = 2; i + 4 <= b.length;) {
+    if (b[i] !== 0xff) break;
+    if (b[i + 1] === 0xff) { i++; continue; }
+    const m = b[i + 1];
+    if (m === 0xda || (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m))) break;
+    const L = b.readUInt16BE(i + 2);
+    if (m === 0xe1 && b.toString('latin1', i + 4, i + 4 + NS_XMP.length) === NS_XMP) g.push({ i, L, pachet: b.toString('utf8', i + 4 + NS_XMP.length, i + 2 + L) });
+    i += 2 + L;
+  }
+  return g;
+};
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const textXml = (s) => s.replace(/&(#x[\da-fA-F]+|#\d+|\w+);/g, (_, e) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENT[e]));
+/**
+ * Un XML mic, citit cu spațiile de nume: `{ radacina }`, cu elemente `{ nume, uri, local, atr, copii,
+ * text }` (`atr`: „URI local” → valoare), sau `{ eroare }`. Cere o singură rădăcină, etichetele
+ * închise în ordine, numai entitățile XML, fiecare prefix declarat (`xml` e predeclarat) și
+ * atributele unice, și după nume, și după spațiul de nume. Comentariile, CDATA și DTD-urile nu le
+ * citește: le refuză, ca orice nu înțelege.
+ */
+const citesteXml = (x) => {
+  const re = /<\?[\s\S]*?\?>|<(\/?)([A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?)((?:\s+[A-Za-z_][\w.:-]*\s*=\s*"[^"<]*")*)\s*(\/?)>|([^<]+)/y;
+  const ent = (s) => /&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/.test(s);
+  const rezolva = (nume, ns, atribut) => {
+    const [p, l] = nume.includes(':') ? nume.split(':') : [null, nume];
+    if (p === 'xml') return { uri: NS.xml, local: l };
+    if (p === null) return { uri: atribut ? '' : ns.get('') ?? '', local: l };
+    return ns.has(p) ? { uri: ns.get(p), local: l } : null;
+  };
+  const radacini = [], stiva = [];
+  for (let p = 0; p < x.length;) {
+    re.lastIndex = p;
+    const m = re.exec(x);
+    if (!m) return { eroare: `nimic de citit la ${p}` };
+    p = re.lastIndex;
+    if (m[5] !== undefined) {
+      if (ent(m[5])) return { eroare: 'un & fără entitate' };
+      if (stiva.length) stiva.at(-1).text += textXml(m[5]);
+      else if (m[5].trim()) return { eroare: 'text în afara rădăcinii' };
+      continue;
+    }
+    if (!m[2]) continue; // o instrucțiune de procesare (xpacket)
+    if (m[1]) {
+      if (stiva.pop()?.nume !== m[2]) return { eroare: `</${m[2]}> închide altceva` };
+      continue;
+    }
+    if (!stiva.length && radacini.length) return { eroare: `a doua rădăcină, <${m[2]}>` };
+    const brute = [...m[3].matchAll(/([A-Za-z_][\w.:-]*)\s*=\s*"([^"<]*)"/g)].map((a) => [a[1], a[2]]);
+    if (new Set(brute.map(([k]) => k)).size !== brute.length) return { eroare: `atribut dublat în <${m[2]}>` };
+    if (brute.some(([, v]) => ent(v))) return { eroare: `un & fără entitate în <${m[2]}>` };
+    const ns = new Map(stiva.at(-1)?.ns ?? []);
+    for (const [k, v] of brute) if (k === 'xmlns') ns.set('', textXml(v)); else if (k.startsWith('xmlns:')) ns.set(k.slice(6), textXml(v));
+    const r = rezolva(m[2], ns, false);
+    if (!r) return { eroare: `prefix nedeclarat în <${m[2]}>` };
+    const atr = new Map();
+    for (const [k, v] of brute) {
+      if (k === 'xmlns' || k.startsWith('xmlns:')) continue;
+      const ra = rezolva(k, ns, true);
+      if (!ra) return { eroare: `prefix nedeclarat în atributul ${k}` };
+      if (atr.has(`${ra.uri} ${ra.local}`)) return { eroare: `atribut dublat (după spațiul de nume) în <${m[2]}>` };
+      atr.set(`${ra.uri} ${ra.local}`, textXml(v));
+    }
+    const e = { nume: m[2], ...r, ns, atr, copii: [], text: '' };
+    (stiva.at(-1)?.copii ?? radacini).push(e);
+    if (!m[4]) stiva.push(e);
+  }
+  if (stiva.length) return { eroare: `<${stiva.at(-1).nume}> neînchis` };
+  return radacini.length === 1 ? { radacina: radacini[0] } : { eroare: 'fără rădăcină' };
+};
+/**
+ * Proprietățile XMP: x:xmpmeta > un rdf:RDF > rdf:Description-uri cu rdf:about; fiecare
+ * proprietate, element sau atribut, după „URI local”. `{ prop }` sau `{ eroare }`.
+ */
+const proprietatiXmp = (rad) => {
+  if (rad.uri !== NS.x || rad.local !== 'xmpmeta') return { eroare: 'rădăcina nu e x:xmpmeta' };
+  if (rad.copii.length !== 1 || rad.copii[0].uri !== NS.rdf || rad.copii[0].local !== 'RDF') return { eroare: 'x:xmpmeta nu are exact un rdf:RDF' };
+  const desc = rad.copii[0].copii;
+  if (!desc.length || desc.some((d) => d.uri !== NS.rdf || d.local !== 'Description')) return { eroare: 'rdf:RDF are altceva decât rdf:Description' };
+  if (desc.some((d) => !d.atr.has(`${NS.rdf} about`))) return { eroare: 'rdf:Description fără rdf:about' };
+  const prop = new Map();
+  for (const d of desc) {
+    for (const [k, v] of d.atr) if (!k.startsWith(`${NS.rdf} `)) prop.set(k, { copii: [], text: v });
+    for (const c of d.copii) prop.set(`${c.uri} ${c.local}`, c);
+  }
+  return { prop };
+};
+/** Valoarea unei proprietăți: textul ei simplu sau `rdf:li` x-default din `rdf:Alt`; null dacă lipsește. */
+const valoareXmp = (prop, uri, local) => {
+  const c = prop.get(`${uri} ${local}`);
+  if (!c) return null;
+  if (!c.copii.length) return c.text;
+  const alt = c.copii.length === 1 && c.copii[0].uri === NS.rdf && c.copii[0].local === 'Alt' ? c.copii[0] : null;
+  return alt?.copii.find((l) => l.uri === NS.rdf && l.local === 'li' && l.atr.get(`${NS.xml} lang`) === 'x-default')?.text ?? null;
+};
 /** Primul marcaj SOF al unui JPEG: `{ W, H, i }`, cu `i` poziția marcajului; null dacă nu e JPEG. */
 const dimJpeg = (b) => {
   if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
@@ -395,13 +542,37 @@ const imagineaOg = (h, citeste) => {
   if (b && b.length > OG.kb * 1000) probleme.push(`${(b.length / 1000).toFixed(0)} KB, peste ${OG.kb}`);
   for (const s of ALT_OG) if (!alt.includes(s)) probleme.push(`textul alternativ nu numește ${s}`);
   if (meta(h, 'twitter:card') !== 'summary_large_image') probleme.push(`twitter:card „${meta(h, 'twitter:card')}”`);
-  return { url, kb: b ? +(b.length / 1000).toFixed(1) : null, d, probleme };
+  // XMP-ul
+  const xmp = d ? segmenteXmp(b) : [], p = xmp[0]?.pachet ?? '';
+  if (d && xmp.length !== 1) probleme.push(xmp.length ? `fișierul are ${xmp.length} segmente XMP` : 'fișierul n-are XMP');
+  if (xmp.length) {
+    if (!/^<\?xpacket begin="﻿?" id="W5M0MpCehiHzreSzNTczkc9d"\?>/.test(p) || !/<\?xpacket end="[rw]"\?>\s*$/.test(p)) probleme.push('XMP-ul n-are învelișul xpacket');
+    const doc = citesteXml(p), x = doc.radacina ? proprietatiXmp(doc.radacina) : null;
+    if (doc.eroare) probleme.push(`XMP-ul nu e XML bine format: ${doc.eroare}`);
+    else if (x.eroare) probleme.push(`XMP-ul n-are structura XMP: ${x.eroare}`);
+    else {
+      const v = (pre, local) => {
+        const val = valoareXmp(x.prop, NS[pre], local);
+        if (val === null) probleme.push(`XMP-ul n-are ${pre}:${local} (${NS[pre]})`);
+        return val;
+      };
+      const drepturi = v('dc', 'rights'), termeni = v('xmpRights', 'UsageTerms');
+      if (drepturi !== null) for (const s of REF_XMP.drepturi) if (!drepturi.includes(s)) probleme.push(`XMP-ul (dc:rights) n-are „${s.slice(0, 48)}${s.length > 48 ? '…' : ''}”`);
+      if (drepturi !== null && !/Prelucrate pentru această pagină: [^.;]+(?:; [^.;]+)*\./.test(drepturi)) probleme.push('XMP-ul (dc:rights) n-are lista prelucrărilor');
+      if (termeni !== null) for (const s of REF_XMP.termeni) if (!termeni.includes(s)) probleme.push(`XMP-ul (xmpRights:UsageTerms) n-are ${s}`);
+      const descriere = v('dc', 'description'), pagina = v('xmpRights', 'WebStatement');
+      if (descriere !== null && descriere !== meta(h, 'og:image:alt')) probleme.push('descrierea din XMP (dc:description) diferă de og:image:alt (cere o captură nouă)');
+      if (pagina !== null && pagina !== meta(h, 'og:url')) probleme.push('xmpRights:WebStatement diferă de og:url');
+    }
+  }
+  return { url, kb: b ? +(b.length / 1000).toFixed(1) : null, d, xmp: xmp.length === 1 ? Buffer.byteLength(p) : null, probleme };
 };
 {
   const src = readFileSync('index.html', 'utf8');
   for (const [nume, h, dir] of [['index.html', src, 'public'], ['dist/index.html', html, 'dist']]) {
     const x = imagineaOg(h, deLaDisc(dir));
-    proba(x.probleme.length === 0, `${nume}: og:image ${x.url}, ${x.d ? `${x.d.W} × ${x.d.H}` : 'fără dimensiuni'}, ${x.kb} KB, textul alternativ cu ${ALT_OG.join(', ')}, twitter:card${x.probleme.length ? `; ${x.probleme.join('; ')}` : ''}`);
+    proba(x.probleme.length === 0, `${nume}: og:image ${x.url}, ${x.d ? `${x.d.W} × ${x.d.H}` : 'fără dimensiuni'}, ${x.kb} KB, textul alternativ cu ${ALT_OG.join(', ')}, twitter:card; `
+      + `XMP ${x.xmp ?? '—'} octeți: ${REF_XMP.descrie}${x.probleme.length ? `; ${x.probleme.join('; ')}` : ''}`);
   }
   const LINIE = /[ \t]*<meta property="og:image" content="[^"]*" \/>\r?\n/;
   const inlocuieste = (a, b) => (html.includes(a) ? html.replace(a, b) : null);
@@ -413,6 +584,17 @@ const imagineaOg = (h, citeste) => {
   const jpeg = deLaDisc('dist')('og-cabo-espichel.jpg'), sof = jpeg ? dimJpeg(jpeg) : null;
   const dinDist = deLaDisc('dist');
   const strica = (f) => (sof ? (cale) => (cale === 'og-cabo-espichel.jpg' ? f(Buffer.from(jpeg)) : dinDist(cale)) : null);
+  // XMP-ul stricat: segmentul scos, dublat sau rescris (o mutație care nu se aplică lasă fișierul
+  // neatins, deci controlul pică singur).
+  const faraXmp = (b) => { const [s] = segmenteXmp(b); return s ? Buffer.concat([b.subarray(0, s.i), b.subarray(s.i + 2 + s.L)]) : b; };
+  const dublat = (b) => { const [s] = segmenteXmp(b); return s ? Buffer.concat([b.subarray(0, s.i + 2 + s.L), b.subarray(s.i, s.i + 2 + s.L), b.subarray(s.i + 2 + s.L)]) : b; };
+  const cuPachet = (f) => (b) => {
+    const [s] = segmenteXmp(b), nou = s ? f(s.pachet) : null;
+    if (!s || nou === s.pachet) return b;
+    const date = Buffer.concat([Buffer.from(NS_XMP, 'latin1'), Buffer.from(nou, 'utf8')]), antet = Buffer.from([0xff, 0xe1, 0, 0]);
+    antet.writeUInt16BE(date.length + 2, 2);
+    return Buffer.concat([b.subarray(0, s.i), antet, date, b.subarray(s.i + 2 + s.L)]);
+  };
   for (const [ce, h, citeste, asteptat] of [
     ['fără og:image', LINIE.test(html) ? html.replace(LINIE, '') : null, dinDist, /fără og:image/],
     ['adresa relativă', inlocuieste(`content="${OG.domeniu}og-`, 'content="/og-'), dinDist, /nu e absolută/],
@@ -423,6 +605,26 @@ const imagineaOg = (h, citeste) => {
     ['fișierul cu 1200 × 631 în SOF', html, strica((b) => { b.writeUInt16BE(631, sof.i + 5); return b; }), /fișierul are 1200 × 631/],
     ['fișierul peste 300 KB', html, strica((b) => Buffer.concat([b, Buffer.alloc(OG.kb * 1000)])), /KB, peste 300/],
     ['un PNG sub numele lui', html, strica(() => readFileSync('public/apple-touch-icon.png')), /fișierul nu e JPEG/],
+    ['fișierul fără XMP', html, strica(faraXmp), /n-are XMP/],
+    ['XMP-ul de două ori', html, strica(dublat), /2 segmente XMP/],
+    ['XMP-ul fără textul SNIG', html, strica(cuPachet((p) => p.replace(SNIG, ''))), /dc:rights\) n-are „Informação geográfica/],
+    ['XMP-ul fără atribuirea Sentinel-2', html, strica(cuPachet((p) => p.replace('Contains modified Copernicus Sentinel data 2025', ''))), /dc:rights\) n-are „Contains modified Copernicus Sentinel/],
+    ['XMP-ul fără adresa ODbL', html, strica(cuPachet((p) => p.replace('https://opendatacommons.org/licenses/odbl/1-0/', ''))), /UsageTerms\) n-are https:\/\/opendatacommons/],
+    ['XMP-ul fără prelucrări', html, strica(cuPachet((p) => p.replace(/(Prelucrate pentru această pagină: )[^.]*\./, '$1.'))), /dc:rights\) n-are lista prelucrărilor/],
+    ['XMP-ul fără adresa OpenStreetMap', html, strica(cuPachet((p) => p.replace('https://www.openstreetmap.org/copyright', ''))), /UsageTerms\) n-are https:\/\/www\.openstreetmap\.org\/copyright/],
+    ['XMP-ul fără portalul DGT', html, strica(cuPachet((p) => p.replace('https://cdd.dgterritorio.gov.pt/', ''))), /UsageTerms\) n-are https:\/\/cdd\.dgterritorio/],
+    ['XMP-ul cu altă pagină', html, strica(cuPachet((p) => p.replace('<xmpRights:WebStatement>https://sebastians.life/<', '<xmpRights:WebStatement>https://text.sebastians.life/<'))), /WebStatement diferă de og:url/],
+    ['XMP-ul fără xpacket', html, strica(cuPachet((p) => p.replace(/<\?xpacket[^>]*\?>/g, ''))), /n-are învelișul xpacket/],
+    ['XMP-ul fără </dc:rights>', html, strica(cuPachet((p) => p.replace('</dc:rights>', ''))), /nu e XML bine format: <\/rdf:Description> închide altceva/],
+    ['XMP-ul fără xmlns:dc', html, strica(cuPachet((p) => p.replace(/\s+xmlns:dc="[^"]*"/, ''))), /prefix nedeclarat în <dc:title>/],
+    ['XMP-ul cu rdf:about dublat', html, strica(cuPachet((p) => p.replace('rdf:about=""', 'rdf:about="" rdf:about=""'))), /atribut dublat/],
+    ['XMP-ul cu a doua rădăcină', html, strica(cuPachet((p) => p.replace('</x:xmpmeta>', '</x:xmpmeta>\n<x:xmpmeta xmlns:x="adobe:ns:meta/"/>'))), /a doua rădăcină/],
+    ['XMP-ul cu dc:rights în afara rdf:Description', html, strica(cuPachet((p) => {
+      const m = /<dc:rights>[\s\S]*?<\/dc:rights>/.exec(p);
+      return m ? p.replace(m[0], '').replace('</x:xmpmeta>', () => `${m[0].replace('<dc:rights>', `<dc:rights xmlns:dc="${NS.dc}" xmlns:rdf="${NS.rdf}">`)}</x:xmpmeta>`) : p;
+    })), /structura XMP: x:xmpmeta nu are exact un rdf:RDF/],
+    ['XMP-ul cu URI-ul xmpRights greșit', html, strica(cuPachet((p) => p.replace(`xmlns:xmpRights="${NS.xmpRights}"`, 'xmlns:xmpRights="http://ns.adobe.com/xap/1.0/right/"'))), /n-are xmpRights:UsageTerms/],
+    ['XMP-ul cu descrierea veche', html, strica(cuPachet((p) => p.replace('plaja de la poalele ei', 'plaja'))), /diferă de og:image:alt/],
   ]) {
     const x = h === null || citeste === null ? null : imagineaOg(h, citeste);
     proba(x !== null && x.probleme.some((p) => asteptat.test(p)), `control, ${ce}: ${x === null ? 'MUTAȚIA NU S-A APLICAT' : x.probleme.join('; ') || 'nicio problemă'} — pică`);

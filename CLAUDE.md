@@ -253,7 +253,7 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - `build.target` e `['es2022', 'safari15.4', 'ios15.4']`; `public/plasa.js` e ES5, script clasic
   cu `defer`. → pornirea
 - Fără `frame-ancestors`, ales: pagina se poate încadra. `og:image` e captura Satelit
-  (`npm run captura-og`), cu sursele în textul alternativ. Hărțile de cod se publică, închise publicului, la alegerea autorului. → livrarea
+  (`npm run captura-og`), cu sursele în textul alternativ și atribuirea întreagă în XMP. Hărțile de cod se publică, închise publicului, la alegerea autorului. → livrarea
 
 **Probele**
 - Fiecare probă de fond are un control negativ: aceeași probă pe o greșeală cunoscută, care

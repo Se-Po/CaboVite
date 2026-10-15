@@ -69,7 +69,8 @@ tratează ambele.
 publicare, și adaptată, textul „Informação geográfica cedida pela Direção-Geral do
 Território”. Îl scrie `scrieSurse()` din `src/main.js`, o singură dată, cu
 `lang="pt"`, ori de câte ori subsolul are o sursă DGT. Sidecarurile publicate nu
-s-au rescris pentru asta.
+s-au rescris pentru asta. Imaginea `og:image` îl poartă și ea, în XMP (`dc:rights`), cu
+atribuirile întregi, luate din aceeași modală (docs/livrarea.md, din 0.1.8.01).
 
 În pagină rămâne un singur rând, fără fundal, sus-stânga: „© DGT · © Copernicus ·
 © OpenStreetMap”. Copernicus vine cu împrejurimile — relieful GLO-30 și Sentinel-2;

@@ -67,7 +67,7 @@ diferă de el însuși cu 226. Fișierele ies identice la fiecare rulare.
 **Imaginea de previzualizare (`og:image`), din 0.1.7.08.** Alegerea autorului: harta pe Satelit,
 din vederea de pornire.
 - **Captura:** `npm run captura-og`, după build, scrie `public/og-cabo-espichel.jpg`, 1200 × 630,
-  cel mult 300 KB (azi 100,7 KB, JPEG la calitatea 85).
+  cel mult 300 KB (azi 104,8 KB, JPEG la calitatea 85, cu XMP-ul de 4 113 octeți).
   - Pagina se deschide în Edge fără interfață, cu un profil temporar, șters la închidere
     (`scripts/comun/edge.mjs`), pe build-ul servit local. Edge desenează harta pe placă (ANGLE,
     Direct3D11).
@@ -85,18 +85,46 @@ din vederea de pornire.
     CC BY 4.0, Copernicus pentru relieful și imaginile împrejurimilor depărtate, OpenStreetMap
     cu ODbL —, pentru cine nu vede imaginea;
   - `twitter:card` `summary_large_image`.
-- **Ce nu ține:** fișierul n-are metadate (EXIF, XMP), deci, salvat și repostat singur,
-  păstrează numai rândul din pixeli, fără licențe și fără textul SNIG pe care îl scrie
-  `scrieSurse()`. Metadatele în fișier rămân la alegerea autorului
-  <!-- NEVERIFICAT: dacă textul SNIG trebuie să însoțească și fișierul -->.
+- **Atribuirea în fișier (XMP), din 0.1.8.01, la cererea autorului.** Salvată și repostată
+  singură, imaginea poartă atribuirea întreagă, nu numai rândul din pixeli.
+  - Textele vin din modala surselor a paginii fotografiate, cele scrise de `scrieSurse()` din
+    sidecaruri; captura nu le scrie a doua oară.
+  - `dc:rights` (IPTC „Copyright Notice”): textul SNIG, atribuirile, clauza Copernicus DEM și
+    nota „Prelucrate pentru această pagină: …” (CC BY cere să se spună ce s-a schimbat).
+  - `xmpRights:UsageTerms`: licențele și portalurile datelor, cu adresele lor.
+  - `xmpRights:WebStatement`: pagina (`og:url`); `photoshop:Credit` (IPTC „Credit Line”):
+    rândul vizibil; `dc:title` și `dc:description`: `og:title` și `og:image:alt`.
+  - Un singur segment APP1, după JFIF, fără nicio dată calendaristică: două capturi au ieșit
+    identice la octet, iar fără segment fișierul are octeții capturii de dinainte (pixelii nu
+    s-au schimbat).
+  - Citit o dată, de mână, cu decodorul Windows (WPF, `BitmapMetadata`): toate câmpurile, cu
+    diacriticele întregi; `Copyright` și `Title` le dă din XMP. Proba de mai jos nu-l folosește.
+  - Fișierul de pe domeniu le păstrează (`--live`, mai jos). Ce păstrează o rețea care
+    recodează imaginea nu s-a încercat <!-- NEVERIFICAT: metadatele după repostarea pe o rețea -->.
 - **Proba,** în `verifica-livrare`, pe sursă și pe build:
   - meta-urile, dimensiunile reale ale fișierului (din antetul JPEG, SOF), mărimea și textul
     alternativ, cu fiecare dintre DGT, CC BY 4.0, Copernicus, OpenStreetMap și ODbL;
-  - 13 controale, fiecare cu problema pe care trebuie s-o numească. Pe marcaj: fără `og:image`,
-    adresa relativă, înălțimea 631, tipul `image/png`, `twitter:card` `summary` și textul
-    alternativ fără fiecare dintre cele cinci. Pe fișier, copii în memorie: 1200 × 631 în SOF,
-    peste 300 KB, un PNG sub numele lui;
-  - cu `--live`: imaginea de pe domeniu, aceiași octeți ca în `dist/`.
+  - XMP-ul, cu un cititor al probei, independent de captură, care citește cum citește un cititor
+    XMP: un singur segment înaintea imaginii, în xpacket (cu id-ul din specificație); XML bine
+    format, cu spațiile de nume — o singură rădăcină, prefixele declarate, atributele unice;
+    structura `x:xmpmeta` > `rdf:RDF` > `rdf:Description`; proprietățile după URI-ul spațiului
+    lor de nume, nu după prefix. Comentariile, CDATA și DTD-urile le refuză: captura nu le scrie;
+  - referința, calculată în probă: în `dc:rights`, textul SNIG (scris în probă: niciun sidecar
+    nu-l are), cele 8 `atributie` și `raspundere` ale sidecarurilor din `public/data` și nota
+    „Prelucrate pentru această pagină: …”, cu o listă care nu e goală (frazele le scrie scena, la
+    rulare, deci n-au referință în sidecaruri); în `xmpRights:UsageTerms`, 4 adrese de licențe —
+    CC BY 4.0 și ODbL 1.0 cerute în probă, restul din `licenta_url` — și cele 4 `portal`-uri.
+    `dc:description` trebuie să fie `og:image:alt`, iar `xmpRights:WebStatement`, `og:url`: o
+    sursă nouă sau un text alternativ schimbat cer o captură nouă;
+  - 30 de controale, fiecare cu problema pe care trebuie s-o numească. Pe marcaj (10): fără
+    `og:image`, adresa relativă, înălțimea 631, tipul `image/png`, `twitter:card` `summary` și
+    textul alternativ fără fiecare dintre cele cinci. Pe fișier, copii în memorie (20): 1200 × 631
+    în SOF, peste 300 KB, un PNG sub numele lui; fără XMP, XMP-ul de două ori, fără textul SNIG,
+    fără atribuirea Sentinel-2, fără adresa ODbL, fără prelucrări, fără adresa OpenStreetMap,
+    fără portalul DGT, cu altă pagină, fără xpacket, fără `</dc:rights>`, fără `xmlns:dc`, cu
+    `rdf:about` dublat, cu a doua rădăcină, cu `dc:rights` în afara `rdf:Description`, cu
+    URI-ul `xmpRights` greșit, cu descrierea veche;
+  - cu `--live`: imaginea de pe domeniu, aceiași octeți ca în `dist/`, deci și același XMP.
 
 **Proba: `npm run verifica-livrare`**, după `npm run build`:
 - politica de cache pe fiecare fișier publicat. Clasa fiecărui fel de fișier din `/data`
