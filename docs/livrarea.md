@@ -22,8 +22,8 @@ revalidau 45 de fișiere, în lanț — HTML, JS, apoi cele trei niveluri de dat
   (`scrieNepublicat` din `scripts/comun/publicat.mjs`). Altfel aruncă, înainte de scriere.
   Octeții se compară ca blob git (`hash-object --path`): cu `core.autocrlf`, un .json
   poate avea pe disc alte capete de rând decât în depozit.
-- Rămân pe revalidare (ETag, 304) documentul, iconițele, `plasa.js`, `paleta-teren.json` și straturile
-  `-ndvi`. Paleta se reface sub același nume și are patru versiuni în istoric. Numele unui
+- Rămân pe revalidare (ETag, 304) documentul, iconițele, imaginea `og:image`, `plasa.js`,
+  `paleta-teren.json` și straturile `-ndvi`. Paleta se reface sub același nume și are patru versiuni în istoric. Numele unui
   strat NDVI vine din al hărții (`loaders.js`), deci un strat refăcut n-ar avea unde primi
   alt nume. Paleta ține și după reparație un dus-întors pe drumul spre primul cadru
   (`incarcaPaleta()`, așteptată în `scena.js`); un nume versionat l-ar scoate.
@@ -62,8 +62,41 @@ publicate, la alegerea autorului.
 SVG-ul ca text, PNG-urile (16, 32 și 48 în ICO, 180 pentru iOS, pe fondul paginii) cu
 gradientul calculat ca în SVG. Față de SVG-ul desenat de Chromium, PNG-urile diferă cu
 0,8–1,5 niveluri în medie și cu 9–19 pe marginea cercului; mutat cu un pixel, SVG-ul
-diferă de el însuși cu 226. Fișierele ies identice la fiecare rulare. `og:image` lipsește
-până când autorul alege o imagine.
+diferă de el însuși cu 226. Fișierele ies identice la fiecare rulare.
+
+**Imaginea de previzualizare (`og:image`), din 0.1.7.08.** Alegerea autorului: harta pe Satelit,
+din vederea de pornire.
+- **Captura:** `npm run captura-og`, după build, scrie `public/og-cabo-espichel.jpg`, 1200 × 630,
+  cel mult 300 KB (azi 100,7 KB, JPEG la calitatea 85).
+  - Pagina se deschide în Edge fără interfață, cu un profil temporar, șters la închidere
+    (`scripts/comun/edge.mjs`), pe build-ul servit local. Edge desenează harta pe placă (ANGLE,
+    Direct3D11).
+  - Panourile de peste hartă se ascund, printr-o foaie construită (`adoptedStyleSheets`), nu
+    printr-un `<style>` pe care CSP-ul l-ar raporta. Rămâne rândul surselor, „© DGT · ©
+    Copernicus · © OpenStreetMap”, pe care licențele îl cer oriunde se arată harta.
+  - Cu erori, avertismente sau încălcări CSP în consolă (și cele scrise de browser, prin
+    `Log.entryAdded`), imaginea nu se scrie.
+  - Două capturi pe același build au ieșit identice la octet.
+- **Cache-ul:** imaginea are un nume fix și stă pe revalidare, ca iconițele, deci o captură
+  nouă se scrie peste ea.
+- **`index.html`:**
+  - `og:image`, cu adresa absolută, `og:image:type`, `:width` și `:height`;
+  - `og:image:alt`, care descrie imaginea și numește sursele cu licențele lor — DGT cu
+    CC BY 4.0, Copernicus pentru relieful și imaginile împrejurimilor depărtate, OpenStreetMap
+    cu ODbL —, pentru cine nu vede imaginea;
+  - `twitter:card` `summary_large_image`.
+- **Ce nu ține:** fișierul n-are metadate (EXIF, XMP), deci, salvat și repostat singur,
+  păstrează numai rândul din pixeli, fără licențe și fără textul SNIG pe care îl scrie
+  `scrieSurse()`. Metadatele în fișier rămân la alegerea autorului
+  <!-- NEVERIFICAT: dacă textul SNIG trebuie să însoțească și fișierul -->.
+- **Proba,** în `verifica-livrare`, pe sursă și pe build:
+  - meta-urile, dimensiunile reale ale fișierului (din antetul JPEG, SOF), mărimea și textul
+    alternativ, cu fiecare dintre DGT, CC BY 4.0, Copernicus, OpenStreetMap și ODbL;
+  - 13 controale, fiecare cu problema pe care trebuie s-o numească. Pe marcaj: fără `og:image`,
+    adresa relativă, înălțimea 631, tipul `image/png`, `twitter:card` `summary` și textul
+    alternativ fără fiecare dintre cele cinci. Pe fișier, copii în memorie: 1200 × 631 în SOF,
+    peste 300 KB, un PNG sub numele lui;
+  - cu `--live`: imaginea de pe domeniu, aceiași octeți ca în `dist/`.
 
 **Proba: `npm run verifica-livrare`**, după `npm run build`:
 - politica de cache pe fiecare fișier publicat. Clasa fiecărui fel de fișier din `/data`

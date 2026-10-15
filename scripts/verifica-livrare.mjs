@@ -353,6 +353,82 @@ proba(STIL_INLINE.test('<div class="bara" style="background: red"></div>'), 'con
   proba(inMain !== null && !bun(inMain), `control, titlul pus în #continut: ${inMain === null ? 'MUTAȚIA NU S-A APLICAT' : descrie(inMain)} — pică`);
 }
 
+// ------------------------------------------------------------ imaginea de previzualizare (og:image)
+
+// index.html numește imaginea de previzualizare (`og:image`), cu adresa absolută pe domeniu, tipul,
+// dimensiunile și textul alternativ; `twitter:card` cere imaginea mare. Fișierul, scris de
+// `npm run captura-og`, trebuie să fie chiar acela: JPEG, cu dimensiunile din antetul lui (SOF),
+// 1200 × 630, cel mult 300 KB. Textul alternativ numește fiecare sursă cu licența ei — DGT cu
+// CC BY 4.0, Copernicus, OpenStreetMap cu ODbL —, pentru cine nu vede imaginea; fișierul n-are
+// metadate, deci, salvat singur, păstrează numai rândul din pixeli. În sursă (cu public/) și în
+// build (cu dist/). Controale, fiecare cu problema pe care trebuie s-o numească: pe marcaj, nouă
+// index.html stricate; pe fișier, trei JPEG-uri stricate în memorie (alte dimensiuni în SOF, peste
+// prag, un PNG sub numele lui).
+const OG = { domeniu: 'https://sebastians.life/', W: 1200, H: 630, kb: 300 };
+const ALT_OG = ['DGT', 'CC BY 4.0', 'Copernicus', 'OpenStreetMap', 'ODbL'];
+const meta = (h, k) => new RegExp(`<meta (?:property|name)="${k.replace(/[.:]/g, '\\$&')}" content="([^"]*)"`).exec(h)?.[1] ?? null;
+/** Primul marcaj SOF al unui JPEG: `{ W, H, i }`, cu `i` poziția marcajului; null dacă nu e JPEG. */
+const dimJpeg = (b) => {
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  for (let i = 2; i + 9 < b.length;) {
+    if (b[i] !== 0xff) return null;
+    if (b[i + 1] === 0xff) { i++; continue; } // octeți de umplere înaintea marcajului (T.81, B.1.1.2)
+    const m = b[i + 1];
+    if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { W: b.readUInt16BE(i + 7), H: b.readUInt16BE(i + 5), i };
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
+};
+const deLaDisc = (dir) => (cale) => (existsSync(`${dir}/${cale}`) ? readFileSync(`${dir}/${cale}`) : null);
+const imagineaOg = (h, citeste) => {
+  const url = meta(h, 'og:image'), alt = meta(h, 'og:image:alt') ?? '';
+  const cale = url?.startsWith(OG.domeniu) ? url.slice(OG.domeniu.length) : null;
+  const b = cale ? citeste(cale) : null, d = b ? dimJpeg(b) : null;
+  const probleme = [];
+  if (!url) probleme.push('fără og:image');
+  else if (!cale) probleme.push(`adresa „${url}” nu e absolută pe ${OG.domeniu}`);
+  else if (!b) probleme.push(`${cale} lipsește`);
+  if (b && !d) probleme.push('fișierul nu e JPEG');
+  if (meta(h, 'og:image:type') !== 'image/jpeg') probleme.push(`og:image:type „${meta(h, 'og:image:type')}”`);
+  if (Number(meta(h, 'og:image:width')) !== OG.W || Number(meta(h, 'og:image:height')) !== OG.H) probleme.push(`meta ${meta(h, 'og:image:width')} × ${meta(h, 'og:image:height')}, nu ${OG.W} × ${OG.H}`);
+  if (d && (d.W !== OG.W || d.H !== OG.H)) probleme.push(`fișierul are ${d.W} × ${d.H}`);
+  if (b && b.length > OG.kb * 1000) probleme.push(`${(b.length / 1000).toFixed(0)} KB, peste ${OG.kb}`);
+  for (const s of ALT_OG) if (!alt.includes(s)) probleme.push(`textul alternativ nu numește ${s}`);
+  if (meta(h, 'twitter:card') !== 'summary_large_image') probleme.push(`twitter:card „${meta(h, 'twitter:card')}”`);
+  return { url, kb: b ? +(b.length / 1000).toFixed(1) : null, d, probleme };
+};
+{
+  const src = readFileSync('index.html', 'utf8');
+  for (const [nume, h, dir] of [['index.html', src, 'public'], ['dist/index.html', html, 'dist']]) {
+    const x = imagineaOg(h, deLaDisc(dir));
+    proba(x.probleme.length === 0, `${nume}: og:image ${x.url}, ${x.d ? `${x.d.W} × ${x.d.H}` : 'fără dimensiuni'}, ${x.kb} KB, textul alternativ cu ${ALT_OG.join(', ')}, twitter:card${x.probleme.length ? `; ${x.probleme.join('; ')}` : ''}`);
+  }
+  const LINIE = /[ \t]*<meta property="og:image" content="[^"]*" \/>\r?\n/;
+  const inlocuieste = (a, b) => (html.includes(a) ? html.replace(a, b) : null);
+  const faraInAlt = (s) => {
+    const alt = meta(html, 'og:image:alt');
+    return alt?.includes(s) ? html.replace(`content="${alt}"`, () => `content="${alt.split(s).join('')}"`) : null;
+  };
+  // Fișierul: copii în memorie ale JPEG-ului din dist/, stricate.
+  const jpeg = deLaDisc('dist')('og-cabo-espichel.jpg'), sof = jpeg ? dimJpeg(jpeg) : null;
+  const dinDist = deLaDisc('dist');
+  const strica = (f) => (sof ? (cale) => (cale === 'og-cabo-espichel.jpg' ? f(Buffer.from(jpeg)) : dinDist(cale)) : null);
+  for (const [ce, h, citeste, asteptat] of [
+    ['fără og:image', LINIE.test(html) ? html.replace(LINIE, '') : null, dinDist, /fără og:image/],
+    ['adresa relativă', inlocuieste(`content="${OG.domeniu}og-`, 'content="/og-'), dinDist, /nu e absolută/],
+    ['înălțimea 631 în meta', inlocuieste('og:image:height" content="630"', 'og:image:height" content="631"'), dinDist, /meta 1200 × 631/],
+    ['tipul image/png', inlocuieste('og:image:type" content="image/jpeg"', 'og:image:type" content="image/png"'), dinDist, /og:image:type „image\/png”/],
+    ['twitter:card summary', inlocuieste('twitter:card" content="summary_large_image"', 'twitter:card" content="summary"'), dinDist, /twitter:card „summary”/],
+    ...ALT_OG.map((s) => [`textul alternativ fără ${s}`, faraInAlt(s), dinDist, new RegExp(`nu numește ${s.replace(/[.]/g, '\\.')}$`)]),
+    ['fișierul cu 1200 × 631 în SOF', html, strica((b) => { b.writeUInt16BE(631, sof.i + 5); return b; }), /fișierul are 1200 × 631/],
+    ['fișierul peste 300 KB', html, strica((b) => Buffer.concat([b, Buffer.alloc(OG.kb * 1000)])), /KB, peste 300/],
+    ['un PNG sub numele lui', html, strica(() => readFileSync('public/apple-touch-icon.png')), /fișierul nu e JPEG/],
+  ]) {
+    const x = h === null || citeste === null ? null : imagineaOg(h, citeste);
+    proba(x !== null && x.probleme.some((p) => asteptat.test(p)), `control, ${ce}: ${x === null ? 'MUTAȚIA NU S-A APLICAT' : x.probleme.join('; ') || 'nicio problemă'} — pică`);
+  }
+}
+
 // Simularea regulilor refuză ce nu înțelege, în loc să potrivească greșit.
 const arunca = (f) => { try { f(); return false; } catch { return true; } };
 proba(['/data/:fisier', '/data/(a(b))', '/data/(x)?', '/data/(?:x)', '/data/()'].every((s) => arunca(() => regexSursa(s))),
@@ -412,6 +488,15 @@ if (iLive >= 0) {
   }
   for (const n of nepotrivite.slice(0, 12)) console.log(`        ${n}`);
   proba(nepotrivite.length === 0, `antetele de pe ${CAI.length} căi sunt cele din vercel.json${nepotrivite.length ? ` (${nepotrivite.length} diferă)` : ''}`);
+  {
+    // imaginea de previzualizare publicată: aceeași adresă în documentul viu, aceiași octeți
+    const og = meta(await (await fetch(origine + '/')).text(), 'og:image');
+    const local = readFileSync(`dist/${meta(html, 'og:image').slice(OG.domeniu.length)}`);
+    const r = og ? await fetch(og.replace(OG.domeniu, origine + '/')) : null;
+    const b = r?.ok ? Buffer.from(await r.arrayBuffer()) : null;
+    proba(og === meta(html, 'og:image') && r?.status === 200 && r.headers.get('content-type') === 'image/jpeg' && b?.equals(local),
+      `og:image publicată: ${og ?? 'lipsă'} → ${r ? `HTTP ${r.status}, ${r.headers.get('content-type')}, ${b ? `${b.length} octeți, ${b.equals(local) ? 'aceiași ca în dist/' : 'ALȚII decât în dist/'}` : 'fără corp'}` : 'necerută'}`);
+  }
   if (HARTI_COD.length && viu) {
     // harta intrării publicate, nu a celei locale: dacă build-urile diferă, numele diferă
     const r = await fetch(`${origine}${viu}.map`, { method: 'HEAD', redirect: 'manual' });

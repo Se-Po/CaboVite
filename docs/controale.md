@@ -260,14 +260,29 @@ paza solului, pe build: Ctrl până la 27,42 m peste mare, apoi Q ×6 (216° →
 
 **Focusul, Escape și contrastul forțat** (2026-10-08):
 - Inelul auriu (`:focus-visible`, 3 px la 2 px de buton) stă pe ce e în spate: pe cerul de la
-  orizont, în jurul busolei, 1,2:1. Busola, Satelit, „Coordonate” și eticheta
+  orizont, în jurul busolei, sub 3:1 (pe pixeli, mai jos; 1,2:1, cifra din 2026-10-08, n-o reface
+  niciun cod). Busola, Satelit, „Coordonate” și eticheta
   au haloul `0 0 0 7px var(--bg)` — 2 px până la inel, 3 inelul, 2 dincolo —, cu umbra lor în
   aceeași declarație: inelul stă pe `--bg` de ambele părți, 8,8:1 (calculat). `verifica-pagina`
   cere haloul de cel puțin offset + grosime + 2 px, din regula generică, și umbra păstrată;
   controale: main.css de la 6ad3a47 (0 px), 5 px pe busolă, Satelit fără umbră, offsetul generic
   de 4 px (ar cere 9), banda dinăuntru a hărții de 1 px. În pagină (build, Tab real): `box-shadow`
-  „rgb(23, 21, 15) 0px 0px 0px 7px, …” pe toate patru (2026-10-09, după plecarea butoanelor hărții), cu inelul la vedere în captură. Contrastul pe
-  pixeli <!-- NEVERIFICAT: pixelii compuși nu se citesc din pagină -->.
+  „rgb(23, 21, 15) 0px 0px 0px 7px, …” pe toate patru (2026-10-09, după plecarea butoanelor hărții), cu inelul la vedere în captură.
+  Contrastul pe pixeli îl măsoară `npm run masoara-pixeli` (din 0.1.7.08), cu focusul adus cu Tab
+  în Edge, la 1280 × 800 și DPR 2, la mijlocul fiecărei laturi, judecată fiecare în parte: cere
+  cel puțin 3:1 de ambele părți ale inelului, pe toate patru.
+  - Pe Satelit, „Coordonate” și etichetă, inelul (#d3b063) are 8,8:1 față de halou (#17150f) pe
+    toate laturile, cât era calculat. Pe busolă tot 8,8:1, în afară de jos, 6,5:1: acolo, la
+    0,4rem sub rozetă, începe chenarul citirii azimutului (`.citire`, `--line`, #332e24).
+  - Pe rândul surselor, inelul are culoarea textului (#ece5d6): 14,6:1 pe toate laturile. Înainte,
+    pe dreapta avea 1,0:1: separatorul „·” de după buton, cu umbrele lui de text din `--bg`, se
+    desena peste inel. Butonul focusat are de atunci `position: relative; z-index: 1` (pe un
+    element flex ajunge și numai `z-index`), păzit de `verifica-pagina`.
+  - Controalele, pe aceeași măsurătoare, pică: rândul surselor fără `z-index`, cum era (1,0:1 pe
+    dreapta), și busola fără halou (1,2–1,3:1 pe trei laturi).
+  - Fără halou, inelul ar sta pe harta din spate: 1,2–1,4:1 la busolă (cerul, pe trei laturi; jos
+    e citirea), 1,2–3,4:1 la etichetă, 1,5–1,9:1 la rândul surselor (pe trei laturi: sus, la 10 px,
+    e marginea ecranului), 5,6–5,9:1 la Satelit și „Coordonate” (marea).
 - Escape cu fișa deschisă o închide: focusul din fișă sau de pe `<body>` se întoarce pe
   etichetă, cel de pe alt control rămâne. Pe telefon foaia acoperă rozeta, Satelit și
   „Coordonate”, la care Shift+Tab ajunge (WCAG 2.4.11); Escape le dezvăluie fără să mute

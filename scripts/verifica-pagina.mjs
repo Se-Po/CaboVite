@@ -17,7 +17,8 @@
 //   - foaia de stil (main.css): fără `:has()`, `dvh` numai cu rezervă, iar selecția
 //     oprită numai pe hartă și pe butoanele ei;
 //   - accesibilitatea foii: haloul `--bg` al focusului pe butoanele de peste hartă, cât
-//     inelul generic plus 2 px, cu umbra lor păstrată; bifa lui Satelit în afara numelui, cu
+//     inelul generic plus 2 px, cu umbra lor păstrată, iar pe rândul surselor peste vecinul
+//     din rând (`z-index`); bifa lui Satelit în afara numelui, cu
 //     rezervă; busola în contrast forțat, pe cascadă; panoul „Coordonate” fără text sub 14 px;
 //   - ordinea de desenare (cer.js, mare.js): cerul ultimul, marea după teren, cu
 //     `Less` strict pe mare, prin sortarea lui three însuși;
@@ -633,6 +634,18 @@ console.log('\nAccesibilitatea foii: haloul focusului, numele lui Satelit, busol
   ].map(([n, c]) => [n, c === null ? null : halouri(c)]);
   proba(mh.every(([, x]) => x !== null && !bunHalou(x)), `control: ${mh.map(([n, x]) => `${n}: ${x === null ? NEAPLICATA
     : `${x.butoane.filter((b) => b.halou < b.cerut || !b.pastrata).map((b) => `${b.s} ${b.halou}/${b.cerut} px${b.pastrata ? '' : ' fără umbră'}`).join(', ') || `harta ${x.harta.inauntru} px`}`}`).join('; ')} — pică`);
+
+  // Rândul surselor: butonul focusat se desenează peste vecinul din rând (`z-index`, pe un element
+  // flex), altfel separatorul „·” de după el, cu umbrele lui de text, taie inelul la mijlocul
+  // laturii drepte. Pe pixeli îl măsoară `npm run masoara-pixeli`, cu același control.
+  const peste = (css) => {
+    const z = reguliCss(css).filter((r) => r.medii.length === 0 && r.sel.includes('#surse .atribuire:focus-visible'))
+      .map((r) => ultima(r, 'z-index')).filter(Boolean).at(-1) ?? 'auto';
+    return { z, bun: Number.parseInt(z, 10) >= 1 };
+  };
+  const zs = peste(CSS), zm = muta(CSS, ['  z-index: 1;\n  outline-color: var(--ink);', '  outline-color: var(--ink);']);
+  proba(zs.bun, `rândul surselor: butonul focusat are z-index ${zs.z}, deci inelul trece peste separatorul „·”`);
+  proba(zm !== null && !peste(zm).bun, `control, fără z-index: ${zm === null ? NEAPLICATA : `z-index ${peste(zm).z}`} — pică`);
 
   // Numele lui Satelit. Orice `content` cu text vizibil are text alternativ (`/ "…"`), iar
   // înaintea lui declarația de rezervă cu același text, fără el: un browser care nu știe forma o

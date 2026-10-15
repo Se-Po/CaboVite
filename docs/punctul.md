@@ -234,6 +234,13 @@ linie; la 195 × 422 pe două, tot fără defilare orizontală; nicio axă rupt�
 390 × 844 cu valorile cele mai lungi: pe două coloane rândul trece pe două linii, iar cu
 `white-space: nowrap` cutia defilează (255 față de 230 px). `verifica-pagina` cere 0 mărimi
 sub 0,875rem în `#punct` și o coloană; pe main.css de la 6ad3a47 găsește 0,8 / 0,78 /
-0,72rem. Golul dintre axe, cu bara de defilare clasică simulată la 195 px, nu s-a remăsurat
-la 14 px <!-- NEVERIFICAT: bara clasică, la 14 px -->.
+0,72rem. Golul dintre axe l-a măsurat `npm run masoara-pixeli` (din 0.1.7.08), la 14 px, pe ecranul îngust:
+- **Ecranul:** 195 × 422 CSS la DPR 2 (390 px cu pagina mărită de două ori), cu bara de
+  defilare clasică pe care o are Edge pe Windows, 15 px; proba cere bara.
+- **Rezultatul:** atât cu valorile unui clic adevărat, cât și cu cele mai lungi, rândurile trec pe
+  câte două linii. Pe rândul scenei, X și Y stau pe o linie, cu 7,8 px între ele, iar Z pe a
+  doua; pe rândul TM06, fiecare axă are linia ei, deci acolo nu e niciun gol de măsurat.
+- **Ce nu se întâmplă:** nicio axă nu se rupe, nimic nu trece peste marginea cutiei, pagina nu
+  defilează pe orizontală.
+- **Pragul:** cel puțin 4 px, o alegere; un spațiu are 3,8 px la 14 px, tipărit de aceeași probă.
 

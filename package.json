@@ -38,7 +38,9 @@
     "verifica-livrare": "node scripts/verifica-livrare.mjs",
     "verifica-pagina": "node scripts/verifica-pagina.mjs",
     "verifica-documentatie": "node scripts/verifica-documentatie.mjs",
-    "iconite": "node scripts/iconite.mjs"
+    "iconite": "node scripts/iconite.mjs",
+    "captura-og": "node scripts/captura-og.mjs",
+    "masoara-pixeli": "node scripts/masoara-pixeli.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

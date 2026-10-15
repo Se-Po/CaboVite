@@ -233,9 +233,14 @@ html, body {
 #surse .rand a:focus-visible { text-decoration: underline; }
 /* Inelul de focus auriu obișnuit are ~1:1 față de cerul de dedesubt. Aici inelul
    e de culoarea textului, cu un chenar din culoarea fundalului de ambele părți —
-   umbra de 7 px stă sub contur, deci se vede orice ar fi în spate. */
+   umbra de 7 px stă sub contur, deci se vede orice ar fi în spate. Poziționat, cu
+   `z-index`, se desenează și peste vecinul din rând: altfel separatorul „·” de după
+   buton, cu umbrele lui de text, tăia inelul la mijlocul laturii drepte
+   (`npm run masoara-pixeli`, din 0.1.7.08). */
 #surse .atribuire:focus-visible,
 #surse .rand a:focus-visible {
+  position: relative;
+  z-index: 1;
   outline-color: var(--ink);
   border-radius: 4px;
   box-shadow: 0 0 0 7px var(--bg);
@@ -429,7 +434,8 @@ noscript p {
 
    Inelul stă la 2 px în afara elementului, deci pe ce e în spatele lui. Pe butoanele de peste
    scenă — busola, Satelit, „Coordonate”, eticheta sanctuarului — acolo e
-   harta: pe cerul de la orizont, la vederea de pornire, aurul are 1,2:1 în jurul busolei.
+   harta: pe cerul de la orizont, la vederea de pornire, aurul are în jurul busolei sub 3:1
+   (cifrele, pe pixeli, în docs/controale.md).
    Fiecare are deci și un halou din culoarea fundalului, `0 0 0 7px var(--bg)` — 2 px până la
    inel, 3 px inelul, 2 px dincolo —, iar inelul stă pe `--bg` de ambele părți: 8,8:1. Umbra
    butonului rămâne, în aceeași declarație. Rândul cu sursele are un halou la fel; harta,

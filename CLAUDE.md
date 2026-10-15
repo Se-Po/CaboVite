@@ -48,6 +48,7 @@ se poartă în română.
 | `npm run verifica` | toate probele Node, în paralel, cu un rezumat; `-- --strict`: o probă sărită e un eșec |
 | `npm run verifica-<nume>` | una singură: `tiff`, `teren`, `sanctuar`, `cladiri`, `imprejurimi`, `controale`, `pagina`, `documentatie`; `livrare` după build, cu `-- --live` pe sebastians.life |
 | `npm run iconite` | iconițele paginii, din sfera cursorului → `public/favicon.*`, `apple-touch-icon.png` |
+| `npm run captura-og` / `masoara-pixeli` | după build, în Edge cu profil temporar: `public/og-cabo-espichel.jpg`; haloul focusului și golul dintre axe, pe pixeli |
 
 Pe larg: `docs/comenzi.md`. Scripturile de construit hărți și texturi cer `date-sursa/`, care nu e
 în depozit; codul lor comun stă în `scripts/comun/`.
@@ -128,8 +129,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   `cladiri_vN.json`) stă un an în cache: un conținut nou primește un nume nou. Scripturile
   build-* refuză un nume urmărit de git (`--suprascrie-lucru` rescrie numai unul neurmărit), iar
   texturile se rescriu numai cu aceiași octeți (`scrieNepublicat`). → livrarea, harti-relief
-- Pe revalidare rămân documentul, iconițele, `plasa.js`, `paleta-teren.json` și straturile
-  `-ndvi`. Un fel nou de fișier în `/data` sau în `/assets` pică `verifica-livrare` până i se
+- Pe revalidare rămân documentul, iconițele, imaginea `og:image`, `plasa.js`, `paleta-teren.json`
+  și straturile `-ndvi`. Un fel nou de fișier în `/data` sau în `/assets` pică `verifica-livrare` până i se
   hotărăște politica. → livrarea
 - Depozitul păstrează exact hărțile pe care le încarcă pagina, cu straturile și texturile lor;
   cele vechi rămân în istoricul git. `date-sursa/` nu intră în depozit, datele produse în
@@ -251,8 +252,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   pointer până la `data-scena`. → pornirea
 - `build.target` e `['es2022', 'safari15.4', 'ios15.4']`; `public/plasa.js` e ES5, script clasic
   cu `defer`. → pornirea
-- Fără `frame-ancestors`, ales: pagina se poate încadra. `og:image` lipsește până alege autorul
-  o imagine. Hărțile de cod se publică, închise publicului, la alegerea autorului. → livrarea
+- Fără `frame-ancestors`, ales: pagina se poate încadra. `og:image` e captura Satelit
+  (`npm run captura-og`), cu sursele în textul alternativ. Hărțile de cod se publică, închise publicului, la alegerea autorului. → livrarea
 
 **Probele**
 - Fiecare probă de fond are un control negativ: aceeași probă pe o greșeală cunoscută, care
