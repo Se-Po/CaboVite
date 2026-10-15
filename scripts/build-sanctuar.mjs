@@ -48,20 +48,26 @@ const inchis = (p) => (p.length > 1 && p[0][0] === p[p.length - 1][0] && p[0][1]
 const parte = (k) => { const p = M.parti.find((q) => q.cheie === k); if (!p) throw new Error(`lipsește partea ${k}`); return p; };
 
 // ------------------------------------------------------------ culorile
-// PROVIZORIU până la culori-sanctuar: valorile de mai jos sunt aparența din
-// ortofoto și din fotografii, nu albedo; se înlocuiesc toate la pasul culorilor.
-const CULORI = existsSync('date-sursa/derivate/culori-sanctuar.json')
-  ? JSON.parse(readFileSync('date-sursa/derivate/culori-sanctuar.json', 'utf8')).materiale
-  : {
-    var: { rgb: [226, 222, 212], sursa: 'provizoriu' },
-    var_spate: { rgb: [178, 172, 162], sursa: 'provizoriu' },
-    cantaria: { rgb: [152, 148, 136], sursa: 'provizoriu' },
-    tigla_biserica: { rgb: [180, 110, 88], sursa: 'provizoriu' },
-    tigla_aripi: { rgb: [190, 128, 100], sursa: 'provizoriu' },
-    terasa: { rgb: [196, 190, 176], sursa: 'provizoriu' },
-    zidarie: { rgb: [150, 140, 128], sursa: 'provizoriu' },
-    cupola: { rgb: [236, 234, 228], sursa: 'provizoriu' },
-  };
+// Albedoul din culori-sanctuar. Acoperișurile sunt aduse la plat sub soarele ortofotoului, care
+// trebuie să fie al zborului: cel din zbor.json și cel al vederii Satelit (sidecarul texturii
+// bazei). Alt soare — sanctuar_v2 purta 96° / 22,5°, din potrivirea liberă — oprește construcția,
+// la fel culorile lipsă (până la sanctuar_v3 ieșeau atunci niște culori provizorii, scrise de mână).
+// Soarele se scrie în fișier (`soare_culori`), ca proba să-l poată compara.
+cereFisier('date-sursa/derivate/culori-sanctuar.json', 'culorile', 'Rulează `npm run culori-sanctuar`.');
+const culori = JSON.parse(readFileSync('date-sursa/derivate/culori-sanctuar.json', 'utf8'));
+const CULORI = culori.materiale;
+const SOARE = {
+  culori: culori.soare_ortofoto,
+  zbor: JSON.parse(readFileSync('date-sursa/derivate/zbor.json', 'utf8')).soare_zbor,
+  satelit: JSON.parse(readFileSync(`public/data/${HARTA_BAZA}-orto_v1.json`, 'utf8')).soare_zbor,
+};
+const acelasi = (p, q) => Number.isFinite(p?.azimut_grila) && p.azimut_grila === q?.azimut_grila
+  && Number.isFinite(p?.elevatie) && p.elevatie === q?.elevatie;
+if (!acelasi(SOARE.culori, SOARE.zbor) || !acelasi(SOARE.culori, SOARE.satelit)) {
+  const c = SOARE.culori ?? {};
+  throw new Error(`culorile acoperișurilor sunt aduse la plat sub alt soare decât al zborului: culori ${c.azimut_grila ?? c.azimut}° / ${c.elevatie}°, `
+    + `zbor.json ${SOARE.zbor?.azimut_grila}° / ${SOARE.zbor?.elevatie}°, Satelit ${SOARE.satelit?.azimut_grila}° / ${SOARE.satelit?.elevatie}°. Rulează npm run culori-sanctuar.`);
+}
 
 // Suprafețele de pe teren. Ortofotoul e ars pe pietrișul deschis — parcarea are
 // 95,6% din pixeli la 254–255, terreiro-ul și potecile 3–4% —, deci nu e o
@@ -396,6 +402,7 @@ const date = {
       licenta: paletaTeren.ortofoto.licenta, atributie: paletaTeren.ortofoto.atributie, portal: paletaTeren.ortofoto.portal },
   ],
   materiale: CULORI,
+  soare_culori: { azimut_grila: SOARE.culori.azimut_grila, elevatie: SOARE.culori.elevatie, sursa: 'soarele zborului (zbor.json), același cu al vederii Satelit' },
   corpuri, turnuri, fatada, arcade, detalii, cupole, ziduri, apeduct, cosuri, cruzeiro, suprafete, poi,
 };
 writeFileSync(iesire, JSON.stringify(date));

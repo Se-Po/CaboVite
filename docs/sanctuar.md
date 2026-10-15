@@ -39,13 +39,22 @@ comună, deci mutarea unui obiect întreg: Ermida da Memória, cu adro-ul și te
   răstoarnă mecanic. Exemple: esplanada are 10 790 → 6 917 m², Estrada do Farol s-a
   mutat cu 47 m.
 - Pentru fiecare cale atinsă, instantaneul păstrează și varianta de dinainte. Ce
-  se folosește e scris în DOUĂ locuri, nu unul: `variante_osm` din
-  `scripts/sanctuar/decizii.json` (esplanada și grupul Ermidei, citit numai de
-  `suprafete-sanctuar`), iar grupul Ermidei încă o dată, în cod, în
-  `nmds-sanctuar` și `masoara-sanctuar`. Tot restul ia versiunea de azi — între
+  se folosește e scris într-un singur loc: `variante_osm` din
+  `scripts/sanctuar/decizii.json`, cu esplanada și grupul Ermidei. Îl citesc
+  `nmds-sanctuar`, `masoara-sanctuar` (unde o parte își poate spune singură
+  `varianta`) și `suprafete-sanctuar`. Tot restul ia versiunea de azi — între
   ele Casa da Água, ruina de SE și cercado-ul, pe care changesetul le-a atins
   (87 → 76, 250 → 366, 3 521 → 3 666 m²). Pentru acelea judecă proba amprentelor,
   mai jos.
+- Până la 0.1.7.06 grupul Ermidei mai stătea o dată, ca listă, în `nmds-sanctuar` și
+  `masoara-sanctuar`. Mutarea lui în `decizii.json` lasă derivatele identice la octet:
+  rastrul, straturile PNG, măsurătorile, modelul și suprafețele. `generat` nu se
+  compară. Controlul, cu Ermida scoasă din `variante_osm`, schimbă suprapunerea OSM și
+  candidații. `verifica-sanctuar` cere ca fiecare script care alege o variantă să o
+  citească de acolo și ca niciunul să nu-și scrie singur id-urile, în afară de
+  `osm-sanctuar`. Textul se judecă fără comentarii. Controalele: `nmds-sanctuar` de la
+  289277f, cu id-urile scrise; cel de azi, cu alegerea scoasă și comentariul care pomenește
+  `variante_osm` lăsat.
 
 Amprentele nu sunt deplasate față de LiDAR. Proba e în `npm run verifica-sanctuar`:
 conturul modelului cade pe pixeli de clădire (nMDS > 1 m) în 98,3% din aria lui,
@@ -125,14 +134,29 @@ slab, cu p90 de ~1 m: `aripa_s.est_sud`, `est_mic`, `est_lean`, `est_jos` și
 `npm run culori-sanctuar` folosește convenția din `paleta.mjs`: luminozitatea din
 cuantila 0,8, nuanța din pixelii de peste mediană.
 - **Acoperișurile** din ortofoto, „reluminate la plat": o potrivire Lambert pe
-  normalele RANSAC dă Y = 0,627·cos i + 0,345, iar culoarea se împarte la factorul
-  fiecărei ape. Potrivirea dădea și un soare, azimut 96°, elevație 22,5°, care e
-  **greșit**: măsurat din umbre, soarele zborului stă la 94,0° / 39,5°
-  (vezi `docs/fotografii.md`, „Zborul ortofotoului”), iar 96° / 22,5° nu e o poziție a soarelui în fereastra de
-  zbor. Albedoul acoperișurilor din `sanctuar_v2` e deci reluminat cu un soare
-  greșit; refacerea lui e un `sanctuar_v3`, încă nefăcut.
-- **Ortofotoul e ars** pe tot ce e alb: cupola Casei da Água are 98,8% din pixeli la
-  254–255, parcarea 95,6%. Peste 2% arși, materialul NU se ia de acolo: varul,
+  normalele RANSAC, Y = k·cos i + a, iar culoarea se împarte la factorul fiecărei ape.
+  - **Până la `sanctuar_v2`:** potrivirea alegea și soarele, iar ieșea 96° / 22,5°, cu
+    Y = 0,627·cos i + 0,345. Soarele acela e **greșit**: măsurat din umbre, soarele
+    zborului stă la 94,0° / 39,5° (vezi `docs/fotografii.md`, „Zborul ortofotoului”), iar
+    96° / 22,5° nu e o poziție prin care soarele să fi trecut în fereastra de zbor.
+  - **Din `sanctuar_v3` (0.1.7.06):** soarele e cel din `zbor.json`, iar se potrivesc numai
+    k și a. Iese Y = 0,625·cos i + 0,231, cu RMS 0,084 pe 33 de ape; potrivirea liberă,
+    tipărită numai ca informație, are 0,074.
+  - **Ce s-a schimbat:** numai materialele. ΔE_OK×100 față de v2: `tigla_aripa_s` 2,60,
+    `tigla_biserica` 0,85, `acoperis_spate_m1` 0,42; pe cele intermediare din ortofoto,
+    0,62–3,20. Toate celelalte, inclusiv cele cinci copiate de clădiri, sunt identice,
+    deci `cladiri_v1` rămâne. La cupolă s-a schimbat numai nota: are 99,4% pixeli arși în
+    loc de 98,8%, fiindcă jumătatea însorită se alege după alt soare.
+  - **Probele de dinainte:**
+    - un build pe derivatele de azi, cu culorile vechi, dă exact `sanctuar_v2` (în afară de
+      `nume`, `generat` și `baza`);
+    - `culori-sanctuar` pe codul neschimbat reface culorile la octet.
+  - **Gărzile:** `build-sanctuar` se oprește dacă soarele culorilor nu e al zborului și al
+    vederii Satelit. Îl scrie în fișier, ca `soare_culori`, iar `verifica-sanctuar` îl
+    compară. Controalele: soarele potrivirii libere, 96° / 22,5°, și numai elevația lui,
+    94° / 22,5°, pică pe valoare; `sanctuar_v2` pică fiindcă n-avea soarele scris.
+- **Ortofotoul e ars** pe tot ce e alb: jumătatea însorită a cupolei Casei da Água are 99,4%
+  din pixeli la 254–255 (98,8% până la `sanctuar_v2`, sub soarele vechi), parcarea 95,6%. Peste 2% arși, materialul NU se ia de acolo: varul,
   cantaria și pietrișul vin din fotografiile autorului, pe petice curate
   (`scripts/sanctuar/petice-culoare.json`).
 - **Țigla** se ia din fotografie; a bisericii și a aripii S, din diferența OKLab
@@ -365,11 +389,12 @@ n-are nevoie de unul.
   necunoscută, material fără rgb, listă lipsă — `null` și un avertisment, fără
   aruncare; ancoră greșită; o coordonată `null` sare numai elementul ei;
 - **bugetul:** clădiri ≤ 70 000 de triunghiuri (azi 17 745), suprafețe ≤ 80 000
-  (60 866 pe `harta_v4`/`harta_v5`; 60 855 pe v2/v3), JSON ≤ 150 KiB (94,7);
+  (60 866 pe `harta_v4`/`harta_v5`; 60 855 pe v2/v3), JSON ≤ 150 KiB (94,8);
 - **geometria:** vârfuri finite, ocluzie pe fiecare, stâlpi în ordine cu goluri
   ≥ 0,2 m, corpuri convexe — proba care a prins linia rotită a aripii N;
 - **amprenta plasei:** sha256 pe position, color și ocluzie, egal cu `AMPRENTA` din
-  capul scriptului, citită pe 2026-10-08 (`sanctuar_v2` pe `harta_v5` + `harta_v4`). O
+  capul scriptului, citită pe 2026-10-08 (`sanctuar_v2` pe `harta_v5` + `harta_v4`; `color`
+  rescrisă pe 2026-10-15, la `sanctuar_v3`, iar `position` și `ocluzie` au rămas la bit). O
   refactorizare a formelor o lasă la bit; o schimbare voită o rescrie acolo, cu motivul
   în commit. Pagina dă aceleași trei sume, citite cu `crypto.subtle` din
   `__scena.sanctuar`. Control: vârful lui `biserica.turn_n` mutat 1 mm dă altă sumă;

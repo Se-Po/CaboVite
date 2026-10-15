@@ -167,8 +167,8 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
 - Capcana semnului: theta = 0 înseamnă camera la SUD; „nordul în sus” e theta = γ. Cifra busolei
   e azimutul poziției camerei, nu al privirii. → busola
 - Azimuturile scenei și ale lui `zbor.json` sunt de grilă: A_grilă = A_adevărat + 0,674°.
-  Soarele zborului e 94,0° / 39,5°; 96° / 22,5° e greșit, dar albedoul acoperișurilor din
-  `sanctuar_v2` încă îl poartă (refacerea e un `sanctuar_v3`). → fotografii, sanctuar
+  Soarele zborului e 94,0° / 39,5°; 96° / 22,5° e greșit. Din `sanctuar_v3`, acoperișurile se
+  aduc la plat sub soarele zborului, iar `build-sanctuar` refuză altul. → fotografii, sanctuar
 - Convenția `bbox_tm06` se deduce din aritmetică (`scripts/comun/relief.mjs`), nu se presupune.
   Peticul se citește din ortofoto la 0,5 m, în blocuri 2 × 2, nu la 1 m. → harti-relief
 - Altitudinea din EXIF e elipsoidală (ondulația geoidului, 52,92 m aici): se folosește

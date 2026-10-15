@@ -73,15 +73,17 @@ const model = new Float32Array(W * H).fill(NaN);
 let picate = 0;
 const proba = (bun, text) => { console.log(`${bun ? '  ok ' : '  PICĂ'}  ${text}`); if (!bun) picate++; };
 
-// OSM, pentru părțile date prin element: geometria de lucru (Ermida de dinainte de 2022).
+// OSM, pentru părțile date prin element: geometria de lucru. Varianta o spune partea
+// (`varianta`), altfel `variante_osm` din decizii.json (grupul Ermidei și esplanada, de dinainte
+// de 2022), altfel azi.
 const osm = (() => {
   const man = JSON.parse(readFileSync('scripts/sanctuar/osm-manifest.json', 'utf8'));
   const inst = JSON.parse(readFileSync(`date-sursa/osm/${man.fisier}`, 'utf8'));
-  const ERMIDA = new Set([999972306, 999972305, 999972304]);
+  const VARIANTE = JSON.parse(readFileSync('scripts/sanctuar/decizii.json', 'utf8')).variante_osm ?? {};
   return (id, varianta) => {
     const el = inst.elemente.find((e) => e.id === id);
     if (!el) throw new Error(`OSM ${id} nu e în instantaneu`);
-    const n = (varianta === 'inainte' || (ERMIDA.has(id) && varianta !== 'azi')) && el.inainte?.noduri ? el.inainte.noduri : el.noduri;
+    const n = (varianta ?? VARIANTE[String(id)]) === 'inainte' && el.inainte?.noduri ? el.inainte.noduri : el.noduri;
     return n.map(([, , lat, lon]) => { const q = laTM06(lon, lat); return [q.x, q.y]; });
   };
 })();

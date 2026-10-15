@@ -53,7 +53,7 @@ const cai = [
   ['HTTP 404', () => new Response('', { status: 404 })],
   ['JSON trunchiat', () => new Response(JSON.stringify(original).slice(0, 2000), { status: 200 })],
   // datele sanctuarului au aceeași schemă: un încărcător care le-ar primi ar construi sanctuarul de două ori
-  ['sanctuarul în locul clădirilor', () => new Response(readFileSync('public/data/sanctuar_v2.json'), { status: 200 })],
+  ['sanctuarul în locul clădirilor', () => new Response(readFileSync('public/data/sanctuar_v3.json'), { status: 200 })],
   ['schemă necunoscută', () => json({ ...original, versiune_schema: 2 })],
   ['material fără rgb', () => json({ ...original, materiale: { ...original.materiale, var: { rgb: [300, 0, 0] } } })],
   ['listă lipsă', () => { const o = { ...original }; delete o.cupole; return json(o); }],
@@ -88,6 +88,21 @@ proba(kib <= BUGET.json_kib, `${FISIER}: ${kib.toFixed(1)} KiB, buget ${BUGET.js
 proba(cladiri.poi === null && cladiri.obiecte.length === 1, 'fără etichetă și fără suprafețe pe teren: un singur obiect');
 const grupuri = [...cladiri.cutiiGrupuri.keys()].sort();
 proba(grupuri.join() === 'casa_da_ronca,far', `grupurile pentru umbre: ${grupuri.join(', ')}`);
+{
+  // Materialele clădirilor sunt copiate din sanctuar (build-cladiri, „prin asemănare”): culoarea lor
+  // trebuie să fie a sanctuarului pe care îl încarcă pagina. Așa cladiri_v1 rămâne valabil lângă
+  // sanctuar_v3, care a schimbat numai acoperișurile aduse la plat; la cupolă s-a schimbat doar nota
+  // (pixelii arși din ortofotoul respins: 98,8% → 99,4%, jumătatea însorită aleasă după alt soare).
+  // Control: același sanctuar, cu varul schimbat cu o unitate.
+  const S = await incarcaSanctuar();
+  const fara = ({ rgb, culoare, oklab }) => ({ rgb, culoare, oklab });
+  const diferite = (s) => Object.keys(date.materiale).filter((k) => JSON.stringify(fara(date.materiale[k])) !== JSON.stringify(fara(s.materiale[k] ?? {})));
+  const d = diferite(S);
+  proba(S !== null && d.length === 0, `materialele clădirilor (${Object.keys(date.materiale).join(', ')}) sunt cele din ${S?.nume}, încărcat de pagină${d.length ? `; diferă ${d.join(', ')}` : ''}`);
+  const stricat = structuredClone(S);
+  stricat.materiale.var.rgb[0] += 1;
+  proba(diferite(stricat).includes('var'), `control, varul sanctuarului schimbat cu o unitate: diferă ${diferite(stricat).join(', ')} — pică`);
+}
 {
   const { r, avert } = await cuAvertismente(() => creeazaSanctuar({ date, inaltimeLa, ancora: { x: ancora.x + 1, y: ancora.y }, eticheta: 'clădiri' }));
   proba(r === null && avert.length === 1 && avert[0].startsWith('clădiri:'), `ancoră greșită: null, „${avert[0]?.slice(0, 60)}"`);

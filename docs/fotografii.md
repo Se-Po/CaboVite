@@ -161,7 +161,8 @@ Pagina folosește soarele sanctuarului.
 poziție prin care soarele chiar a trecut în fereastra de zbor a lotului 4
 (24.05–25.07.2025). Soarele sanctuarului cade la 0,08° de poziția din 17 iulie,
 09:00 UTC, sau din 25 mai, 08:51 UTC; cel al farului, la 0,01° de 2 iunie, 08:49 UTC.
-Cifra veche, 96° / 22,5°, cade la 9,76° de orice poziție posibilă — deci era greșită.
+Cifra veche, 96° / 22,5°, cade la 9,76° de orice poziție posibilă — deci era greșită. Din
+`sanctuar_v3`, acoperișurile sanctuarului se aduc la plat sub soarele acesta (`docs/sanctuar.md`).
 Mozaicul poate avea linii de zbor din zile diferite; ora exactă nu contează, direcția
 da. Vârful umbrei farului a fost încercat ca a doua metodă și lăsat: umbra turnului
 traversează acoperișurile și o curte deja umbrită, iar capătul ei nu se citește

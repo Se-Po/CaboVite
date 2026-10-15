@@ -117,8 +117,8 @@ for (const f of planeTigla) f.Y = cuantila(f.pix.map((i) => Y(lin(i))), 0.5);
 // diferite. Biserica are țiglă mai roșie și intră separat, mai jos.
 const antrenare = planeTigla.filter((f) => f.parte.startsWith('aripa_n.'));
 const sDin = (az, el) => [Math.sin(az) * Math.cos(el), Math.cos(az) * Math.cos(el), Math.sin(el)];
-let soare = { e: Infinity };
-for (let azg = 0; azg < 360; azg += 1) for (let elg = 5; elg <= 85; elg += 0.5) {
+/** k și a prin cele mai mici pătrate, sub soarele (azimut de grilă, elevație) dat, în grade. */
+const potriveste = (azg, elg) => {
   const s = sDin((azg * Math.PI) / 180, (elg * Math.PI) / 180);
   const X = antrenare.map((f) => Math.max(0, f.n[0] * s[0] + f.n[1] * s[1] + f.n[2] * s[2])), Yv = antrenare.map((f) => f.Y);
   const n = X.length, mx = X.reduce((a, b) => a + b) / n, my = Yv.reduce((a, b) => a + b) / n;
@@ -127,17 +127,34 @@ for (let azg = 0; azg < 360; azg += 1) for (let elg = 5; elg <= 85; elg += 0.5) 
   const k = sxy / sxx, a = my - k * mx;
   let e = 0;
   for (let q = 0; q < n; q++) e += (Yv[q] - (k * X[q] + a)) ** 2;
-  if (k > 0 && e < soare.e) soare = { e, az: azg, el: elg, k, a, n };
+  return { e, az: azg, el: elg, k, a, n };
+};
+// Soarele e al zborului, măsurat din umbre (masoara-zbor → zbor.json), nu se potrivește aici: pe
+// apele aripii N, azimutul și elevația lăsate libere dădeau 96° / 22,5°, o poziție prin care
+// soarele n-a trecut în fereastra de zbor (docs/fotografii.md). Albedoul din sanctuar_v2 purta
+// soarele acela; din sanctuar_v3, pe al zborului — același cu al vederii Satelit. Potrivirea liberă
+// se mai tipărește, ca informație.
+const ZBOR = JSON.parse(readFileSync('date-sursa/derivate/zbor.json', 'utf8'));
+const SZ = ZBOR.soare_zbor;
+if (!Number.isFinite(SZ?.azimut_grila) || !Number.isFinite(SZ?.elevatie)) throw new Error('zbor.json n-are soare_zbor; rulează npm run masoara-zbor');
+const soare = potriveste(SZ.azimut_grila, SZ.elevatie);
+if (!(soare.k > 0)) throw new Error(`sub soarele zborului panta k iese ${soare.k}: apele aripii N nu se luminează după el`);
+let libera = { e: Infinity };
+for (let azg = 0; azg < 360; azg += 1) for (let elg = 5; elg <= 85; elg += 0.5) {
+  const p = potriveste(azg, elg);
+  if (p.k > 0 && p.e < libera.e) libera = p;
 }
 const rms = Math.sqrt(soare.e / soare.n);
-console.log(`Soarele ortofotoului, din ${soare.n} ape de țiglă ale aripii N: azimut ${soare.az}°, elevație ${soare.el}°; `
-  + `Y = ${soare.k.toFixed(3)}·cos i + ${soare.a.toFixed(3)}, RMS ${rms.toFixed(4)} (Y mediu ${(antrenare.reduce((s0, f) => s0 + f.Y, 0) / antrenare.length).toFixed(3)})`);
+const Ymediu = antrenare.reduce((s0, f) => s0 + f.Y, 0) / antrenare.length;
+console.log(`Lumina ortofotoului, pe ${soare.n} ape de țiglă ale aripii N, sub soarele zborului (${SZ.azimut_grila}° / ${SZ.elevatie}°, zbor.json): `
+  + `Y = ${soare.k.toFixed(3)}·cos i + ${soare.a.toFixed(3)}, RMS ${rms.toFixed(4)} (Y mediu ${Ymediu.toFixed(3)})`);
+console.log(`  potrivirea liberă, numai ca informație: ${libera.az}° / ${libera.el}°, Y = ${libera.k.toFixed(3)}·cos i + ${libera.a.toFixed(3)}, RMS ${Math.sqrt(libera.e / libera.n).toFixed(4)}`);
 
 
 
 // Cât de bine e determinată lumina: pentru culoarea „la plat" contează Y_plat =
 // k·sin(el) + a, nu elevația în sine. Se tipărește Y_plat pe toate potrivirile cu
-// eroarea sub 1,1 × minimul.
+// eroarea sub 1,1 × minimul potrivirii libere, ca informație.
 {
   const plate = [];
   for (let azg = 0; azg < 360; azg += 2) for (let elg = 5; elg <= 85; elg += 1) {
@@ -148,7 +165,7 @@ console.log(`Soarele ortofotoului, din ${soare.n} ape de țiglă ale aripii N: a
     for (let k = 0; k < n; k++) { sxy += (X[k] - mx) * (Yv[k] - my); sxx += (X[k] - mx) ** 2; }
     const k = sxy / sxx, a = my - k * mx;
     let e = 0; for (let q = 0; q < n; q++) e += (Yv[q] - (k * X[q] + a)) ** 2;
-    if (k > 0 && e <= soare.e * 1.1) plate.push({ azg, elg, yPlat: k * Math.sin((elg * Math.PI) / 180) + a });
+    if (k > 0 && e <= libera.e * 1.1) plate.push({ azg, elg, yPlat: k * Math.sin((elg * Math.PI) / 180) + a });
   }
   const ys = plate.map((q) => q.yPlat);
   console.log(`Potriviri sub 1,1 × eroarea minimă: ${plate.length}; azimut ${Math.min(...plate.map((q) => q.azg))}–${Math.max(...plate.map((q) => q.azg))}°, elevație ${Math.min(...plate.map((q) => q.elg))}–${Math.max(...plate.map((q) => q.elg))}°; Y_plat ${Math.min(...ys).toFixed(3)}–${Math.max(...ys).toFixed(3)}`);
@@ -308,7 +325,13 @@ writeFileSync('date-sursa/derivate/culori-sanctuar.json', JSON.stringify({
   generat: new Date().toISOString(),
   conventie: 'albedo ca în paleta-teren.json: L din cuantila 0,8, nuanța din pixelii peste mediană; apele de acoperiș aduse la plat sub lumina măsurată a ortofotoului',
   ortofoto: { deplasare_fata_de_lidar_m: [depl.dx, depl.dy], corelatie: r3(depl.r) },
-  soare_ortofoto: { azimut: soare.az, elevatie: soare.el, k: r3(soare.k), a: r3(soare.a), y_plat: r3(yPlat), rms: r3(Math.sqrt(soare.e / soare.n)), ape: soare.n },
+  // Soarele sub care s-au adus apele la plat: al zborului, din zbor.json. build-sanctuar îl
+  // compară cu soarele vederii Satelit și îl scrie în fișierul publicat.
+  soare_ortofoto: {
+    azimut_grila: soare.az, elevatie: soare.el, sursa: 'zbor.json (umbrele, masoara-zbor)',
+    k: r3(soare.k), a: r3(soare.a), y_plat: r3(yPlat), rms: r3(Math.sqrt(soare.e / soare.n)), ape: soare.n,
+    potrivire_libera: { azimut_grila: libera.az, elevatie: libera.el, rms: r3(Math.sqrt(libera.e / libera.n)), nota: 'nu e o poziție a soarelui în fereastra de zbor; folosită până la sanctuar_v2' },
+  },
   materiale,
 }, null, 1));
 console.log('\nscris: date-sursa/derivate/culori-sanctuar.json');

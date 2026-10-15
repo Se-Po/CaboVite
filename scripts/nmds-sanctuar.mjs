@@ -113,9 +113,11 @@ for (let i = 0; i < W * H; i++) veg[i] = ndvi(R[i], N[i]);
 const man = JSON.parse(readFileSync('scripts/sanctuar/osm-manifest.json', 'utf8'));
 const inst = JSON.parse(readFileSync(`date-sursa/osm/${man.fisier}`, 'utf8'));
 const tm = ([, , lat, lon]) => { const p = laTM06(lon, lat); return [p.x, p.y]; };
-const ERMIDA = new Set([999972306, 999972305, 999972304]);
-// Geometria de lucru: azi, cu excepția grupului Ermidei, luat de dinainte de 2022.
-const cale = (el) => (ERMIDA.has(el.id) && el.inainte?.noduri ? el.inainte.noduri : el.noduri).map(tm);
+// Geometria de lucru: azi, cu excepția elementelor pe care `variante_osm` din decizii.json le ia
+// de dinainte de changesetul 120423250 — grupul Ermidei și esplanada. Un singur loc, citit și de
+// masoara-sanctuar și de suprafete-sanctuar.
+const VARIANTE = JSON.parse(readFileSync('scripts/sanctuar/decizii.json', 'utf8')).variante_osm ?? {};
+const cale = (el) => (VARIANTE[String(el.id)] === 'inainte' && el.inainte?.noduri ? el.inainte.noduri : el.noduri).map(tm);
 const inchisa = (el) => el.noduri.length > 3 && el.noduri[0][0] === el.noduri[el.noduri.length - 1][0];
 const cladiri = inst.elemente.filter((e) => e.tip === 'way' && inchisa(e) && e.tags?.building);
 const cauta = (id) => inst.elemente.find((e) => e.id === id);

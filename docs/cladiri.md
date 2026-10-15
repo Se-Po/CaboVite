@@ -146,6 +146,9 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 
 - **încărcătorul:** șapte căi de eșec dau `null` și un avertisment, fără aruncare.
   Una dintre ele sunt datele sanctuarului;
+- **materialele:** cele cinci copiate din sanctuar (`cupola`, `terasa`, `tigla`, `var`,
+  `zidarie`) au culoarea (`rgb`, `culoare`, `oklab`) din sanctuarul pe care îl încarcă pagina, azi
+  `sanctuar_v3`; control, varul schimbat cu o unitate. `build-cladiri` citește `sanctuar_v3`;
 - **construcția:** 0 elemente sărite, 232 de triunghiuri (buget 6 000), 6,5 KiB
   (buget 20), două grupuri. O cheie inexistentă în `materiale_profil` sare farul,
   cu avertisment; înainte, culoarea nedefinită se scria tăcut ca negru;

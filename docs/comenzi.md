@@ -17,20 +17,20 @@ noi ale subsistemului se scriu aici, nu în CLAUDE.md.
 | `npm run strat-ndvi` | infraroșul ortofotoului → `public/data/<hartă>-ndvi.bin` + `.json`, pe fiecare nod |
 | `npm run verifica` | toate cele nouă `verifica-*` de mai jos, fiecare în procesul lui, în paralel, cu un singur rezumat: probele picate, cele căzute (ieșite fără rezumat), secțiunile sărite; `-- --strict` face din săritură un eșec, `-- --serie` le rulează pe rând, `-- --tot` tipărește jurnalele întregi, `-- teren pagina` numai acelea. `verifica-livrare` se sare dacă `dist/` lipsește sau e mai vechi decât sursele. Vezi „Baza probelor”, mai jos |
 | `npm run verifica-teren` | construiește plasa cu codul paginii, în Node, și verifică ce primește și ce pictează regula de culoare; previzualizarea NDVI (scara viridis, magenta fără strat, legenda cu modul din adresă numai ca text) |
-| `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/`; `build-zona -- --proba` reface `harta_v4` din dalele numite, identică la octet cu git |
+| `npm run verifica-tiff` | verifică decodorul LZW și predictorii TIFF, sintetic și pe dalele DGT din `date-sursa/`; `build-zona -- --proba` reface `harta_v4` din dalele numite, identică la octet cu git; cusăturile dalelor lui `harta_v9` neverificate față de GLO-30, judecate față de vecinele lor |
 | `npm run osm-sanctuar` | instantaneul OSM al sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run nmds-sanctuar` | MDS − MDT la 50 cm pe fereastra sanctuarului: probele de sosire ale dalelor, straturile PNG, candidații din afara OSM |
 | `npm run masoara-sanctuar` | acoperișuri, turnuri, cupole, ziduri, apeduct și coșuri măsurate pe MDS → `date-sursa/derivate/` |
 | `npm run culori-sanctuar` | albedoul materialelor sanctuarului, din ortofoto și din fotografii |
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
-| `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește) |
-| `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși |
+| `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește); se oprește dacă culorile acoperișurilor nu sunt aduse la plat sub soarele zborului |
+| `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși; variantele OSM citite dintr-un singur loc, soarele culorilor egal cu al vederii Satelit |
 | `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
 | `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic → `public/data/<hartă>-orto_v1.ktx2` + `.json`; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul și cu ce lumină s-ar colora stânca → `date-sursa/derivate/faleza.json`; măsurătoare, nefolosită de pagină |
 | `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, înregistrate și măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
-| `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul; umbrele pe grupuri (texelul cutiilor, pragurile și histerezisul lui `urmaresteGrupul`) |
+| `npm run verifica-cladiri` | construiește clădirile cu codul paginii, în Node, și le confruntă cu LiDAR-ul; umbrele pe grupuri (texelul cutiilor, pragurile și histerezisul lui `urmaresteGrupul`); materialele copiate din sanctuar |
 | `npm run surse-imprejurimi` | aduce o singură dată, prin HTTP pe intervale, ferestrele Copernicus DEM și Sentinel-2 ale împrejurimilor → `date-sursa/copernicus/`, `date-sursa/sentinel/`, cu manifestul `scripts/imprejurimi/surse.json` |
 | `npm run build-imprejurimi -- harta_vN` | împrejurimile: `harta_v6` și `harta_v9` din dalele DGT numite în `scripts/comun/imprejurimi.mjs`, `harta_v7` și `harta_v8` din Copernicus, în ordinea lanțului: v6, v9, v7, v8 |
 | `npm run textura-imprejurimi` | texturile Satelit ale împrejurimilor și NDVI-ul lui `harta_v9`/`harta_v7`/`harta_v8`, din ortofoto (464-3 și 464-1) și Sentinel-2; `-- harta_vN …` numai acelea; cere KTX-Software 4.4 |
@@ -92,5 +92,7 @@ Pe o clonă curată (`git clone` al depozitului, cu modificările de lucru copia
 tiff, teren, sanctuarul și clădirile câte o secțiune pe date reale (19 probe), plus
 `verifica-livrare`; cu `--strict`, cod 1. Înainte, aceeași clonă trecea ca „toate probele au
 trecut”, fără nicio cifră. La 0.1.7.05, pe o clonă cu CRLF și pe una cu LF: „671 ok, 0 picate, 6
-sărite”. tiff are acum două secțiuni pe date reale, dalele MDT și `build-zona -- --proba`, iar pe
-date reale se sar 23 de probe; cu `--strict`, cod 1.
+sărite”; tiff avea atunci două secțiuni pe date reale. La 0.1.7.06, pe amândouă: „680 ok, 0 picate,
+8 sărite”. tiff are trei secțiuni pe date reale (dalele MDT, cusăturile lui `harta_v9`,
+`build-zona -- --proba`), sanctuarul două (rastrul MDS și `zbor.json`), iar pe date reale se sar 32
+de probe; cu `--strict`, cod 1.

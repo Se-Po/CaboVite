@@ -1167,7 +1167,7 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
     //    antet, un strat al împrejurimilor blocat. Toate `null`, fără niciun avertisment, iar
     //    `verifica()` — pe care scena.js îl cheamă după fiecare așteptare — aruncă.
     {
-      const BLOCATE = { '/data/paleta-teren.json': 'corp', '/data/cladiri_v1.json': 'corp', '/data/sanctuar_v2.json': 'antet', '/data/harta_v8-ndvi.bin': 'corp' };
+      const BLOCATE = { '/data/paleta-teren.json': 'corp', '/data/cladiri_v1.json': 'corp', '/data/sanctuar_v3.json': 'antet', '/data/harta_v8-ndvi.bin': 'corp' };
       const special = (fel) => (u) => (BLOCATE[u] === undefined ? null : fel === '404' ? new Response('', { status: 404 }) : BLOCATE[u] === 'corp' ? blocat() : new Promise(() => {}));
       const toate = (g) => Promise.all([
         incarcaPaleta(undefined, { garda: g }), L.incarcaSanctuar(undefined, { garda: g }),
@@ -1198,7 +1198,7 @@ console.log('\nGarda pornirii: o cerere care tace abandonează pornirea, una len
     //    `opreste()`, progresul nu mai armează nimic.
     {
       const g = garda();
-      const { o } = ruleaza((u) => (u === V4 ? blocat() : u === '/data/sanctuar_v2.json' ? new Promise(() => {}) : null),
+      const { o } = ruleaza((u) => (u === V4 ? blocat() : u === '/data/sanctuar_v3.json' ? new Promise(() => {}) : null),
         () => Promise.all([L.incarcaRelief(undefined, undefined, { garda: g }).catch((e) => e), L.incarcaSanctuar(undefined, { garda: g })]));
       await curge(() => false, 300);
       g.abandoneaza();

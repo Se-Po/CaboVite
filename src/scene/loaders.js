@@ -347,7 +347,7 @@ export function straturiNdvi(relief, reliefPetic) {
  *
  * @returns {Promise<object|null>}
  */
-export function incarcaSanctuar(url = '/data/sanctuar_v2.json', { garda = null } = {}) {
+export function incarcaSanctuar(url = '/data/sanctuar_v3.json', { garda = null } = {}) {
   return incarcaCladiriDate(url, 'sanctuar', (motiv) => `sanctuarul lipsește (${motiv}) — scena pornește fără el`, garda);
 }
 

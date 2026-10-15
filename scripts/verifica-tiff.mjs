@@ -13,7 +13,7 @@
 // trebuie să le citească pe cea bună și să le refuze pe cea greșită.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { anuleazaPredictor, decodeazaLzw } from './comun/lzw.mjs';
@@ -209,6 +209,94 @@ if (![MDT50_105162, MDT50_105163, MDT2_105162].every(existsSync)) {
   const inauntru = (in63.d + in62.d) / 2;
   proba(peste.d < 1.5 * inauntru,
     `peste cusătură ${peste.d.toFixed(3)} m (${peste.k} px), între rânduri vecine în dală ${inauntru.toFixed(3)} m — cerut sub 1,5×`);
+}
+
+// ------------------------------------------------------------ cusăturile lui harta_v9
+
+// Patru dale ale lui harta_v9 au prea puține noduri plate ca proba față de GLO-30 să le judece:
+// sidecarul le scrie NEVERIFICATE (`dale_fata_de_copernicus.neverificate`). Aici se judecă față de
+// vecinele lor DGT, pe cusătură: pe fiecare rând (sau coloană) cu uscat în primii 6 pixeli de
+// ambele părți, fără pixelul de margine — coloana exterioară a unei dale citește un gol de
+// 2,6–3,6 m în loc de 2 (docs/harti-relief.md) —, treapta e = B₁ − A₁ − 3·ḡ, cu panta ḡ luată din
+// pixelii 2–5, care nu intră în diferență. Numai rândurile cu aceeași pantă de ambele părți
+// (|g_A − g_B| ≤ 0,3 m pe pixel): peste o vale sau o creastă care taie cusătura oblic,
+// extrapolarea liniară greșește cu metri. Treapta cusăturii e mediana lui e, împrăștierea ei abaterea
+// mediană față de ea (o vecină greșită poate avea treapta mică, dar împrăștierea de metri); o cusătură
+// contează de la 50 de rânduri. Pragurile, 0,3 m și 0,5 m, se sprijină pe cusăturile dintre dalele
+// verificate, măsurate la fel. Controale: dala neverificată ridicată și coborâtă cu 1 m, o vecină greșită.
+// O deplasare de un pixel nu se poate judeca așa la 2 m: pe faleze curbura terenului o acoperă.
+console.log('\nCusăturile lui harta_v9: dalele neverificate față de GLO-30, judecate față de vecinele lor');
+{
+  const sidecar = JSON.parse(readFileSync('public/data/harta_v9-dem.json', 'utf8'));
+  const NEVER = sidecar.prelucrare.dale_fata_de_copernicus.neverificate.map((q) => q.dala);
+  const { NIVELURI } = await import('./comun/imprejurimi.mjs');
+  // 104xxx au colțul nealiniat și n-au uscat dincolo de alpha; harta_v9 le sare.
+  const DALE = NIVELURI.harta_v9.dale.filter((d) => !d.startsWith('104'));
+  const cale = (ind) => `date-sursa/lidar/MDT-2m-${ind}-06-2024_v01.tif`;
+  const lipsa = DALE.filter((d) => !existsSync(cale(d)));
+  if (lipsa.length) sari(`cusăturile lui harta_v9: lipsesc dale, ${lipsa.length} din ${DALE.length} (${lipsa.slice(0, 3).join(', ')}${lipsa.length > 3 ? ', …' : ''})`);
+  else {
+    const dala = new Map(DALE.map((ind) => {
+      const t = citesteTiffDGT(cale(ind));
+      const v = new Float32Array(t.latime * t.inaltime);
+      for (let r = 0; r < t.inaltime; r++) v.set(t.rand(r), r * t.latime);
+      return [ind, { ...t, v }];
+    }));
+    // Pătratul de 1 km al indicelui CCCRRR: x0 = (CCC − 200) km, colțul de nord y0 = (RRR − 300) km.
+    const peGrila = [...dala].filter(([ind, t]) => t.x0 !== (+ind.slice(0, 3) - 200) * 1000 || t.y0 !== (+ind.slice(3) - 300) * 1000
+      || t.latime !== 500 || t.inaltime !== 500 || t.rezolutie !== 2);
+    proba(peGrila.length === 0, `cele ${DALE.length} de dale stau pe pătratele lor de 1 km, 500 × 500 la 2 m${peGrila.length ? `; altfel: ${peGrila.map(([i]) => i).join(', ')}` : ''}`);
+    const uscat = (z) => z > 0.01 && z > -900;
+    /** Treapta pe cusătura dintre A și B (B la est de A, sau la nord); `dz` ridică B. */
+    const cusatura = (a, b, est, dz = 0) => {
+      const A = dala.get(a), B = dala.get(b);
+      if (!A || !B) return { n: 0, o: NaN };
+      const e = [];
+      for (let k = 0; k < 500; k++) {
+        const pa = (i) => (est ? A.v[k * 500 + 499 - i] : A.v[i * 500 + k]);
+        const pb = (i) => (est ? B.v[k * 500 + i] : B.v[(499 - i) * 500 + k]) + dz;
+        const va = [1, 2, 3, 4, 5].map(pa), vb = [1, 2, 3, 4, 5].map(pb);
+        if (!uscat(pa(0)) || !uscat(pb(0)) || !va.every(uscat) || !vb.every(uscat)) continue;
+        const gA = (va[1] - va[4]) / 3, gB = (vb[4] - vb[1]) / 3;
+        if (Math.abs(gA - gB) > 0.3) continue;
+        e.push(vb[0] - va[0] - 3 * (gA + gB) / 2);
+      }
+      e.sort((x, y) => x - y);
+      const o = e.length ? e[e.length >> 1] : NaN;
+      const d = e.map((x) => Math.abs(x - o)).sort((x, y) => x - y);
+      return { n: e.length, o, mad: d.length ? d[d.length >> 1] : NaN };
+    };
+    // Toate cusăturile dintre dale de pe disc: [A, B, est].
+    const toate = DALE.flatMap((a) => {
+      const c = +a.slice(0, 3), r = +a.slice(3);
+      return [[`${c + 1}${r}`, true], [`${c}${r + 1}`, false]].filter(([b]) => dala.has(b)).map(([b, est]) => [a, b, est]);
+    });
+    const PRAG = 0.3, PRAG_MAD = 0.5, MIN = 50;
+    const bun = (x) => Math.abs(x.o) <= PRAG && x.mad <= PRAG_MAD;
+    const nume = ([a, b, est]) => `${a}|${b}${est ? '' : ' (N)'}`;
+    const verificate = toate.filter(([a, b]) => !NEVER.includes(a) && !NEVER.includes(b)).map((p) => ({ p, ...cusatura(...p) })).filter((x) => x.n >= MIN);
+    const maxRef = Math.max(...verificate.map((x) => Math.abs(x.o))), madRef = Math.max(...verificate.map((x) => x.mad));
+    proba(verificate.length >= 10 && verificate.every(bun), `${verificate.length} cusături între dale verificate, cu cel puțin ${MIN} de rânduri: treapta cel mult ${maxRef.toFixed(3)} m, împrăștierea cel mult ${madRef.toFixed(3)} m (praguri ${PRAG} și ${PRAG_MAD})`);
+    const ale = toate.filter(([a, b]) => NEVER.includes(a) || NEVER.includes(b)).map((p) => ({ p, ...cusatura(...p) }));
+    const numarate = ale.filter((x) => x.n >= MIN);
+    for (const ind of NEVER) {
+      const ale_ = ale.filter((x) => x.p[0] === ind || x.p[1] === ind);
+      const num = ale_.filter((x) => x.n >= MIN);
+      const desc = ale_.map((x) => `${nume(x.p)} ${x.n} rânduri${x.n ? `, ${x.o >= 0 ? '+' : ''}${x.o.toFixed(3)} ± ${x.mad.toFixed(3)} m` : ''}`).join('; ');
+      if (!num.length) console.log(`        ${ind}: rămâne neverificată, nicio cusătură cu ${MIN} de rânduri (${desc})`);
+      else proba(num.every(bun), `${ind}: ${desc}`);
+    }
+    // Controale, pe cusăturile numărate.
+    // dala neverificată mutată cu h metri: B ridicat cu h dacă ea e B, cu −h dacă e A
+    const mutata = (h) => numarate.map((x) => cusatura(...x.p, NEVER.includes(x.p[1]) ? h : -h));
+    for (const [h, ce] of [[1, 'ridicată'], [-1, 'coborâtă']]) {
+      const m = mutata(h);
+      proba(m.every((x) => !bun(x)), `control, dala neverificată ${ce} cu 1 m: treptele ${m.map((x) => x.o.toFixed(2)).join(', ')} m — pică pe toate cele ${m.length} cusături`);
+    }
+    // Vecina greșită: în locul vecinei de est a lui 106162 (107162), cea de deasupra ei (107163).
+    const gresita = cusatura('106162', '107163', true);
+    proba(!(gresita.n >= MIN && bun(gresita)), `control, 106162 cusută de 107163 în loc de 107162: ${gresita.n} rânduri, treapta ${Number.isFinite(gresita.o) ? `${gresita.o.toFixed(2)} ± ${gresita.mad.toFixed(2)}` : '—'} m — pică`);
+  }
 }
 
 // ------------------------------------------------------------ build-zona, din dalele numite

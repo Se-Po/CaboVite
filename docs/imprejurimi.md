@@ -83,7 +83,34 @@ un pixel, 19,9 m); dalele 104xxx se sar, n-au uscat dincolo de alpha. `harta_v9`
 pe 11 × 11 pixeli, cât doi pași; fiecare dală stă pe GLO-30 minus decalaj la 0,30–1,85 m
 (mediana pe nodurile plate; citite cu 1 km alături, 34,8 m). Patru dale au sub 50 de noduri
 plate și sunt scrise în sidecar NEVERIFICATE de proba asta: 105165, 106161, 106162, 108162
-(aceasta, numai faleză). `harta_v7` și `harta_v8`: GLO-30 se
+(aceasta, numai faleză). Din 0.1.7.06, `verifica-tiff` le judecă față de vecinele lor DGT, pe
+cusătură:
+- **Măsura:**
+  - Pe fiecare rând cu uscat de ambele părți, fără pixelul de margine (artefactul din
+    `docs/harti-relief.md`), treapta e diferența peste cusătură minus panta. Panta se ia din
+    pixelii 2–5 de fiecare parte.
+  - Intră numai rândurile cu aceeași pantă de ambele părți: o vale care taie cusătura oblic
+    strică extrapolarea cu metri.
+  - Pe cusătură se iau mediana treptei și împrăștierea ei. O cusătură contează de la 50 de
+    rânduri.
+- **Pragurile** sunt 0,3 m pentru treaptă și 0,5 m pentru împrăștiere. Cele 23 de cusături
+  dintre dale verificate dau cel mult 0,101 m și 0,396 m.
+- **Dalele:**
+  - 106162 trece pe toate patru cusăturile (−0,031 … +0,068 m; cea de sud e cu 106161, tot
+    neverificată);
+  - 108162 trece pe cea de nord (−0,032 m, 145 de rânduri), iar cea de vest are numai 12;
+  - 106161 trece pe nord (−0,031 m) și pe est (−0,255 ± 0,462 m, 75 de rânduri, cea mai
+    aproape de prag);
+  - 105165 rămâne neverificată: are cel mult 25 de rânduri pe o cusătură.
+- **Controale,** care pică:
+  - dala ridicată sau coborâtă cu 1 m, pe toate cele 6 cusături;
+  - 106162 cusută de 107163 în loc de 107162: treapta e mică, 0,29 m, dar împrăștierea are
+    4,95 m.
+- **Ce nu se poate judeca așa:** o deplasare de un pixel. Pe faleze, curbura terenului o
+  acoperă, iar o coloană sărită sau dublată nu dă o deplasare de ±1 pixel pe toate
+  cusăturile.
+
+`harta_v7` și `harta_v8`: GLO-30 se
 înregistrează pe alpha — abaterea mediană minimă, 0,161 m, e exact la (0, 0); cu solul
 mutat un pixel, minimul se mută cu el (0,154 față de 0,537 m) — și se coboară cu
 decalajul măsurat, **−0,778 m** (IQR −0,931 … −0,612), pe 632 de pixeli de sol gol

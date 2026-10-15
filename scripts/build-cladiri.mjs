@@ -79,7 +79,9 @@ const inventar = existsSync(INVENTAR) ? JSON.parse(readFileSync(INVENTAR, 'utf8'
 const baza = JSON.parse(readFileSync('public/data/harta_v4-dem.json', 'utf8'));
 const bb = baza.bbox_tm06;
 const ANCORA = { x: (bb.xMin + bb.xMax) / 2, y: (bb.yMin + bb.yMax) / 2 };
-const sanctuar = JSON.parse(readFileSync('public/data/sanctuar_v2.json', 'utf8'));
+// Sanctuarul pe care îl încarcă pagina: de la el se copiază materialele (`mat`). sanctuar_v3 a schimbat
+// numai acoperișurile aduse la plat, nu și materialele copiate aici — verifica-cladiri le compară.
+const sanctuar = JSON.parse(readFileSync('public/data/sanctuar_v3.json', 'utf8'));
 
 const ransac = creeazaRansac({ saminta: 20260930, tol: 0.12 });
 const r2 = (v) => Math.round(v * 100) / 100;

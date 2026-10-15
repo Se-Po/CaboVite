@@ -22,7 +22,7 @@
 // maximul MDS al părții, deci proba prinde doar o greșeală de transport a lui.
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
 import { construiesteAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
@@ -34,19 +34,22 @@ import { creeazaZbor } from '../src/scene/zbor.js';
 import { creeazaCamera } from '../src/scene/camera.js';
 import { creeazaCadruFisa, distantaLaFisa, parteLibera, PRAG_ZBOR_NOU, RAZA_COMPLEX } from '../src/scene/fisa-cadru.js';
 import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, opreste, proba, rezumat, sari } from './comun/proba.mjs';
+import { muta, NEAPLICATA, textLa, textSursa } from './comun/mutatii.mjs';
 import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
 const BUGET = { cladiri: 70000, drapaj: 80000, json_kib: 150 };
-const FISIER = 'public/data/sanctuar_v2.json';
-// Amprenta plasei clădirilor, sha256 pe atributele ei, pe `sanctuar_v2` așezat pe
+const FISIER = 'public/data/sanctuar_v3.json';
+// Amprenta plasei clădirilor, sha256 pe atributele ei, pe sanctuar așezat pe
 // `harta_v5` + `harta_v4` (talpa pereților vine din relief). O refactorizare a formelor
 // trebuie s-o lase la bit; o schimbare voită a datelor, a reliefului sau a formelor o
-// rescrie aici, cu motivul în commit. Citită pe 2026-10-08, înainte de turn() pe orice
-// număr de colțuri.
+// rescrie aici, cu motivul în commit. Citită pe 2026-10-08, pe `sanctuar_v2`, înainte de turn()
+// pe orice număr de colțuri. `color` rescrisă pe 2026-10-15, la `sanctuar_v3`: acoperișurile
+// aduse la plat sub soarele zborului (94° / 39,5°), nu sub cel al potrivirii libere (96° / 22,5°);
+// `position` și `ocluzie` au rămas la bit.
 const AMPRENTA = {
   position: '80849bfb6118470886b683fa4731c37c4d9ef40610f9fe35996c8fcee63b9f9e',
-  color: '1c28d835408390bcfbfc0893f5db2cb20f003fb1544ab7ddf1c59ad7fb66987e',
+  color: '7a96d43ff2fdd3ff08c42a45ff5ed9e7441d26293e7d29725853a317919a4f9a',
   ocluzie: '5132591b4f8a24ccf918f9fc80de64e23419f47503000e3eed68ea04a39e5fbd',
 };
 // Amprenta drapajului, pe straturi, cu aceeași regulă de rescriere. Citită pe 2026-10-08
@@ -743,4 +746,71 @@ console.log('\nPanoul punctului: ce lovește o rază');
 }
 
 sanctuar.dispose();
+
+// ------------------------------------------------------------ 9. variantele OSM, dintr-un singur loc
+
+// Changesetul 120423250 a mutat grupul Ermidei; instantaneul OSM păstrează varianta de dinainte, iar
+// care se folosește spune `variante_osm` din scripts/sanctuar/decizii.json. Pe sursă, fără
+// comentarii: fiecare script de date care alege între variante (`.inainte?.noduri`) citește
+// `.variante_osm`, și niciunul nu scrie de mână id-urile de acolo — în afară de osm-sanctuar, care
+// face instantaneul. Până la 0.1.7.06, nmds-sanctuar și masoara-sanctuar țineau grupul Ermidei
+// într-o listă a lor. Controale: nmds-sanctuar.mjs de la 289277f; cel de azi cu alegerea scoasă
+// și comentariul lăsat.
+console.log('\nVariantele OSM, dintr-un singur loc (decizii.json)');
+{
+  const ids = Object.keys(JSON.parse(readFileSync('scripts/sanctuar/decizii.json', 'utf8')).variante_osm ?? {});
+  // comentariile pe rânduri întregi și cele de bloc; în scripturile acestea nu stau după cod
+  const fara = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const judeca = (fisiere) => fisiere.map(([f, src]) => {
+    const s = fara(src);
+    return { f, alege: s.includes('.inainte?.noduri'), citeste: s.includes('.variante_osm'), iduri: ids.filter((id) => s.includes(id)) };
+  });
+  const rele = (r) => r.filter((x) => (x.alege && !x.citeste) || x.iduri.length);
+  const SCRIPTURI = readdirSync('scripts').filter((f) => f.endsWith('.mjs') && !f.startsWith('verifica') && f !== 'osm-sanctuar.mjs')
+    .map((f) => [f, textSursa(`scripts/${f}`)]);
+  const cu = (f, src) => SCRIPTURI.map(([g, s]) => [g, g === f ? src : s]);
+  const descrie = (r) => r.map((x) => `${x.f}: ${x.iduri.length ? x.iduri.join(', ') : 'alege fără variante_osm'}`).join('; ');
+  const azi = judeca(SCRIPTURI);
+  const aleg = azi.filter((x) => x.alege).map((x) => x.f);
+  proba(ids.length >= 4 && aleg.length >= 3 && rele(azi).length === 0,
+    `${ids.length} elemente în variante_osm; scripturile care aleg varianta (${aleg.join(', ')}) o citesc de acolo, niciunul nu-și scrie id-urile${rele(azi).length ? `: ${descrie(rele(azi))}` : ''}`);
+  const vechi = textLa('289277f', 'scripts/nmds-sanctuar.mjs');
+  const rv = vechi === null ? null : rele(judeca(cu('nmds-sanctuar.mjs', vechi)));
+  proba(rv !== null && rv.length > 0, `control, nmds-sanctuar.mjs de la 289277f: ${rv === null ? 'NECITIT' : descrie(rv)} — pică`);
+  const nmds = textSursa('scripts/nmds-sanctuar.mjs');
+  const rand = nmds.split('\n').find((l) => l.startsWith('const VARIANTE = '));
+  const fara2 = rand === undefined ? null : muta(nmds, [`${rand}\n`, ''],
+    ["const cale = (el) => (VARIANTE[String(el.id)] === 'inainte' && el.inainte?.noduri ? el.inainte.noduri : el.noduri).map(tm);",
+      'const cale = (el) => (el.inainte?.noduri ?? el.noduri).map(tm);']);
+  const rf = fara2 === null ? null : rele(judeca(cu('nmds-sanctuar.mjs', fara2)));
+  proba(rf !== null && rf.length > 0, `control, nmds-sanctuar.mjs de azi fără variante_osm, cu comentariul care o pomenește lăsat: ${rf === null ? NEAPLICATA : descrie(rf)} — pică`);
+}
+
+// ------------------------------------------------------------ 10. soarele culorilor
+
+// Acoperișurile se aduc la plat sub soarele ortofotoului, iar build-sanctuar îl scrie în fișier
+// (`soare_culori`): trebuie să fie al zborului, același cu al vederii Satelit (sidecarul texturii
+// bazei) și cu zbor.json, dacă e pe disc. Controale: soarele potrivirii libere, 96° / 22,5° (din
+// culori-sanctuar.json, dacă e pe disc), și numai elevația lui, 94° / 22,5°; sanctuar_v2, de la
+// 289277f, care n-avea soarele scris.
+console.log('\nSoarele culorilor e soarele vederii Satelit');
+{
+  const satelit = JSON.parse(readFileSync('public/data/harta_v4-orto_v1.json', 'utf8')).soare_zbor;
+  const scrie = (s) => (s ? `${s.azimut_grila}° / ${s.elevatie}°` : 'nescris');
+  const acelasi = (s) => Number.isFinite(s?.azimut_grila) && s.azimut_grila === satelit.azimut_grila && s.elevatie === satelit.elevatie;
+  proba(acelasi(original.soare_culori), `${FISIER.split('/').pop()}: soarele culorilor ${scrie(original.soare_culori)}, cât al vederii Satelit (${scrie(satelit)})`);
+  const ZBOR = 'date-sursa/derivate/zbor.json';
+  if (existsSync(ZBOR)) {
+    const z = JSON.parse(readFileSync(ZBOR, 'utf8')).soare_zbor;
+    proba(acelasi(z), `zbor.json: ${scrie(z)}, același`);
+  } else sari('zbor.json lipsește din date-sursa/derivate/');
+  const CULORI = 'date-sursa/derivate/culori-sanctuar.json';
+  const liber = (existsSync(CULORI) ? JSON.parse(readFileSync(CULORI, 'utf8')).soare_ortofoto?.potrivire_libera : null) ?? { azimut_grila: 96, elevatie: 22.5 };
+  for (const [ce, s] of [['soarele potrivirii libere', liber], ['numai elevația lui', { ...original.soare_culori, elevatie: liber.elevatie }]])
+    proba(!acelasi(s), `control, ${ce}, ${scrie(s)} — pică`);
+  const v2 = textLa('289277f', 'public/data/sanctuar_v2.json');
+  const s2 = v2 === null ? undefined : JSON.parse(v2).soare_culori;
+  proba(v2 !== null && !acelasi(s2), `control, sanctuar_v2 de la 289277f: soarele culorilor ${v2 === null ? 'NECITIT' : scrie(s2)} — pică`);
+}
+
 await rezumat({ iesi: true });
