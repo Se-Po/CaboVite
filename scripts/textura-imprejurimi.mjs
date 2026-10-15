@@ -21,8 +21,10 @@
 // La fel NDVI-ul: din ortofoto unde acoperă; altfel din roșul și infraroșul Sentinel,
 // calibrat liniar pe NDVI-ul ortofotoului.
 //
-// Apa se topește în apa adâncă măsurată pentru alpha (harta_v4-orto_v1.json), pe
-// aceeași distanță de la mal: planul mării din afara texturilor are culoarea ei.
+// Apa se topește în apa adâncă măsurată pentru alpha, pe aceeași distanță de la mal: planul mării
+// din afara texturilor are culoarea ei. Se citește din textura bazei pe care o cere pagina
+// (harta_v4-orto_v2.json, din 0.1.7.07), cu garda că marea și cutia sunt cele din
+// harta_v4-orto_v1.json, pe care s-au făcut texturile publicate — retușul n-a atins marea.
 //
 // Texturile publicate se rescriu numai cu aceiași octeți (scripts/comun/publicat.mjs):
 // vercel.json le ține un an în cache-ul cititorilor, deci o textură nouă primește o
@@ -38,6 +40,8 @@ import { dinTM06, UTM29 } from './comun/tm06.mjs';
 import { deschideCog } from './comun/cog.mjs';
 import { cereFisier } from './comun/cere.mjs';
 import { citestePngRgb } from './comun/png.mjs';
+import { numeOrto } from '../src/scene/satelit.js';
+import { spawnSync } from 'node:child_process';
 import { scrieNepublicat } from './comun/publicat.mjs';
 import { DALE_SENTINEL, NIVELURI as GRILE, SURSA_SENTINEL, dirSentinel, idSentinel, urlSentinel } from './comun/imprejurimi.mjs';
 import { KTX, LIN, NIVELURI_MIP, codeazaKtx, distanta, laOctet, lantMipuri, multiplu, octeti, pierdere, scriePngNiveluri } from './comun/textura.mjs';
@@ -52,7 +56,16 @@ const PRAG_MIB = 4;
 for (const f of ORTO) cereFisier(f, `dala de ortofoto ORTOS-2025 ${f.match(/464-\d/)[0]}`, 'Vezi „Ortofotoul” în docs/fotografii.md.');
 cereFisier(ZBOR, 'măsurătorile zborului', 'Rulează întâi: npm run masoara-zbor');
 const zbor = JSON.parse(readFileSync(ZBOR, 'utf8'));
-const bazaOrto = JSON.parse(readFileSync(join(IESIRE, `harta_v4-${VERSIUNE}.json`), 'utf8'));
+const bazaOrto = JSON.parse(readFileSync(join(IESIRE, `${numeOrto('harta_v4')}.json`), 'utf8'));
+// Sidecarul lui orto_v1 al bazei, cum era publicat (db067f8, ultimul commit care îl are în public/data).
+const ORTO_V1 = 'harta_v4-orto_v1.json', REPER_V1 = 'db067f8';
+{
+  const x = spawnSync('git', ['show', `${REPER_V1}:public/data/${ORTO_V1}`], { encoding: 'utf8', maxBuffer: 1 << 24 });
+  if (x.status !== 0) throw new Error(`nu pot citi ${ORTO_V1} de la ${REPER_V1} din git`);
+  const v1 = JSON.parse(x.stdout);
+  if (JSON.stringify(v1.mare) !== JSON.stringify(bazaOrto.mare) || JSON.stringify(v1.bbox_tm06) !== JSON.stringify(bazaOrto.bbox_tm06))
+    throw new Error(`${numeOrto('harta_v4')}.json are altă mare sau altă cutie decât ${ORTO_V1}: texturile împrejurimilor s-ar face altfel`);
+}
 const manifest = JSON.parse(readFileSync('scripts/imprejurimi/surse.json', 'utf8'));
 
 let picate = 0;
@@ -565,8 +578,9 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
   // texeli de apă: la mal baza și-a amestecat marea înainte de mipuri. Control: baza
   // citită cu un texel alături.
   if (nume === 'harta_v6') {
-    const cale = join('date-sursa/derivate/textura', `harta_v4-${VERSIUNE}`, 'nivel-1.png');
-    if (!existsSync(cale)) console.log(`  PROBA CUSĂTURII SĂRITĂ: lipsește ${cale} (rulează npm run textura-ortofoto)`);
+    // Baza fără retuș, pe care s-au cusut împrejurimile: retușul stă la sanctuar, departe de cusătură.
+    const cale = join('date-sursa/derivate/textura', 'harta_v4-orto_v1', 'nivel-1.png');
+    if (!existsSync(cale)) console.log(`  PROBA CUSĂTURII SĂRITĂ: lipsește ${cale} (rulează npm run textura-ortofoto -- --fara-retus)`);
     else {
       const baza = citestePngRgb(readFileSync(cale));
       const apa = new Uint8Array(c.W * c.H);
@@ -620,7 +634,8 @@ for (const nume of LANT.filter((n) => !cerute.length || cerute.includes(n))) {
     culoare: {
       ortofoto: dgt ? 'nivelul de 0,25 m, mutat cu deplasarea pe sol, mediat în liniar' : nume === 'harta_v7' ? 'nivelul de 2 m, mediat în liniar, unde acoperă' : 'nefolosit',
       sentinel: transfer ? { varianta_tci: transfer.varianta, transfer: transfer.cifre, amestec: 'pe ultimii 300 m dinspre marginea ortofotoului' } : 'nefolosit',
-      apa: { srgb: bazaOrto.mare.srgb, estompare_m: [D0, D1], sursa: `harta_v4-${VERSIUNE}.json` },
+      // numele de atunci: sidecarele publicate trebuie să iasă la aceiași octeți
+      apa: { srgb: bazaOrto.mare.srgb, estompare_m: [D0, D1], sursa: ORTO_V1 },
       gaura: `texelii aflați la mai mult de ${MARJA} m în interiorul lui ${N.interior} au culoarea apei: acolo se vede ${N.interior}`,
     },
     unealta: KTX.versiune,

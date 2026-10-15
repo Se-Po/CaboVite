@@ -25,7 +25,10 @@ import { ceataCer } from './mare.js';
 // atribut `uv` ar fi costat 23–46 MB pe cele 5,8 milioane de vârfuri ale lui alpha (cu
 // 4 sau 8 octeți pe vârf: două componente pe 16 biți sau Float32).
 
-export const VERSIUNE_ORTO = 'orto_v1';
+// Versiunea texturii fiecărei hărți: alpha (baza și peticul) are acoperișurile fantomă retușate
+// (`orto_v2`, din 0.1.7.07, vezi docs/satelit.md), împrejurimile rămân pe `orto_v1`. Exportată
+// pentru probe, care cer fișierele pe numele lor.
+export const VERSIUNI_ORTO = Object.freeze({ harta_v4: 'orto_v2', harta_v5: 'orto_v2' });
 const CHEIE_PREFERINTA = 'cabo-espichel:strat';
 const PRELUCRARE_IMPREJURIMI = 'fotografia împrejurimilor, drapată pe relief în vederea Satelit';
 
@@ -40,7 +43,7 @@ const citestePreferinta = () => { try { return localStorage.getItem(CHEIE_PREFER
 const scriePreferinta = (v) => { try { localStorage.setItem(CHEIE_PREFERINTA, v); } catch { /* stocare blocată: alegerea ține cât pagina */ } };
 
 /** Numele texturii Satelit a unei hărți. */
-const numeOrto = (nume) => `${nume}-${VERSIUNE_ORTO}`;
+export const numeOrto = (nume) => `${nume}-${VERSIUNI_ORTO[nume] ?? 'orto_v1'}`;
 
 /** Sidecarul bazei are soarele zborului și culoarea mării, fără de care Satelit nu se poate aplica. */
 const areSoareSiMare = (m) => Number.isFinite(m?.soare_zbor?.azimut_grila) && Number.isFinite(m?.soare_zbor?.elevatie)
@@ -179,7 +182,7 @@ export function materialMareSatelit(textura, srgb, cer) {
  *   descarcare?: object|null, laProgres?: (fractie: number) => void,
  *   faraSatelit?: AbortSignal|null}} o
  *   `imprejurimi`: plasele de dincolo de alpha, fiecare cu textura ei
- *   (`<hartă>-orto_v1`). Fără textură, plasa aceea rămâne pe culorile Relief.
+ *   (`numeOrto`, `<hartă>-orto_v1`). Fără textură, plasa aceea rămâne pe culorile Relief.
  *   `descarcare`: cererile pornite devreme (`descarcaSatelit`); de aici încolo sunt ale
  *   lui `creeazaSatelit`, care le oprește la `dispose()`. Fără ele, se cer la `pregateste()`.
  *   `laProgres`: cât din octeții texturilor a sosit, numai la pornire, numai când crește

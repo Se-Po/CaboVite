@@ -21,7 +21,7 @@ import { creeazaCamera } from '../src/scene/camera.js';
 import { creeazaLumini } from '../src/scene/lights.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
-import { soareZborDin } from '../src/scene/satelit.js';
+import { numeOrto, soareZborDin } from '../src/scene/satelit.js';
 import * as umbreAzi from '../src/scene/umbre.js';
 import { fereastraLidar, fisierDala, daleFereastra } from './comun/lidar.mjs';
 import { modulDin, muta, NEAPLICATA, textSursa } from './comun/mutatii.mjs';
@@ -242,7 +242,7 @@ console.log('\nUmbrele pe grupuri (umbre.js): texelul cutiilor și pragurile lui
   proba(Object.keys(cutii).sort().join() === [...nume].sort().join(), `cutiile: ${Object.keys(cutii).join(', ')}`);
 
   // Soarele zborului, din sidecarul texturii bazei, ca în satelit.js.
-  const S = JSON.parse(readFileSync('public/data/harta_v4-orto_v1.json', 'utf8')).soare_zbor;
+  const S = JSON.parse(readFileSync(`public/data/${numeOrto('harta_v4')}.json`, 'utf8')).soare_zbor;
   const R = Math.PI / 180;
   // Texelul, socotit aici: colțurile cutiei lărgite cu 60 m (lungimea umbrei), proiectate pe
   // axele camerei de umbră — z dinspre țintă spre soare, x = sus × z, y = z × x —, latura mai

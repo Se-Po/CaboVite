@@ -38,7 +38,7 @@ se poartă în română.
 | `npm run suprafete-sanctuar` | terreiro-ul, parcarea și drumurile ca poligoane, din OSM și ortofoto |
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`; un nume se scrie o singură dată |
 | `npm run masoara-zbor` | soarele, deplasarea și înclinarea ortofotoului → `date-sursa/derivate/zbor.json` |
-| `npm run textura-ortofoto` | texturile Satelit ale lui alpha (KTX2 UASTC) → `public/data/<hartă>-orto_v1.*`; cere KTX-Software 4.4 |
+| `npm run textura-ortofoto` | texturile Satelit ale lui alpha (KTX2 UASTC), retușate → `public/data/<hartă>-orto_v2.*`; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul; măsurătoare, nefolosită de pagină |
 | `npm run osm-cladiri` | instantaneul OSM al celorlalte clădiri, cu versiuni fixate; `-- --din-manifest` îl reface |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
@@ -230,8 +230,9 @@ proba ei, în fișierul din `docs/` numit la capătul rândului. Unitățile: MB
   Relief rămâne la octet. → satelit
 - Texturile sunt KTX2 UASTC (alegerea autorului), cu versiune proprie (`orto_vN`). Transcodorul
   nu se copiază în `public/`: îl emite Vite. → satelit, livrarea
-- Falezele rămân fotografia: alegerea autorului. Acoperișurile fantomă încă nu s-au retușat;
-  retușul (`orto_v2`) e opțional, iar primul loc de retușat e turnul de nord. → satelit
+- Falezele rămân fotografia: alegerea autorului. Pe alpha, acoperișurile fantomă ale sanctuarului
+  se retușează (`orto_v2`, prin difuzie, după amprentele lui); farul și casele lui rămân ca în
+  fotografie, împrejurimile pe `orto_v1`. → satelit
 - Gărzile: 20 s fără niciun octet opresc pornirea sau fotografia; transcodarea are 30 s,
   numărate numai cât pagina e vizibilă. → pornirea, satelit
 
@@ -291,7 +292,7 @@ ce e fiecare lucru cum e și ce probă pică dacă îl strici.
 | `terrain.js`, `palette.js`, `previzualizare.js`, `verifica-teren` | `docs/teren.md` |
 | `cer.js`, `mare.js`, `renderer.js`, `lights.js`, `dispose.js`, bucla, `renderOrder` și `compileAsync` din `scena.js` | `docs/randarea.md` |
 | `alpha.js`, `imprejurimi.js`, `cusatura.js`, `harta_v6`, `v9`, `v7`, `v8`, `*-imprejurimi.mjs`, `scripts/comun/imprejurimi.mjs`, `cog.mjs`, `textura.mjs` | `docs/imprejurimi.md` |
-| `satelit.js`, KTX2 din `loaders.js`, `*-orto_v1.*`, `textura-ortofoto`, `masoara-faleza` | `docs/satelit.md` |
+| `satelit.js`, KTX2 din `loaders.js`, `*-orto_vN.*`, `textura-ortofoto`, `scripts/comun/fantome.mjs`, `masoara-faleza` | `docs/satelit.md` |
 | `sanctuar.js`, `sanctuar-forme.js`, `drapaj.js`, `eticheta.js`, `fisa-cadru.js`, `umbre.js`, `src/content/sanctuar.js`, `*-sanctuar.mjs`, `scripts/sanctuar/`, `scripts/comun/osm.mjs`, `plane.mjs` | `docs/sanctuar.md` |
 | `cladiri_v1.json`, `*-cladiri.mjs`, `scripts/cladiri/`, `src/content/cladiri.js`, `src/scene/nume.js`, umbrele pe grupuri (`urmaresteGrupul`) | `docs/cladiri.md` |
 | `citeste-poze`, `culori-poze`, `paleta`, `masoara-zbor`, `scripts/comun/soare.mjs`, `paleta-teren.json`, `scripts/comun/exif.mjs`, `oklab.mjs`, atribuirea și modala „© DGT” | `docs/fotografii.md` |

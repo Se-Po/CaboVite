@@ -332,6 +332,9 @@ export function straturiNdvi(relief, reliefPetic) {
   return { baza: undefined, petic: undefined };
 }
 
+/** Sanctuarul pe care îl încarcă pagina. Exportat pentru textura-ortofoto, care retușează fotografia după amprentele lui. */
+export const SANCTUAR_URL = '/data/sanctuar_v3.json';
+
 /**
  * Datele sanctuarului, produse de `npm run build-sanctuar`.
  *
@@ -347,7 +350,7 @@ export function straturiNdvi(relief, reliefPetic) {
  *
  * @returns {Promise<object|null>}
  */
-export function incarcaSanctuar(url = '/data/sanctuar_v3.json', { garda = null } = {}) {
+export function incarcaSanctuar(url = SANCTUAR_URL, { garda = null } = {}) {
   return incarcaCladiriDate(url, 'sanctuar', (motiv) => `sanctuarul lipsește (${motiv}) — scena pornește fără el`, garda);
 }
 

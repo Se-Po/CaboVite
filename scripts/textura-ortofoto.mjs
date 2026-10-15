@@ -1,12 +1,17 @@
 // Texturile vederii Satelit: ortofotoul DGT pe cutia bazei, la 1 m, și pe peticul
 // de la sanctuar, la 0,25 m.
 //
-//   npm run textura-ortofoto [-- harta_v5]
+//   npm run textura-ortofoto [-- harta_v5] [-- --fara-retus]
 //
-// Scrie public/data/<bază>-orto_v1.ktx2 + .json și <petic>-orto_v1.ktx2 + .json.
-// Textura are versiune proprie: un retuș, alte setări de compresie înseamnă _v2,
+// Scrie public/data/<bază>-orto_v2.ktx2 + .json și <petic>-orto_v2.ktx2 + .json.
+// Textura are versiune proprie: un retuș, alte setări de compresie înseamnă alt _vN,
 // fără ca harta să se schimbe. Un nume publicat se rescrie numai cu aceiași octeți
 // (scripts/comun/publicat.mjs): vercel.json îl ține un an în cache-ul cititorilor.
+//
+// orto_v2 (2026-10-15) = orto_v1 cu acoperișurile fantomă retușate pe amândouă hărțile (vezi
+// „Retușul” mai jos și scripts/comun/fantome.mjs). `--fara-retus` face orto_v1, fără retuș, și îl
+// compară, ca blob git, cu cel publicat la REPER_V1: trebuie să iasă la octet; nu scrie în
+// public/data, unde orto_v1 al lui alpha nu mai stă. `--numai-retus` se oprește după probele retușului.
 //
 // Geometria. Marginile de pixel ale texturii sunt metri TM06 scriși în sidecar
 // (`conventie: muchii de pixel`); pagina calculează din ei coordonatele texturii,
@@ -27,6 +32,7 @@
 // într-un canal alfa: mipurile ar media altfel culoarea și ponderea separat.
 
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { deschideOrtofoto, fereastra } from './comun/ortofoto.mjs';
@@ -37,8 +43,20 @@ import { scrieNepublicat } from './comun/publicat.mjs';
 import {
   KTX, LIN, LUCRU, NIVELURI_MIP as NIVELURI, codeazaKtx, dE, distanta, injumatateste, laOctet, multiplu, octeti, pierdere, scriePngNiveluri,
 } from './comun/textura.mjs';
+import { amprente, departareDeSol, difuzie, fara, mascaFantome, sau } from './comun/fantome.mjs';
+import { SANCTUAR_URL } from '../src/scene/loaders.js';
+import { incarcaRastru } from './comun/rastru-sanctuar.mjs';
 
-const VERSIUNE = 'orto_v1';
+const ARGUMENTE = process.argv.slice(2);
+const RETUS = !ARGUMENTE.includes('--fara-retus');
+const VERSIUNE = RETUS ? 'orto_v2' : 'orto_v1';
+// Numărul de treceri ale difuziei (o alegere).
+const TRECERI = 300;
+// Ultimul commit cu orto_v1 al lui alpha în public/data: `--fara-retus` trebuie să-l refacă la octet.
+// Comparația e pe blob git, cu reperul acesta, nu cu HEAD, care nu-l mai are.
+const REPER_V1 = 'db067f8';
+const blobDin = (b) => createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex');
+const blobLa = (reper, cale) => { const x = spawnSync('git', ['rev-parse', `${reper}:${cale}`], { encoding: 'utf8' }); return x.status === 0 ? x.stdout.trim() : null; };
 const ORTO = 'date-sursa/ortofoto/ortos2025_cog_25cm_rgbi_jpg_464-3_v02.tif';
 const ZBOR = 'date-sursa/derivate/zbor.json';
 const IESIRE = 'public/data';
@@ -156,7 +174,7 @@ function masoaraMarea(lin, date, uscat, D, c) {
 
 // ------------------------------------------------------------ main
 
-const petic = incarcaHarta(process.argv[2] || 'harta_v5');
+const petic = incarcaHarta(ARGUMENTE.find((a) => !a.startsWith('--')) || 'harta_v5');
 if (!petic.meta.baza) throw new Error(`${petic.nume} nu e un petic; cer peticul, care își aduce baza`);
 const baza = incarcaHarta(petic.meta.baza);
 const cB = cadru(baza, 1), cP = cadru(petic, 0.25);
@@ -182,6 +200,90 @@ proba(uscatDate === uscatTot, `uscatul bazei are date peste tot: ${uscatDate} / 
   proba(cu < n, `control: fâșia de vest a cutiei are texeli fără date (${n - cu} din ${n})`);
 }
 
+// ------------------------------------------------------------ retușul (orto_v2)
+//
+// Acoperișurile fantomă (scripts/comun/fantome.mjs): masca, din amprentele sanctuarului pe care îl
+// încarcă pagina (SANCTUAR_URL din loaders.js), înălțimile nMDS de 50 cm și înclinarea fotografiei
+// din zbor.json, lărgită cu LARGIRE texeli; umplerea, prin difuzie din solul din jur, cu un număr fix
+// de treceri. Numai sanctuarul: farul, casele lui și Casa da Ronca sunt în afara rastrului nMDS.
+//
+// Măsura: ΔE_OK×100 față de solul din jur (RAZA texeli: 1 m pe petic, 4 m pe bază; o alegere — fantoma
+// are ~0,5 m, iar la 3 m referința ar amesteca umbra de la vest de clădiri cu solul însorit), cu
+// ACEEAȘI referință de sol pentru toate
+// măsurile — tot ce nu e mască, mască opusă (aceleași clădiri, înclinarea întoarsă) sau amprentă.
+// Probele, pe fiecare hartă:
+//   - pe partea VNV a clădirilor (partea exclusivă a măștii), fotografia se depărtează de sol mai
+//     mult decât pe partea ESE (partea exclusivă a măștii opuse, martorul). Nu dovedește direcția
+//     fantomei — umbrele soarelui de 94° cad tot spre vest —; direcția o măsoară masoara-zbor;
+//   - retușul scoate cel puțin 90% (o alegere) din excesul față de martor: pe partea exclusivă și
+//     pe toată masca, cu inelul comun al celor două măști. Control: aceeași difuzie fără pereți —
+//     amprentele dau și ele culoare — pică;
+//   - niciun texel în afara măștii nu se atinge; control: retușul pe masca opusă le atinge;
+//   - texelii fără niciun drum spre sol (curți închise între amprente) se numără: rămân fotografia.
+const LARGIRE = 1, RAZA = 4, PARTE = 0.1;
+const retus = {};
+if (RETUS) {
+  const SANCTUAR = `public${SANCTUAR_URL}`;
+  cereFisier(SANCTUAR, 'sanctuarul încărcat de pagină', 'Rulează npm run build-sanctuar.');
+  const am = amprente(JSON.parse(readFileSync(SANCTUAR, 'utf8')));
+  const poligoane = am.map((a) => a.poligon);
+  const amprenteSha = createHash('sha256').update(JSON.stringify(am)).digest('hex');
+  const rastru = incarcaRastru();
+  // Golul peticului în bază (gaura_scena, în metri de scenă din centrul bazei): în afara lui pagina
+  // desenează baza, deci acolo se vede retușul ei.
+  const bb = baza.meta.bbox_tm06, A = { x: (bb.xMin + bb.xMax) / 2, y: (bb.yMin + bb.yMax) / 2 }, gs = petic.meta.gaura_scena;
+  const subPetic = (x, y) => x > A.x + gs.x0 && x < A.x + gs.x1 && y > A.y - gs.z1 && y < A.y - gs.z0;
+  console.log(`\nretușul acoperișurilor fantomă: ${am.length} amprente din ${SANCTUAR.split('/').pop()} (sha256 ${amprenteSha.slice(0, 12)})`);
+  for (const [h, c, n] of [[baza, cB, nB], [petic, cP, nP]]) {
+    const M = mascaFantome({ rastru, poligoane, zbor, c, largire: LARGIRE });
+    const O = mascaFantome({ rastru, poligoane, zbor, c, largire: LARGIRE, semn: -1 });
+    const exclus = sau(M.masca, O.masca, M.amp);
+    const ex = fara(M.masca, O.masca), exO = fara(O.masca, M.masca);
+    const inainte = n.lin.slice();
+    const dif = difuzie(n.lin, c, M.masca, M.amp, TRECERI);
+    const faraPereti = inainte.slice();
+    difuzie(faraPereti, c, M.masca, new Uint8Array(M.masca.length), TRECERI);
+    const opus = inainte.slice();
+    difuzie(opus, c, O.masca, O.amp, TRECERI);
+    const m = (img, sel) => departareDeSol(img, c, sel, exclus, RAZA).medie;
+    const d = {
+      inainte: m(inainte, ex), martor: m(inainte, exO), dupa: m(n.lin, ex), fara_pereti: m(faraPereti, ex),
+      masca_inainte: m(inainte, M.masca), masca_dupa: m(n.lin, M.masca), masca_fara_pereti: m(faraPereti, M.masca),
+    };
+    const scoate = (dupa, inainte_) => dupa - d.martor <= PARTE * (inainte_ - d.martor);
+    const atinsi = (img) => {
+      let k = 0;
+      for (let i = 0; i < c.W * c.H; i++) {
+        if (M.masca[i]) continue;
+        for (let t = 0; t < 3; t++) if (laOctet(img[i * 3 + t]) !== laOctet(inainte[i * 3 + t])) { k++; break; }
+      }
+      return k;
+    };
+    let vizibili = 0;
+    if (h === baza) for (let i = 0; i < c.W * c.H; i++) if (M.masca[i] && !subPetic(c.x0 + (i % c.W) + 0.5, c.y1 - Math.floor(i / c.W) - 0.5)) vizibili++;
+    const f = (x) => x.toFixed(2), m2 = (k) => (k * c.pas * c.pas).toFixed(0);
+    console.log(`  ${h.nume}: masca ${M.texeli} texeli (${m2(M.texeli)} m²${h === baza ? `, ${m2(vizibili)} în afara golului peticului, unde se vede` : ''}), din ${M.coloane} coloane nMDS, cel mai înalt ${M.hMax.toFixed(1)} m; partea exclusivă ${d.inainte !== undefined ? ex.reduce((a, v) => a + v, 0) : 0}, a măștii opuse ${exO.reduce((a, v) => a + v, 0)}`);
+    proba(d.inainte > 1.3 * d.martor, `${h.nume}: pe partea VNV a clădirilor fotografia se depărtează de sol cu ${f(d.inainte)}, pe partea ESE (martorul) cu ${f(d.martor)}`);
+    proba(scoate(d.dupa, d.inainte), `${h.nume}: retușul scoate ${(100 * (d.inainte - d.dupa) / (d.inainte - d.martor)).toFixed(0)}% din excesul de pe partea exclusivă (${f(d.inainte)} → ${f(d.dupa)}; cerut ≥ ${100 * (1 - PARTE)}%)`);
+    proba(scoate(d.masca_dupa, d.masca_inainte), `${h.nume}: pe toată masca, cu inelul comun, ${f(d.masca_inainte)} → ${f(d.masca_dupa)} (${(100 * (d.masca_inainte - d.masca_dupa) / (d.masca_inainte - d.martor)).toFixed(0)}% din exces)`);
+    proba(!scoate(d.fara_pereti, d.inainte), `${h.nume}: control, difuzia fără pereți: ${f(d.fara_pereti)} pe partea exclusivă (${(100 * (d.inainte - d.fara_pereti) / (d.inainte - d.martor)).toFixed(0)}% din exces) — pică`);
+    const a0 = atinsi(n.lin), a1 = atinsi(opus);
+    proba(a0 === 0, `${h.nume}: în afara măștii, ${a0} texeli atinși`);
+    proba(a1 > 0, `${h.nume}: control, retușul pe masca opusă atinge ${a1} texeli din afara măștii — pică`);
+    console.log(`        ${h.nume}: ${dif.faraDrum} texeli ai măștii fără niciun drum spre sol (curți închise între amprente, acoperite toate de mască): rămân fotografia`);
+    retus[h.nume] = {
+      masca: M.masca, texeli: M.texeli, m2: +(M.texeli * c.pas * c.pas).toFixed(1), fara_drum: dif.faraDrum,
+      ...(h === baza ? { m2_in_afara_peticului: vizibili } : {}),
+      departare: Object.fromEntries(Object.entries(d).map(([k, v]) => [k, +v.toFixed(2)])),
+    };
+  }
+  retus.amprente = { fisier: SANCTUAR.split('/').pop(), numar: am.length, sha256: amprenteSha };
+}
+if (ARGUMENTE.includes('--numai-retus')) {
+  console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');
+  process.exit(picate ? 1 : 0);
+}
+
 // Marea
 const D = distanta(uscat, cB.W, cB.H);
 const mare = masoaraMarea(nB.lin, nB.date, uscat, D, cB);
@@ -205,22 +307,31 @@ const lanț = (n0, c) => {
 const linB = lanț(nB.lin, cB), linP = lanț(nP.lin, cP);
 
 // Nivelul de 1 m al peticului față de bază, pe suprapunere: aceeași medie 4 × 4 în
-// liniar, din aceiași pixeli — deci aceiași octeți.
+// liniar, din aceiași pixeli — deci aceiași octeți. Cu retușul, în afara texelilor retușați pe
+// oricare dintre hărți: baza e retușată la 1 m, peticul la 0,25 m, deci acolo diferă.
 {
   const nivel = 2, wP = cP.W >> nivel, hP = cP.H >> nivel;
   const oq = cP.x0 - cB.x0, or = cB.y1 - cP.y1;
+  const atins = (r, q) => {
+    if (!RETUS) return false;
+    if (retus[baza.nume].masca[(r + or) * cB.W + q + oq]) return true;
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (retus[petic.nume].masca[(r * 4 + y) * cP.W + q * 4 + x]) return true;
+    return false;
+  };
+  let scosi = 0;
   const cmp = (dq) => {
     let dif = 0, n = 0;
     for (let r = 0; r < hP; r++) for (let q = 0; q < wP; q++) {
       const ib = (r + or) * cB.W + q + oq + dq, ip = r * wP + q;
       if (uscat[(r + or) * cB.W + q + oq] !== 1) continue;
+      if (atins(r, q)) { if (dq === 0) scosi++; continue; }
       n++;
       for (let k = 0; k < 3; k++) if (laOctet(linB[0][ib * 3 + k]) !== laOctet(linP[nivel][ip * 3 + k])) { dif++; break; }
     }
     return { dif, n };
   };
   const a = cmp(0), b = cmp(1);
-  proba(a.dif === 0, `nivelul de 1 m al peticului e identic cu baza pe ${a.n} texeli de uscat (${a.dif} diferiți)`);
+  proba(a.dif === 0, `nivelul de 1 m al peticului e identic cu baza pe ${a.n} texeli de uscat (${a.dif} diferiți${RETUS ? `; ${scosi} retușați, scoși din comparație` : ''})`);
   proba(b.dif > a.n / 4, `control: mutat cu 1 m, ${b.dif} din ${b.n} texeli diferă`);
 }
 
@@ -255,7 +366,7 @@ for (const [numeH, R] of Object.entries(rezultat)) {
   proba(variante.uastc.pierdere_dE.medie < variante.etc1s.pierdere_dE.medie, `${numeH}: UASTC pierde mai puțin decât ETC1S (${variante.uastc.pierdere_dE.medie} față de ${variante.etc1s.pierdere_dE.medie})`);
   if (ales.length > PRAG_MIB * 1048576)
     throw new Error(`${numeH}: ${(ales.length / 1048576).toFixed(2)} MiB peste pragul de ${PRAG_MIB} MiB — oprește-te și spune autorului`);
-  const scris = scrieNepublicat(iesire, ales);
+  const refV1 = (ext) => blobLa(REPER_V1, `${IESIRE}/${numeH}-orto_v1.${ext}`);
   const c = R.c;
   const refs = referinte.map((q) => {
     const q0 = Math.round((q.x - q.latura_m / 2 - c.x0) / c.pas), r0 = Math.round((c.y1 - (q.y + q.latura_m / 2)) / c.pas), n = Math.round(q.latura_m / c.pas);
@@ -276,6 +387,18 @@ for (const [numeH, R] of Object.entries(rezultat)) {
     sha256: createHash('sha256').update(ales).digest('hex'),
     deplasare_aplicata_m: { dx: dxPx * o.pas, dy: -dyPx * o.pas, sursa: 'deplasarea pe sol din masoara-zbor' },
     soare_zbor: zbor.soare_zbor,
+    ...(RETUS ? {
+      retus: {
+        ce: 'acoperișurile fantomă ale sanctuarului: unde fotografia, care nu e true-ortho, arată perete și acoperiș pe solul din jurul amprentelor modelate',
+        masca: `amprentele din ${retus.amprente.fisier} (corpuri, turnuri, cupole), înălțimile nMDS de 50 cm, înclinarea din zbor.json (acoperisuri)`,
+        amprente: retus.amprente,
+        largire_texeli: LARGIRE,
+        umplere: `difuzie din solul din jur, în lumină liniară, ${TRECERI} de treceri Gauss–Seidel în ordine fixă; amprentele nu dau nimic`,
+        texeli: retus[numeH].texeli, m2: retus[numeH].m2, fara_drum: retus[numeH].fara_drum,
+        ...(retus[numeH].m2_in_afara_peticului !== undefined ? { m2_in_afara_golului_peticului: retus[numeH].m2_in_afara_peticului } : {}),
+        departare_de_sol_dE: { raza_texeli: RAZA, ...retus[numeH].departare },
+      },
+    } : {}),
     ...(numeH === baza.nume ? { mare: { srgb: mare.deepOctet, estompare_m: [mare.d0, mare.d1], benzi: mare.benzi } } : {}),
     unealta: KTX.versiune,
     variante: Object.fromEntries(Object.entries(variante).map(([k, v]) => [k, { octeti: v.octeti, pierdere_dE: v.pierdere_dE }])),
@@ -289,7 +412,18 @@ for (const [numeH, R] of Object.entries(rezultat)) {
       portal: 'https://cdd.dgterritorio.gov.pt/',
     },
   };
-  const scrisJson = scrieNepublicat(join(IESIRE, `${numeH}-${VERSIUNE}.json`), JSON.stringify(meta, null, 1));
+  const json = JSON.stringify(meta, null, 1);
+  if (!RETUS) {
+    // orto_v1 nu se mai publică: se compară cu cel de la REPER_V1 și rămâne în LUCRU.
+    const k = refV1('ktx2'), j = refV1('json');
+    proba(k !== null && blobDin(ales) === k && blobDin(Buffer.from(json)) === j, `${numeH}: fără retuș iese orto_v1 de la ${REPER_V1}, la octet (${k === null ? 'reperul NECITIT' : `ktx2 ${blobDin(ales) === k ? 'identic' : 'DIFERĂ'}, json ${blobDin(Buffer.from(json)) === j ? 'identic' : 'DIFERĂ'}`})`);
+    continue;
+  }
+  // Control al gărzii de mai sus: orto_v2 nu e orto_v1 — retușul a schimbat fișierul.
+  const k1 = refV1('ktx2');
+  proba(k1 !== null && blobDin(ales) !== k1, `${numeH}: orto_v2 diferă de orto_v1 de la ${REPER_V1} (${k1 === null ? 'reperul NECITIT' : 'blob diferit'})`);
+  const scris = scrieNepublicat(iesire, ales);
+  const scrisJson = scrieNepublicat(join(IESIRE, `${numeH}-${VERSIUNE}.json`), json);
   if (scris || scrisJson) console.log(`  scris ${iesire} (${(ales.length / 1048576).toFixed(2)} MiB) + .json`);
 }
 console.log(picate ? `\n${picate} probe picate` : '\ntoate probele au trecut');

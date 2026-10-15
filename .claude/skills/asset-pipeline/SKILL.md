@@ -45,7 +45,7 @@ unei lumini în scenă, scara (glTF e în metri; modelele din alte surse pot fi 
 - Plafon pentru proiectul ăsta: peste 2048 pe oricare latură, întreabă-mă întâi.
   Excepțiile deja publicate nu se mai întreabă: texturile Satelit ale bazei
   (2368 × 3008), peticului (2176 × 2880) și lui `harta_v9` (2432 × 2752), din
-  `public/data/*-orto_v1.json`. Vezi
+  `public/data/*-orto_vN.json` (baza și peticul pe `orto_v2`, retușate). Vezi
   `docs/satelit.md`, „Texturile: `npm run textura-ortofoto`”, și
   `docs/imprejurimi.md`, „Textura lui `harta_v9`”.
 - Setează `minFilter`, `magFilter` și `anisotropy` explicit când textura se vede

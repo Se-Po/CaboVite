@@ -165,6 +165,11 @@ din `harta_v7` până la ~5,5 km spre est și ~6,4 km spre nord de marginea lui 
 Sentinel-2 adus la ortofoto printr-o matrice 3 × 3 plus decalaj, în lumină liniară: ΔE_OK×100
 3,24 la 10 m (TCI citit ca sRGB; ca liniar 3,75) și 3,93 la 80 m (TCI liniar; ca sRGB 4,01),
 pe jumătatea de verificare, față de 8,77 / 17,85 fără transfer. Varianta se alege pe nivel.
+Apa adâncă și colțul lui alpha se citesc, din 0.1.7.07, din textura bazei pe care o cere pagina
+(`harta_v4-orto_v2.json`), cu garda că marea și cutia sunt cele din `harta_v4-orto_v1.json` de la
+db067f8, pe care s-au făcut texturile publicate; câmpul `apa.sursa` le numește tot așa, ca ele să
+iasă la aceiași octeți (refăcute pe 2026-10-15: toate patru identice). Proba cusăturii folosește
+baza fără retuș (`textura-ortofoto -- --fara-retus`).
 Uscatul pe texeli se citește din tot lanțul, cu nivelurile din afară la urmă: texelii de
 dincolo de ultimul nod ieșeau înainte apă adâncă, iar mipurile întunecau marginea (ΔL_OK×100
 −5,3 la mipul 1 pe marginea de nord a lui `harta_v9`, −7 la `harta_v7`). Unde nu e nicio

@@ -166,7 +166,7 @@ Ronca, la ~400 m spre sud-vest, intră pe hartă ca geometrie, în schema sanctu
 - **umbrele pe grupuri** (din 0.1.7.05). Totul vine din codul paginii:
   - `creeazaUmbre`, `urmaresteGrupul` și grupurile (`grupuriUmbre`), toate din `umbre.js`;
   - soarele, din `creeazaLumini`, iar al zborului din `soareZborDin` (satelit.js), cu sidecarul
-    `harta_v4-orto_v1`;
+    bazei (`numeOrto('harta_v4')`, azi `harta_v4-orto_v2`);
   - camera, din `creeazaCamera`;
   - sanctuarul și clădirile, construite ca în pagină.
 

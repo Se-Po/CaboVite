@@ -1,7 +1,7 @@
 {
- "nume": "harta_v4-orto_v1",
+ "nume": "harta_v4-orto_v2",
  "harta": "harta_v4",
- "versiune": "orto_v1",
+ "versiune": "orto_v2",
  "format": "KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, 5 niveluri de mip",
  "conventie": "muchii de pixel: texelul (q, r) acoperă [x0 + q·pas, x0 + (q + 1)·pas] × [y1 − (r + 1)·pas, y1 − r·pas]; rândul 0 e nordul",
  "bbox_tm06": {
@@ -14,8 +14,8 @@
  "latime": 2368,
  "inaltime": 3008,
  "niveluri": 5,
- "octeti": 4069665,
- "sha256": "230e4afcd75a3af1b489e5868642696d9888fb02bf270201df7bb0281a25484d",
+ "octeti": 4069741,
+ "sha256": "7f03916517d487f478b677aa5d2c96c74cba02b00bf7bab86ac2153a979f083c",
  "deplasare_aplicata_m": {
   "dx": 0.25,
   "dy": 0,
@@ -25,6 +25,31 @@
   "azimut_grila": 94,
   "elevatie": 39.5,
   "sursa": "umbrele din zona sanctuarului"
+ },
+ "retus": {
+  "ce": "acoperișurile fantomă ale sanctuarului: unde fotografia, care nu e true-ortho, arată perete și acoperiș pe solul din jurul amprentelor modelate",
+  "masca": "amprentele din sanctuar_v3.json (corpuri, turnuri, cupole), înălțimile nMDS de 50 cm, înclinarea din zbor.json (acoperisuri)",
+  "amprente": {
+   "fisier": "sanctuar_v3.json",
+   "numar": 54,
+   "sha256": "5d789dceff2e4c1f385b92ed63331f92db7d91d1af64887fbb720ed23b0346ab"
+  },
+  "largire_texeli": 1,
+  "umplere": "difuzie din solul din jur, în lumină liniară, 300 de treceri Gauss–Seidel în ordine fixă; amprentele nu dau nimic",
+  "texeli": 1174,
+  "m2": 1174,
+  "fara_drum": 27,
+  "m2_in_afara_golului_peticului": 610,
+  "departare_de_sol_dE": {
+   "raza_texeli": 4,
+   "inainte": 15.9,
+   "martor": 4.74,
+   "dupa": 5.14,
+   "fara_pereti": 6.91,
+   "masca_inainte": 12.53,
+   "masca_dupa": 4.89,
+   "masca_fara_pereti": 7.29
+  }
  },
  "mare": {
   "srgb": [
@@ -174,7 +199,7 @@
  "unealta": "ktx version: v4.4.2",
  "variante": {
   "uastc": {
-   "octeti": 4069665,
+   "octeti": 4069741,
    "pierdere_dE": {
     "medie": 0.248,
     "p99": 1.416,
@@ -182,11 +207,11 @@
    }
   },
   "etc1s": {
-   "octeti": 804206,
+   "octeti": 804963,
    "pierdere_dE": {
-    "medie": 1.317,
-    "p99": 5.78,
-    "max": 16.927
+    "medie": 1.316,
+    "p99": 5.752,
+    "max": 19.524
    }
   }
  },

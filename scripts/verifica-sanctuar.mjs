@@ -24,13 +24,14 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { incarcaRelief, incarcaSanctuar } from '../src/scene/loaders.js';
+import { incarcaRelief, incarcaSanctuar, SANCTUAR_URL } from '../src/scene/loaders.js';
 import { construiesteAlpha, pregatesteAlpha } from '../src/scene/alpha.js';
 import { incarcaPaleta, paletaCurenta } from '../src/scene/palette.js';
 import { creeazaSanctuar } from '../src/scene/sanctuar.js';
 import { creeazaDrapaj } from '../src/scene/drapaj.js';
 import { creeazaScriitor, turn, yMinim } from '../src/scene/sanctuar-forme.js';
 import { creeazaZbor } from '../src/scene/zbor.js';
+import { numeOrto } from '../src/scene/satelit.js';
 import { creeazaCamera } from '../src/scene/camera.js';
 import { creeazaCadruFisa, distantaLaFisa, parteLibera, PRAG_ZBOR_NOU, RAZA_COMPLEX } from '../src/scene/fisa-cadru.js';
 import { cuAvertismente, cuantila, cuFetch, dinDisc, INDEX, opreste, proba, rezumat, sari } from './comun/proba.mjs';
@@ -39,7 +40,8 @@ import { convergentaDinColturi } from '../src/scene/busola.js';
 import { VEDERE_START } from '../src/scene/camera.js';
 
 const BUGET = { cladiri: 70000, drapaj: 80000, json_kib: 150 };
-const FISIER = 'public/data/sanctuar_v3.json';
+// sanctuarul pe care îl încarcă pagina
+const FISIER = `public${SANCTUAR_URL}`;
 // Amprenta plasei clădirilor, sha256 pe atributele ei, pe sanctuar așezat pe
 // `harta_v5` + `harta_v4` (talpa pereților vine din relief). O refactorizare a formelor
 // trebuie s-o lase la bit; o schimbare voită a datelor, a reliefului sau a formelor o
@@ -795,7 +797,7 @@ console.log('\nVariantele OSM, dintr-un singur loc (decizii.json)');
 // 289277f, care n-avea soarele scris.
 console.log('\nSoarele culorilor e soarele vederii Satelit');
 {
-  const satelit = JSON.parse(readFileSync('public/data/harta_v4-orto_v1.json', 'utf8')).soare_zbor;
+  const satelit = JSON.parse(readFileSync(`public/data/${numeOrto('harta_v4')}.json`, 'utf8')).soare_zbor;
   const scrie = (s) => (s ? `${s.azimut_grila}° / ${s.elevatie}°` : 'nescris');
   const acelasi = (s) => Number.isFinite(s?.azimut_grila) && s.azimut_grila === satelit.azimut_grila && s.elevatie === satelit.elevatie;
   proba(acelasi(original.soare_culori), `${FISIER.split('/').pop()}: soarele culorilor ${scrie(original.soare_culori)}, cât al vederii Satelit (${scrie(satelit)})`);
@@ -811,6 +813,27 @@ console.log('\nSoarele culorilor e soarele vederii Satelit');
   const v2 = textLa('289277f', 'public/data/sanctuar_v2.json');
   const s2 = v2 === null ? undefined : JSON.parse(v2).soare_culori;
   proba(v2 !== null && !acelasi(s2), `control, sanctuar_v2 de la 289277f: soarele culorilor ${v2 === null ? 'NECITIT' : scrie(s2)} — pică`);
+}
+
+// ------------------------------------------------------------ 11. amprentele retușului fotografiei
+
+// Textura Satelit a lui alpha (orto_v2) e retușată după amprentele sanctuarului (textura-ortofoto,
+// scripts/comun/fantome.mjs), iar sidecarul scrie sha256-ul lor. Trebuie să fie chiar amprentele
+// sanctuarului pe care îl încarcă pagina: un sanctuar nou cu alte contururi cere o textură refăcută.
+// Control: un vârf al unei amprente mutat cu 1 mm.
+console.log('\nAmprentele retușului fotografiei sunt ale sanctuarului încărcat de pagină');
+{
+  const { amprente } = await import('./comun/fantome.mjs');
+  const sha = (a) => createHash('sha256').update(JSON.stringify(a)).digest('hex');
+  const am = amprente(original);
+  for (const h of ['harta_v4', 'harta_v5']) {
+    const r = JSON.parse(readFileSync(`public/data/${numeOrto(h)}.json`, 'utf8')).retus?.amprente;
+    proba(r?.sha256 === sha(am) && r?.numar === am.length, `${numeOrto(h)}: ${r ? `${r.numar} amprente din ${r.fisier}, sha256 ${r.sha256.slice(0, 12)}` : 'fără amprentele retușului'}; sanctuarul încărcat: ${am.length}, ${sha(am).slice(0, 12)}`);
+  }
+  const mutat = structuredClone(original);
+  mutat.corpuri[0].contur[0][0] += 0.001;
+  const r4 = JSON.parse(readFileSync(`public/data/${numeOrto('harta_v4')}.json`, 'utf8')).retus?.amprente;
+  proba(r4 !== undefined && sha(amprente(mutat)) !== r4.sha256, `control, ${mutat.corpuri[0].cheie} cu un vârf mutat 1 mm: sha256 ${sha(amprente(mutat)).slice(0, 12)} — pică`);
 }
 
 await rezumat({ iesi: true });

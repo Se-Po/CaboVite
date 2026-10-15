@@ -1328,6 +1328,9 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     return src === null ? null : modulDin(src);
   };
   const V = await deLaReper('src/scene/satelit.js');
+  // Numele texturii unei hărți a lui alpha, după codul încercat: cel de la REPER_VECHI le cere pe
+  // `orto_v1`, cel de azi și mutațiile lui pe `orto_v2` (retușul, 0.1.7.07).
+  const ALPHA = (M, h) => `${h}-${M === V ? 'orto_v1' : 'orto_v2'}`;
   // O mutație plauzibilă a lui satelit.js de azi (`muta`): `null` dacă nu se mai aplică.
   const SRC_S = textSursa('src/scene/satelit.js');
   const mutatie = async (...perechi) => {
@@ -1548,7 +1551,8 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   const marcaLa = (j, m) => loc(j, (e) => e.marca === m);
   const harta = (d, n) => d.imp.find((q) => q.nume === n).obiect;
   const latime = (obiect) => obiect.material.map?.image?.width ?? null;
-  const T6 = ['harta_v4', 'harta_v5', ...NUME_IMP].map((n) => `${n}-orto_v1`);
+  // alpha are textura retușată (orto_v2, 0.1.7.07), împrejurimile pe cea dintâi
+  const T6 = ['harta_v4', 'harta_v5', ...NUME_IMP].map((n) => `${n}-${['harta_v4', 'harta_v5'].includes(n) ? 'orto_v2' : 'orto_v1'}`);
   const LAT = Object.fromEntries(T6.map((n) => [n, SIDECAR(n).latime]));
   const S6 = T6.reduce((a, n) => a + SIDECAR(n).octeti, 0);
   const MiB = (n) => (n / 2 ** 20).toFixed(2);   // MiB = 2^20 octeți; cifra, în `docs/satelit.md`, „O singură încărcare”
@@ -1575,9 +1579,12 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     rez.dispuse = dispuse;
     return rez;
   };
-  const descrie = (r) => {
+  // Cele șase texturi, pe numele cerute de modulul încercat (`ALPHA`: orto_v1 pe codul de la
+  // REPER_VECHI), ca proba să judece cererile, nu numele.
+  const T6M = (M) => [ALPHA(M, 'harta_v4'), ALPHA(M, 'harta_v5'), ...NUME_IMP.map((n) => `${n}-orto_v1`)];
+  const descrie = (r, T = T6) => {
     const j = r.jurnal, c = marcaLa(j, 'constructie'), s = marcaLa(j, 'satelit');
-    const devreme = T6.filter((n) => { const i = cerereLa(j, new RegExp(`/${n}\\.ktx2$`)); return i >= 0 && i < c; }).length;
+    const devreme = T.filter((n) => { const i = cerereLa(j, new RegExp(`/${n}\\.ktx2$`)); return i >= 0 && i < c; }).length;
     const transcodate = j.slice(0, s < 0 ? j.length : s).filter((e) => e.transcodata).map((e) => e.transcodata);
     return { devreme, mic: j.filter((e) => e.url?.includes('-mic')).length, transcodate, octeti: transcodate.reduce((a, n) => a + (OCTETI.get(n) ?? 0), 0) };
   };
@@ -1590,14 +1597,14 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     const x = descrie(r), la = r.la ?? {};
     proba(la.v === true && x.devreme === T6.length && x.mic === 0,
       `cererile înaintea construcției: ${x.devreme} din ${T6.length} .ktx2 (baza, peticul, ${NUME_IMP.join(', ')}), ${x.mic} cereri -mic; Satelit ${la.v ? 'pornit' : 'NEPORNIT'}`);
-    proba(la.activ && la.petic === 'harta_v5-orto_v1' && la.teren === 'harta_v4-orto_v1' && la.v9 === LAT['harta_v9-orto_v1'] && la.urcate === T6.length,
+    proba(la.activ && la.petic === 'harta_v5-orto_v2' && la.teren === 'harta_v4-orto_v2' && la.v9 === LAT['harta_v9-orto_v1'] && la.urcate === T6.length,
       `la gata: Satelit ${la.activ ? 'aplicat' : 'NEAPLICAT'}, peticul pe ${la.petic}, baza pe ${la.teren}, harta_v9 la ${la.v9} texeli lățime (întreaga are ${LAT['harta_v9-orto_v1']}), ${la.urcate} texturi urcate pe placă`);
     proba(x.transcodate.length === T6.length && x.octeti === S6, `transcodate până la Satelit: ${x.transcodate.length} texturi, ${MiB(x.octeti)} MiB (${x.octeti} octeți)`);
     proba(r.avert.length === 0 && r.dispuse === 1, `avertismente ${r.avert.length}${r.avert[0] ? ` („${r.avert[0]}”)` : ''}, încărcătorul eliberat de ${r.dispuse} ori`);
     if (V) {
       const rv = await porneste({ M: V });
-      const xv = descrie(rv), lv = rv.la ?? {};
-      const bun = lv.v === true && xv.devreme === T6.length && xv.mic === 0 && lv.v9 === LAT['harta_v9-orto_v1'] && lv.petic === 'harta_v5-orto_v1';
+      const xv = descrie(rv, T6M(V)), lv = rv.la ?? {};
+      const bun = lv.v === true && xv.devreme === T6M(V).length && xv.mic === 0 && lv.v9 === LAT['harta_v9-orto_v1'] && lv.petic === ALPHA(V, 'harta_v5');
       proba(!bun, `control, ${NUME_V}: ${xv.devreme} cereri înaintea construcției, ${xv.mic} cereri -mic, la gata harta_v9 la ${lv.v9} texeli și peticul pe ${lv.petic} — pică`);
     } else proba(false, `control, ${NUME_V}, o singură treaptă: nu s-a putut citi din git`);
   }
@@ -1611,10 +1618,10 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       const valori = [];
       let gataCompilarea = null;
       const r = { ...renderer(true), compileAsync: () => new Promise((res) => { gataCompilarea = res; }) };
-      retinute = (u) => u.endsWith('.ktx2') && !u.endsWith('/harta_v4-orto_v1.ktx2');
+      retinute = (u) => u.endsWith('.ktx2') && !u.endsWith('/harta_v4-orto_v2.ktx2');
       const d = deschide({ M, r, laProgres: (f) => valori.push(f) });
       const g = urmareste(d.sat.gata);
-      await curge(() => jurnal.some((e) => e.transcodata === 'harta_v4-orto_v1'), 200_000);
+      await curge(() => jurnal.some((e) => e.transcodata === 'harta_v4-orto_v2'), 200_000);
       await curge(() => false, 500);
       const cuBaza = [...valori];
       retinute = () => false;
@@ -1629,7 +1636,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       await curge(() => false, 200);
       return rez;
     };
-    const ob = OCTETI.get('harta_v4-orto_v1'), asteptat = Math.floor((100 * ob) / S6) / 100;
+    const ob = OCTETI.get('harta_v4-orto_v2'), asteptat = Math.floor((100 * ob) / S6) / 100;
     const m = await masoara(S);
     const crescator = m.final.every((v, i) => i === 0 || v > m.final[i - 1]);
     const intregi = m.final.every((v) => Number.isInteger(Math.round(v * 100)) && Math.abs(v * 100 - Math.round(v * 100)) < 1e-9);
@@ -1652,7 +1659,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   //     încărcării, nu și când rețeaua și-a terminat treaba, pierde transcodarea lungă.
   {
     const N = L.INACTIVITATE_PORNIRE_MS;
-    const BAZA = '/data/harta_v4-orto_v1.ktx2';
+    const BAZA = '/data/harta_v4-orto_v2.ktx2';
     const caz = (M, sp) => {
       deLaZero();
       special = sp;
@@ -1661,7 +1668,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       return { d, g: urmareste(d.sat.gata) };
     };
     // Celelalte cinci texturi sosesc și se transcodează pe loc; numai baza rămâne.
-    const restulGata = () => curge(() => jurnal.filter((e) => e.transcodata && e.transcodata !== 'harta_v4-orto_v1').length >= T6.length - 1, 200_000);
+    const restulGata = () => curge(() => jurnal.filter((e) => e.transcodata && e.transcodata !== 'harta_v4-orto_v2').length >= T6.length - 1, 200_000);
     {
       const { d, g } = caz(S, (u) => (u === BAZA ? blocat() : null));
       await restulGata();
@@ -1679,7 +1686,8 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       await curge(() => false, 200);
     }
     if (V) {
-      const { d, g } = caz(V, (u) => (u === BAZA ? blocat() : null));
+      const BAZA_V = `/data/${ALPHA(V, 'harta_v4')}.ktx2`;
+      const { d, g } = caz(V, (u) => (u === BAZA_V ? blocat() : null));
       await restulGata();
       await avanseaza(300_000);
       proba(!g.gata, `control, ${NUME_V}, fără gardă: după 300 s ${g.gata ? `gata ${g.v}` : 'tot în așteptare'} — pică`);
@@ -1713,7 +1721,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     }
     const lunga = async (M) => {
       deLaZero();
-      intarziere = (n) => (n === 'harta_v4-orto_v1' ? 25_000 : 0);
+      intarziere = (n) => (n === 'harta_v4-orto_v2' ? 25_000 : 0);
       const d = deschide({ M });
       const g = urmareste(d.sat.gata);
       await restulGata();
@@ -1803,7 +1811,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     await curge(() => d.sat.activ, 200_000);
     const din = jurnal.slice(inainte), cerute = T6.filter((n) => din.some((e) => e.url === `/data/${n}.ktx2`)).length;
     const s = stare(d);
-    proba(s.activ && preferinta === 'satelit' && cerute === T6.length && s.petic === 'harta_v5-orto_v1' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
+    proba(s.activ && preferinta === 'satelit' && cerute === T6.length && s.petic === 'harta_v5-orto_v2' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
       `apoi clic pe Satelit: ${s.activ ? 'aplicat' : 'NEAPLICAT'}, ${cerute} din ${T6.length} texturi cerute din nou, peticul pe ${s.petic}, harta_v9 la ${s.v9} texeli, preferința ${preferinta}, avertismente ${avert.length}`);
     d.sat.dispose();
     await curge(() => false, 200);
@@ -1843,10 +1851,10 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   for (const M of [S, V]) {
     if (!M) { proba(false, `control, ${NUME_V}, fără compresie: nu s-a putut citi din git`); continue; }
     const r = await porneste({ M, compresie: false });
-    const cerere = r.jurnal.find((e) => e.url === '/data/harta_v5-orto_v1.ktx2');
-    const transcodat = r.jurnal.some((e) => e.transcodata === 'harta_v5-orto_v1');
+    const cerere = r.jurnal.find((e) => e.url === `/data/${ALPHA(M, 'harta_v5')}.ktx2`);
+    const transcodat = r.jurnal.some((e) => e.transcodata === ALPHA(M, 'harta_v5'));
     const la = r.la ?? {};
-    if (M === S) proba(la.v === true && cerere?.semnal?.aborted && !transcodat && la.petic === 'harta_v4-orto_v1' && la.v9 === LAT['harta_v9-orto_v1'] / 2 && la.v6 === LAT['harta_v6-orto_v1'] / 2,
+    if (M === S) proba(la.v === true && cerere?.semnal?.aborted && !transcodat && la.petic === 'harta_v4-orto_v2' && la.v9 === LAT['harta_v9-orto_v1'] / 2 && la.v6 === LAT['harta_v6-orto_v1'] / 2,
       `fără compresie: Satelit ${la.v ? 'pornit' : 'NEPORNIT'}, cererea peticului ${cerere ? (cerere.semnal?.aborted ? 'oprită' : 'NEOPRITĂ') : 'lipsă'}, ${transcodat ? 'TRANSCODAT' : 'netranscodat'}, plasa lui pe ${la.petic}; harta_v9 la ${la.v9} texeli (4 m), harta_v6 la ${la.v6}`);
     else proba(transcodat, `control, ${NUME_V}, fără compresie: peticul ${transcodat ? 'transcodat' : 'netranscodat'} — pică`);
   }
@@ -1863,7 +1871,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     const d = deschide({ M: S });
     await curge(() => false, 3000);
     const cereri = jurnal.filter((e) => e.url).map((e) => e.url.replace('/data/', ''));
-    proba(cereri.length === 1 && cereri[0] === 'harta_v4-orto_v1.json' && avert.length === 0, `preferința Relief, până la primul clic: ${cereri.join(', ') || 'nicio cerere'}`);
+    proba(cereri.length === 1 && cereri[0] === 'harta_v4-orto_v2.json' && avert.length === 0, `preferința Relief, până la primul clic: ${cereri.join(', ') || 'nicio cerere'}`);
     d.sat.dispose();
     deLaZero('satelit');
     const hs = S.descarcaSatelit({ renderer: renderer(true), numeBaza: 'harta_v4', numePetic: 'harta_v5', imprejurimi: NUME_IMP });
@@ -1895,7 +1903,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   //     nu se mai descarcă degeaba. Control: cu texturile la locul lor, se cere.
   for (const faraTexturi of [true, false]) {
     deLaZero();
-    lipsa = faraTexturi ? (u) => /-orto_v1\.(json|ktx2)$/.test(u) : () => false;
+    lipsa = faraTexturi ? (u) => /-orto_v\d+\.(json|ktx2)$/.test(u) : () => false;
     const d = deschide({ M: S });
     const g = urmareste(d.sat.gata);
     await curge(() => g.gata, 200_000);
@@ -2123,7 +2131,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       await curge(() => d.sat.activ, 200_000);
       const din = jurnal.slice(inainte), cerute = T6.filter((n) => din.some((e) => e.url === `/data/${n}.ktx2`)).length;
       const s = stare(d);
-      proba(s.activ && preferinta === 'satelit' && b.atribute['aria-pressed'] === 'true' && !b.atribute['aria-busy'] && cerute === T6.length && s.petic === 'harta_v5-orto_v1' && avert.length === 0,
+      proba(s.activ && preferinta === 'satelit' && b.atribute['aria-pressed'] === 'true' && !b.atribute['aria-busy'] && cerute === T6.length && s.petic === 'harta_v5-orto_v2' && avert.length === 0,
         `al treilea clic: Satelit ${s.activ ? 'aplicat' : 'NEAPLICAT'}, ${cerute} din ${T6.length} texturi cerute din nou, peticul pe ${s.petic}; avertismente ${avert.length}`);
     } else {
       proba(d.sat.activ && preferinta === 'satelit',
@@ -2156,7 +2164,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       gataCompilarea();
       await curge(() => d.sat.activ, 200_000);
       const s = stare(d);
-      proba(s.activ && preferinta === 'satelit' && s.petic === 'harta_v5-orto_v1' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
+      proba(s.activ && preferinta === 'satelit' && s.petic === 'harta_v5-orto_v2' && s.v9 === LAT['harta_v9-orto_v1'] && avert.length === 0,
         `dublu-clic cu compilarea în curs: Satelit ${s.activ ? 'aplicat' : 'NEAPLICAT'}, plasa peticului pe ${s.petic}, harta_v9 la ${s.v9} texeli, avertismente ${avert.length}`);
       d.sat.dispose();
       await curge(() => false, 200);
@@ -2175,7 +2183,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
       clic(b);
       const peLoc = d.sat.activ, noi = jurnal.slice(inainte).filter((e) => e.url).length;
       const s = stare(d);
-      proba(!activ0 && peLoc && noi === 0 && s.petic === 'harta_v5-orto_v1' && avert.length === 0,
+      proba(!activ0 && peLoc && noi === 0 && s.petic === 'harta_v5-orto_v2' && avert.length === 0,
         `apoi clic pe Satelit: aplicat ${peLoc ? 'pe loc' : 'NU'}, ${noi} cereri noi, peticul pe ${s.petic}`);
     }
     d.sat.dispose();
@@ -2186,12 +2194,12 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   // (n) Eșecul pornirii automate: baza lipsă (404) — butonul pleacă, cu anunțul eșecului.
   {
     deLaZero();
-    lipsa = (u) => u === '/data/harta_v4-orto_v1.ktx2';
+    lipsa = (u) => u === '/data/harta_v4-orto_v2.ktx2';
     const d = deschide({ M: S });
     const { b, anunt } = butonul(d);
     const g = urmareste(d.sat.gata);
     await curge(() => g.gata, 200_000);
-    proba(g.v === false && b.hidden && !b.atribute['aria-busy'] && anunt.textContent === ESEC && avert.some((a) => a.includes('harta_v4-orto_v1 lipsește')) && ceas.t.size === 0,
+    proba(g.v === false && b.hidden && !b.atribute['aria-busy'] && anunt.textContent === ESEC && avert.some((a) => a.includes('harta_v4-orto_v2 lipsește')) && ceas.t.size === 0,
       `baza lipsă la pornire: butonul ${b.hidden ? 'scos' : 'RĂMAS'}, anunțul „${anunt.textContent}”, avertismente ${avert.length}, temporizatoare rămase ${ceas.t.size}`);
     d.sat.dispose();
     await curge(() => false, 200);
@@ -2220,7 +2228,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     await curge(() => g.gata, 200_000);
     const fmt = d.teren.obiect.material.map?.format;
     const petic = numeTextura.get(d.petic.obiect.material.map);
-    proba(g.v === true && transcodateCatPierdut === 0 && fmt === THREE.RGBA_BPTC_Format && petic === 'harta_v5-orto_v1' && (asc.webglcontextrestored?.size ?? 0) === 0,
+    proba(g.v === true && transcodateCatPierdut === 0 && fmt === THREE.RGBA_BPTC_Format && petic === 'harta_v5-orto_v2' && (asc.webglcontextrestored?.size ?? 0) === 0,
       `context pierdut la sosirea încărcătorului, refăcut apoi: ${transcodateCatPierdut} texturi transcodate cât era pierdut, baza ${fmt === THREE.RGBA_BPTC_Format ? 'BC7' : fmt === THREE.RGBAFormat ? 'RGBA NECOMPRIMAT' : fmt}, plasa peticului pe ${petic}, ascultători rămași ${asc.webglcontextrestored?.size ?? 0}`);
     d.sat.dispose();
     await curge(() => false, 200);
@@ -2266,13 +2274,13 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
   //     .ktx2 oprite, nimic transcodat, un singur avertisment, al bazei. Control: `opresteTot` făcut
   //     no-op — `gata` vine abia după celelalte texturi, la 66 s.
   {
-    const BAZA = '/data/harta_v4-orto_v1.ktx2', SC_BAZA = '/data/harta_v4-orto_v1.json';
+    const BAZA = '/data/harta_v4-orto_v2.ktx2', SC_BAZA = '/data/harta_v4-orto_v2.json';
     const lente = (u) => (u.endsWith('.ktx2') ? lent(u, 10, 6_000) : null);
-    const faraSoare = JSON.stringify({ ...SIDECAR('harta_v4-orto_v1'), soare_zbor: undefined });
+    const faraSoare = JSON.stringify({ ...SIDECAR('harta_v4-orto_v2'), soare_zbor: undefined });
     const cazuri = [
-      ['fișierul bazei cu 404', (u) => u === BAZA, lente, /^textura Satelit harta_v4-orto_v1 lipsește \(HTTP 404\)$/],
+      ['fișierul bazei cu 404', (u) => u === BAZA, lente, /^textura Satelit harta_v4-orto_v2 lipsește \(HTTP 404\)$/],
       ['sidecarul bazei fără soarele zborului', () => false, (u) => (u === SC_BAZA ? new Response(faraSoare, { status: 200 }) : lente(u)),
-        /^textura Satelit harta_v4-orto_v1: sidecarul n-are soarele zborului sau marea$/],
+        /^textura Satelit harta_v4-orto_v2: sidecarul n-are soarele zborului sau marea$/],
     ];
     const cade = async (M, lipseste, sp) => {
       deLaZero();
@@ -2334,7 +2342,7 @@ console.log('\nSatelit la pornire: o singură treaptă, progresul, garda fotogra
     const descrieScrierile = (s) => (s.length ? s.map((x) => `„${x.text}” la +${x.la} ms${x.schimbare ? '' : ' (FĂRĂ SCHIMBARE)'}`).join(', ') : 'nicio scriere');
     const reanunta = async (M, cum) => {
       deLaZero();
-      if (cum === 'esec' || cum.startsWith('dispose')) lipsa = (u) => u === '/data/harta_v4-orto_v1.ktx2';
+      if (cum === 'esec' || cum.startsWith('dispose')) lipsa = (u) => u === '/data/harta_v4-orto_v2.ktx2';
       const iesire = cum === 'iesire' ? new AbortController() : null;
       if (iesire) retinute = (u) => u.endsWith('.ktx2');
       const d = deschide({ M, faraSatelit: iesire?.signal });
@@ -3559,7 +3567,7 @@ console.log('\nAnunțurile după apariția hărții (scena.js, busola.js)');
 // ------------------------------------------------------------ matricea UV a texturilor Satelit
 
 // `matriceUV` (satelit.js) duce (x, z) de scenă în coordonatele texturii, cu centrul BAZEI, pentru
-// orice textură: baza, peticul, împrejurimile. Pe fiecare sidecar `*-orto_v1.json`, centrul
+// orice textură: baza, peticul, împrejurimile. Pe fiecare sidecar `*-orto_vN.json`, centrul
 // texelilor din colțuri și din mijloc, citit după `conventie` (muchii de pixel, rândul 0 la nord):
 // texelul (q, r) are centrul în X = xMin + (q + ½)·pas, Y = yMax − (r + ½)·pas, deci u = (q + ½) / L,
 // v = (r + ½) / H, cu L și H din `latime` și `inaltime`, nu din cutie. Scena: x = X − cx, z = cy − Y.

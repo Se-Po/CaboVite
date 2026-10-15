@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { cereFisier } from './comun/cere.mjs';
 import { cadru } from './comun/rastru-sanctuar.mjs';
+import { numeOrto } from '../src/scene/satelit.js';
 
 const nume = process.argv[2];
 if (!/^sanctuar_v\d+$/.test(nume ?? '')) throw new Error('dă un nume: npm run build-sanctuar -- sanctuar_vN');
@@ -59,7 +60,8 @@ const CULORI = culori.materiale;
 const SOARE = {
   culori: culori.soare_ortofoto,
   zbor: JSON.parse(readFileSync('date-sursa/derivate/zbor.json', 'utf8')).soare_zbor,
-  satelit: JSON.parse(readFileSync(`public/data/${HARTA_BAZA}-orto_v1.json`, 'utf8')).soare_zbor,
+  // sidecarul texturii bazei pe care o cere pagina (satelit.js)
+  satelit: JSON.parse(readFileSync(`public/data/${numeOrto(HARTA_BAZA)}.json`, 'utf8')).soare_zbor,
 };
 const acelasi = (p, q) => Number.isFinite(p?.azimut_grila) && p.azimut_grila === q?.azimut_grila
   && Number.isFinite(p?.elevatie) && p.elevatie === q?.elevatie;

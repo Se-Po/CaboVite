@@ -1,7 +1,7 @@
 {
- "nume": "harta_v5-orto_v1",
+ "nume": "harta_v5-orto_v2",
  "harta": "harta_v5",
- "versiune": "orto_v1",
+ "versiune": "orto_v2",
  "format": "KTX2, UASTC cu RDO și zstd, R8G8B8_SRGB, 5 niveluri de mip",
  "conventie": "muchii de pixel: texelul (q, r) acoperă [x0 + q·pas, x0 + (q + 1)·pas] × [y1 − (r + 1)·pas, y1 − r·pas]; rândul 0 e nordul",
  "bbox_tm06": {
@@ -14,8 +14,8 @@
  "latime": 2176,
  "inaltime": 2880,
  "niveluri": 5,
- "octeti": 6325030,
- "sha256": "4acdcbbf29650d722d706df37353fe02ad88fa89c6f653579ab098189b5dde4a",
+ "octeti": 6325234,
+ "sha256": "a67023f3cca84a08aacad6ce5c19d8d98344fa22ce61bd37df505aec0223ff87",
  "deplasare_aplicata_m": {
   "dx": 0.25,
   "dy": 0,
@@ -26,22 +26,46 @@
   "elevatie": 39.5,
   "sursa": "umbrele din zona sanctuarului"
  },
+ "retus": {
+  "ce": "acoperișurile fantomă ale sanctuarului: unde fotografia, care nu e true-ortho, arată perete și acoperiș pe solul din jurul amprentelor modelate",
+  "masca": "amprentele din sanctuar_v3.json (corpuri, turnuri, cupole), înălțimile nMDS de 50 cm, înclinarea din zbor.json (acoperisuri)",
+  "amprente": {
+   "fisier": "sanctuar_v3.json",
+   "numar": 54,
+   "sha256": "5d789dceff2e4c1f385b92ed63331f92db7d91d1af64887fbb720ed23b0346ab"
+  },
+  "largire_texeli": 1,
+  "umplere": "difuzie din solul din jur, în lumină liniară, 300 de treceri Gauss–Seidel în ordine fixă; amprentele nu dau nimic",
+  "texeli": 3772,
+  "m2": 235.8,
+  "fara_drum": 32,
+  "departare_de_sol_dE": {
+   "raza_texeli": 4,
+   "inainte": 8.26,
+   "martor": 3.84,
+   "dupa": 3.58,
+   "fara_pereti": 9.59,
+   "masca_inainte": 8.15,
+   "masca_dupa": 3.35,
+   "masca_fara_pereti": 9.22
+  }
+ },
  "unealta": "ktx version: v4.4.2",
  "variante": {
   "uastc": {
-   "octeti": 6325030,
+   "octeti": 6325234,
    "pierdere_dE": {
-    "medie": 0.518,
-    "p99": 1.944,
+    "medie": 0.517,
+    "p99": 1.943,
     "max": 8.045
    }
   },
   "etc1s": {
-   "octeti": 1257854,
+   "octeti": 1257691,
    "pierdere_dE": {
-    "medie": 1.34,
-    "p99": 6.597,
-    "max": 18.678
+    "medie": 1.337,
+    "p99": 6.606,
+    "max": 19.739
    }
   }
  },

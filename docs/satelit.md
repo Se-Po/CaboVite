@@ -12,8 +12,12 @@ Pornește pe Satelit, iar harta apare abia cu fotografia întreagă pe placă �
 
 ### Texturile: `npm run textura-ortofoto`
 
-Scrie `public/data/<hartă>-orto_v1.ktx2` + `.json`, pentru bază și petic. Textura are
-versiune proprie: un retuș înseamnă `_v2`, harta rămâne. Un nume publicat se rescrie numai
+Scrie `public/data/<hartă>-orto_v2.ktx2` + `.json`, pentru bază și petic: `orto_v1` cu
+acoperișurile fantomă retușate, din 0.1.7.07 (mai jos). `-- --fara-retus` face `orto_v1` și îl
+compară cu cel publicat până atunci (db067f8): trebuie să iasă la octet; nu scrie în `public/data`.
+Textura are versiune proprie: un retuș înseamnă alt
+`_vN`, harta rămâne; pagina știe versiunea fiecărei hărți (`VERSIUNI_ORTO`, `numeOrto` din
+satelit.js), iar împrejurimile au rămas pe `orto_v1`. Un nume publicat se rescrie numai
 cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea.md`, „Cache-ul”). Cere KTX-Software 4.4
 (`ktx`); scriptul îl caută și în `C:/Program Files/KTX-Software/bin` sau în
 `KTX_BIN`, fiindcă un shell pornit înainte de instalare nu vede PATH-ul nou.
@@ -58,8 +62,8 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea
   Un atribut `uv` ar fi costat 23–46 MB (5 771 844 de vârfuri ale lui alpha, cu 4 sau 8 octeți
   pe vârf). Matricea o face `matriceUV(meta, centru)`, cu centrul bazei pentru orice textură.
   Proba ei, în `verifica-pagina` (din 0.1.7.05):
-  - pe toate cele șase sidecare `*-orto_v1.json`, centrul texelilor din colțuri și din
-    mijloc, socotit după `conventie` (muchii de pixel, rândul 0 la nord), cu `latime` și
+  - pe toate cele șase sidecare `*-orto_vN.json` (alpha pe `orto_v2`, împrejurimile pe
+    `orto_v1`), centrul texelilor din colțuri și din mijloc, socotit după `conventie` (muchii de pixel, rândul 0 la nord), cu `latime` și
     `inaltime`, nu cu cutia, cade pe texelul lui (abatere 4,5·10⁻¹³ texeli);
   - controlul, cu v întors, iese la 3 007 texeli.
 - **Soarele** trece pe al zborului (94,0° / 39,5°; poziția o dă `soareZborDin`, exportată și
@@ -69,15 +73,53 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea
 - **Marea**, în cutia texturii, e fotografia; în afara ei, apa adâncă măsurată;
   ceața pe pixel rămâne (cu AgX inclus de mână: materialul nu e tone-mapped).
 - Suprafețele sanctuarului de pe teren (drapajul) se ascund: fotografia le are.
-- **Acoperișurile fantomă nu se retușează.** Ortofotoul nu e true-ortho: acoperișul
-  unei clădiri de h metri apare mutat cu h × înclinarea din `zbor.json` (0,095 m/m
-  sub 9 m, 0,085 peste). Imaginea iese din amprentele modelate cu ~0,6 m în lungul
-  pereților de 6–9 m — pe bază sub un texel, pe petic ~2 texeli — și cu până la
-  ~1,3 m (15 m × 0,085) la colțul de NV al turnului de nord, peste poteca de la
-  nord de biserică: pe petic, ~5 texeli. Turnul farului se mută cu ~2,7 m, dar
-  cade peste acoperișul casei lui, care e modelată. Retușul prin difuzie
-  (`orto_v2`), prevăzut ca opțional, nu s-a făcut; dacă se vede, turnul de nord e
-  primul loc de retușat.
+- **Acoperișurile fantomă ale sanctuarului se retușează, din `orto_v2` (0.1.7.07).**
+  - **Ce sunt:** ortofotoul nu e true-ortho. Acoperișul unei clădiri de h metri apare mutat
+    cu h × înclinarea din `zbor.json`: 0,095 m/m spre 296,6° sub 9 m, 0,085 m/m spre 284°
+    peste. Direcția o măsoară `masoara-zbor`, prin corelația acoperișurilor. Pagina desenează
+    clădirea pe amprenta ei din LiDAR, deci pe solul din jur, spre vest-nord-vest, textura
+    arăta perete și acoperiș.
+  - **Ce nu se retușează:** farul, casele lui și Casa da Ronca (`cladiri_v1`). Stau în afara
+    rastrului nMDS al sanctuarului, iar turnul farului cade oricum peste acoperișul casei lui,
+    care e modelată.
+  - **Masca** (`scripts/comun/fantome.mjs`):
+    - fiecare pixel nMDS de 50 cm dintr-o amprentă a sanctuarului încărcat de pagină
+      (corpurile, turnurile și cupolele din `SANCTUAR_URL`) își trage segmentul de la sol la
+      acoperiș peste texeli;
+    - masca e ce acoperă segmentele în afara amprentelor, lărgit cu un texel. Pe petic,
+      lărgirea prinde marginea JPEG a acoperișului; pe bază, texelii de 1 m din jurul
+      fantomei sunt pe jumătate clădire.
+  - **Mărimea:** 236 m² pe petic (3 772 de texeli) și 1 174 m² pe bază. Din a doua, 610 m²
+    cad în afara golului peticului (`gaura_scena`), unde pagina desenează baza: sub
+    jumătatea de sud a sanctuarului și la est.
+  - **Amprentele** intră în sidecar cu sha256 (`retus.amprente`). `verifica-sanctuar` cere ca
+    ele să fie ale sanctuarului încărcat de pagină; controlul, un vârf mutat 1 mm, pică.
+  - **Umplerea:** difuzie din solul din jur, în lumină liniară, cu 300 de treceri
+    Gauss–Seidel în ordine fixă. Amprentele nu dau nimic. Două rulări dau aceiași octeți.
+    Texelii fără niciun drum spre sol rămân fotografia: 27 pe bază și 32 pe petic, în curți
+    închise între amprente și acoperite toate de mască.
+  - **Probele**, în `textura-ortofoto` (`-- --numai-retus` se oprește după ele). Măsura e
+    ΔE_OK×100 față de solul din jur, pe 4 texeli (1 m pe petic, 4 m pe bază; o alegere). Toate
+    măsurile au aceeași referință de sol: tot ce nu e mască, mască opusă (aceleași clădiri,
+    înclinarea întoarsă) sau amprentă. Cifrele sunt pentru petic / bază:
+    - pe partea VNV a clădirilor, fotografia se depărtează de sol cu 8,26 / 15,90; pe partea
+      ESE, martorul, cu 3,84 / 4,74. Asta nu dovedește direcția fantomei, fiindcă umbrele
+      soarelui de 94° cad tot spre vest;
+    - retușul scoate cel puțin 90% din excesul față de martor (o alegere): 106% / 96% pe
+      partea exclusivă, 111% / 98% pe toată masca, cu inelul comun al celor două măști;
+    - controlul, aceeași difuzie fără pereți, scoate −30% / 81% și pică;
+    - în afara măștii, 0 texeli atinși; controlul, retușul pe masca opusă, atinge 1 748 /
+      373;
+    - pe 3 și pe 5 texeli verdictul rămâne (pe bază, la 5, 91%). Pe petic, la 3 m
+      (12 texeli), referința amestecă umbra de la vest de clădiri cu solul însorit, iar
+      măsura nu mai deosebește nimic;
+    - nivelul de 1 m al peticului e tot identic cu baza, în afara celor 1 215 texeli
+      retușați;
+    - `--fara-retus` reface `orto_v1` de la db067f8, comparat ca blob git, la octet. `orto_v2`
+      diferă de el.
+  - **Turnul de nord:** fantoma lui, ~1,3 m la colțul de NV, cade pe sol, pe poteca dintre
+    aripa de nord și navă. Fâșia întunecată de acolo e umbra turnului, nu un acoperiș.
+    Retușul înlocuiește fâșia de zid cu solul umbrit de lângă ea.
 - **Falezele rămân fotografia.** `npm run masoara-faleza` a măsurat, pe plasa
   paginii, cât detaliu are fotografia pe metrul de SUPRAFAȚĂ, pe clase de pantă:
   sub 50% din cel de pe terenul plat de la 46,6° încolo, 17% la 70–75°, 2% la
@@ -109,7 +151,7 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea
 - **O singură încărcare** (2026-10-08, la cererea autorului: harta o singură dată, direct pe
   Satelit, cu tot la detaliul întreg). `descarcaSatelit`, chemată de scena.js după TOATE datele
   pornirii și înaintea construcției plaselor, cere deodată cele șase texturi întregi — baza,
-  peticul și cele patru împrejurimi, 14,44 MiB (15 138 469 de octeți). Sidecarul și
+  peticul și cele patru împrejurimi, 14,44 MiB (15 138 749 de octeți). Sidecarul și
   fișierul pleacă deodată (`cereOrto`); transcodorul, după sidecarul bazei, deci un deploy fără
   texturi nu-l descarcă. Pornit, nu se mai poate opri: `init()` din r186 nu primește semnal. Un
   încărcător eliberat cu transcodorul în drum îi revocă URL-ul workerului la sosire
@@ -156,9 +198,9 @@ cu aceiași octeți (garda din `scripts/comun/publicat.mjs`, vezi `docs/livrarea
   9 Mbit/s <!-- NEVERIFICAT: calculat; telefon și rețea mobilă nemăsurate -->.
 
   `npm run verifica-pagina`, cu fișierele adevărate, un `fetch` fals și ceasul virtual: 6 din 6
-  `.ktx2` cerute înaintea construcției, 0 `-mic`; la `gata` peticul pe `harta_v5-orto_v1`,
+  `.ktx2` cerute înaintea construcției, 0 `-mic`; la `gata` peticul pe `harta_v5-orto_v2`,
   `harta_v9` la 2432 de texeli, 14,44 MiB transcodate; cu baza sosită singură procentul e 0,26 =
-  ⌊100 × 4 069 665 / 15 138 469⌋ / 100, iar 1 vine o dată, înaintea compilării; baza tăcută după
+  ⌊100 × 4 069 741 / 15 138 749⌋ / 100, iar 1 vine o dată, înaintea compilării; baza tăcută după
   1 KB e în așteptare la 19,999 s și `false` la 20 s, cu un avertisment și 0 temporizatoare, dar o
   bază în 10 bucăți la 15 s și o transcodare de 25 s după ultimul octet trec; ieșirea în descărcare
   oprește 6 din 6, cu preferința neatinsă, iar un clic apoi aplică tot; fără compresie peticul e

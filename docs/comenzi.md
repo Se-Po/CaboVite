@@ -26,7 +26,7 @@ noi ale subsistemului se scriu aici, nu în CLAUDE.md.
 | `npm run build-sanctuar -- sanctuar_vN` | adună tot în `public/data/sanctuar_vN.json`, în coordonatele scenei; un nume se scrie o singură dată (`--suprascrie-lucru` rescrie numai un nume pe care git încă nu-l urmărește); se oprește dacă culorile acoperișurilor nu sunt aduse la plat sub soarele zborului |
 | `npm run verifica-sanctuar` | construiește sanctuarul cu codul paginii, în Node, și îl confruntă cu LiDAR-ul, cu numărătoarea din 1880 și cu el însuși; variantele OSM citite dintr-un singur loc, soarele culorilor egal cu al vederii Satelit |
 | `npm run masoara-zbor` | soarele ortofotoului din umbre, deplasarea lui pe sol și înclinarea acoperișurilor → `date-sursa/derivate/zbor.json` |
-| `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic → `public/data/<hartă>-orto_v1.ktx2` + `.json`; cere KTX-Software 4.4 |
+| `npm run textura-ortofoto` | texturile vederii Satelit, KTX2 UASTC, pentru bază și petic, cu acoperișurile fantomă retușate → `public/data/<hartă>-orto_v2.ktx2` + `.json`; `-- --fara-retus` reface `orto_v1` și îl compară cu cel publicat la db067f8, `-- --numai-retus` rulează numai probele retușului; cere KTX-Software 4.4 |
 | `npm run masoara-faleza` | de la ce pantă fotografia își pierde detaliul și cu ce lumină s-ar colora stânca → `date-sursa/derivate/faleza.json`; măsurătoare, nefolosită de pagină |
 | `npm run osm-cladiri` | instantaneul OSM al clădirilor din afara sanctuarului, cu versiuni fixate; `-- --din-manifest` îl reface și îl compară |
 | `npm run build-cladiri -- cladiri_vN` | farul și celelalte clădiri, înregistrate și măsurate pe LiDAR → `public/data/cladiri_vN.json`; `--proba` numai măsoară |
